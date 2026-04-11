@@ -35,7 +35,7 @@ const DashboardPage = () => {
 
   const handleContestacao = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!motivo || !descricao) {
+    if (!motivo || !descricao || !whatsapp) {
       toast.error('Preencha todos os campos obrigatórios.');
       return;
     }
@@ -155,12 +155,13 @@ const DashboardPage = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="whatsapp">WhatsApp (opcional)</Label>
+                <Label htmlFor="whatsapp">WhatsApp / Telefone *</Label>
                 <Input
                   id="whatsapp"
                   placeholder="(86) 99999-9999"
                   value={whatsapp}
                   onChange={(e) => setWhatsapp(e.target.value)}
+                  required
                 />
               </div>
               <Button type="submit" disabled={submitting} className="w-full sm:w-auto">
