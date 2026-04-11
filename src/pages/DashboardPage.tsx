@@ -30,7 +30,7 @@ const DashboardPage = () => {
   
   // Redirect admin to admin panel
   if (professor.role === 'admin') {
-    nav('/admin');
+    navigate('/admin');
     return null;
   }
 
