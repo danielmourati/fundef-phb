@@ -14,7 +14,95 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      contestacoes: {
+        Row: {
+          created_at: string
+          descricao: string
+          id: string
+          motivo: string
+          professor_id: string
+          status: string
+          updated_at: string
+          whatsapp: string | null
+        }
+        Insert: {
+          created_at?: string
+          descricao: string
+          id?: string
+          motivo: string
+          professor_id: string
+          status?: string
+          updated_at?: string
+          whatsapp?: string | null
+        }
+        Update: {
+          created_at?: string
+          descricao?: string
+          id?: string
+          motivo?: string
+          professor_id?: string
+          status?: string
+          updated_at?: string
+          whatsapp?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contestacoes_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "professors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      professors: {
+        Row: {
+          cpf: string
+          created_at: string
+          data_nascimento: string | null
+          id: string
+          matricula: string
+          nome: string
+          role: string
+          senha: string
+          status: string
+          total_cotas: number | null
+          updated_at: string
+          vinculo_fim: string | null
+          vinculo_inicio: string | null
+        }
+        Insert: {
+          cpf: string
+          created_at?: string
+          data_nascimento?: string | null
+          id?: string
+          matricula: string
+          nome: string
+          role?: string
+          senha: string
+          status?: string
+          total_cotas?: number | null
+          updated_at?: string
+          vinculo_fim?: string | null
+          vinculo_inicio?: string | null
+        }
+        Update: {
+          cpf?: string
+          created_at?: string
+          data_nascimento?: string | null
+          id?: string
+          matricula?: string
+          nome?: string
+          role?: string
+          senha?: string
+          status?: string
+          total_cotas?: number | null
+          updated_at?: string
+          vinculo_fim?: string | null
+          vinculo_inicio?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
