@@ -24,7 +24,14 @@ const LoginPage = () => {
     setIsLoading(false);
 
     if (result.success) {
-      navigate('/dashboard');
+      // Check role from the stored session to redirect properly
+      const stored = localStorage.getItem('fundef_session');
+      if (stored) {
+        const prof = JSON.parse(stored);
+        navigate(prof.role === 'admin' ? '/admin' : '/dashboard');
+      } else {
+        navigate('/dashboard');
+      }
     } else {
       setError(result.error || 'Erro ao fazer login.');
     }
