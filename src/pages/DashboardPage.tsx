@@ -26,8 +26,6 @@ const DashboardPage = () => {
   const [whatsapp, setWhatsapp] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const nav = useNavigate();
-  
   if (!professor) return null;
   
   // Redirect admin to admin panel
