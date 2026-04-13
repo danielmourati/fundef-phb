@@ -55,6 +55,30 @@ export type Database = {
           },
         ]
       }
+      login_attempts: {
+        Row: {
+          created_at: string
+          id: string
+          ip_address: string
+          matricula: string | null
+          success: boolean
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ip_address: string
+          matricula?: string | null
+          success?: boolean
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ip_address?: string
+          matricula?: string | null
+          success?: boolean
+        }
+        Relationships: []
+      }
       professors: {
         Row: {
           cpf: string
@@ -65,6 +89,7 @@ export type Database = {
           nome: string
           role: string
           senha: string
+          senha_hash: string | null
           status: string
           total_cotas: number | null
           updated_at: string
@@ -80,6 +105,7 @@ export type Database = {
           nome: string
           role?: string
           senha: string
+          senha_hash?: string | null
           status?: string
           total_cotas?: number | null
           updated_at?: string
@@ -95,6 +121,7 @@ export type Database = {
           nome?: string
           role?: string
           senha?: string
+          senha_hash?: string | null
           status?: string
           total_cotas?: number | null
           updated_at?: string
