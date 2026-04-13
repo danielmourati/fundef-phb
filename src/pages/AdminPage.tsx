@@ -24,7 +24,6 @@ interface Professor {
   total_cotas: number | null;
   status: string;
   role: string;
-  senha: string;
 }
 
 interface Contestacao {
@@ -43,21 +42,21 @@ const emptyProfessor = {
 };
 
 const AdminPage = () => {
-  const { professor, logout } = useAuth();
+  const { professor, token, logout } = useAuth();
   const navigate = useNavigate();
   const [professors, setProfessors] = useState<Professor[]>([]);
   const [contestacoes, setContestacoes] = useState<Contestacao[]>([]);
   const [loading, setLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Professor form dialog
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProf, setEditingProf] = useState<any>(null);
   const [formData, setFormData] = useState(emptyProfessor);
 
-  // Settings
   const [emailDestino, setEmailDestino] = useState('');
   const [savingSettings, setSavingSettings] = useState(false);
+
+  const authHeaders = { Authorization: `Bearer ${token}` };
 
   useEffect(() => {
     if (!professor || professor.role !== 'admin') {
@@ -68,25 +67,37 @@ const AdminPage = () => {
     fetchSettings();
   }, [professor, navigate]);
 
+  const apiCall = async (method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH", action: string, body?: unknown) => {
+    const opts: { method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH"; headers: Record<string, string>; body?: unknown } = {
+      method,
+      headers: authHeaders,
+    };
+    if (body) opts.body = body;
+    const { data, error } = await supabase.functions.invoke(`admin-api?action=${action}`, opts);
+    return { data, error };
+  };
+
   const fetchData = async () => {
     setLoading(true);
     const [profRes, contRes] = await Promise.all([
-      supabase.from('professors').select('id, matricula, nome, cpf, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, status, role, senha').order('nome'),
-      supabase.from('contestacoes').select('id, motivo, descricao, whatsapp, status, created_at, professors(nome, matricula)').order('created_at', { ascending: false }),
+      apiCall('GET', 'professors'),
+      apiCall('GET', 'contestacoes'),
     ]);
-    if (profRes.data) setProfessors(profRes.data);
-    if (contRes.data) setContestacoes(contRes.data as unknown as Contestacao[]);
+    if (profRes.data && Array.isArray(profRes.data)) setProfessors(profRes.data);
+    if (contRes.data && Array.isArray(contRes.data)) setContestacoes(contRes.data);
     setLoading(false);
   };
 
   const fetchSettings = async () => {
-    const { data } = await supabase.from('system_settings').select('value').eq('key', 'email_destino').maybeSingle();
-    if (data) setEmailDestino(data.value);
+    const { data } = await apiCall('GET', 'settings');
+    if (data && Array.isArray(data)) {
+      const emailSetting = data.find((s: any) => s.key === 'email_destino');
+      if (emailSetting) setEmailDestino(emailSetting.value);
+    }
   };
 
   const handleLogout = () => { logout(); navigate('/'); };
 
-  // Professor CRUD
   const openAddDialog = () => {
     setEditingProf(null);
     setFormData(emptyProfessor);
@@ -96,7 +107,7 @@ const AdminPage = () => {
   const openEditDialog = (p: Professor) => {
     setEditingProf(p);
     setFormData({
-      nome: p.nome, cpf: p.cpf, matricula: p.matricula, senha: p.senha,
+      nome: p.nome, cpf: p.cpf, matricula: p.matricula, senha: '',
       data_nascimento: p.data_nascimento || '', vinculo_inicio: p.vinculo_inicio || '',
       vinculo_fim: p.vinculo_fim || '', total_cotas: p.total_cotas || 0,
       status: p.status, role: p.role,
@@ -109,19 +120,14 @@ const AdminPage = () => {
       toast.error('Nome, Matrícula e CPF são obrigatórios.');
       return;
     }
-    const payload = {
-      ...formData,
-      senha: formData.senha || formData.data_nascimento?.replace(/\D/g, '') || '',
-      total_cotas: Number(formData.total_cotas) || 0,
-    };
 
     if (editingProf) {
-      const { error } = await supabase.from('professors').update(payload).eq('id', editingProf.id);
-      if (error) { toast.error('Erro ao atualizar: ' + error.message); return; }
+      const { data, error } = await apiCall('PUT', 'update_professor', { ...formData, id: editingProf.id });
+      if (error || data?.error) { toast.error(data?.error || 'Erro ao atualizar.'); return; }
       toast.success('Professor atualizado!');
     } else {
-      const { error } = await supabase.from('professors').insert(payload);
-      if (error) { toast.error('Erro ao adicionar: ' + error.message); return; }
+      const { data, error } = await apiCall('POST', 'create_professor', formData);
+      if (error || data?.error) { toast.error(data?.error || 'Erro ao adicionar.'); return; }
       toast.success('Professor adicionado!');
     }
     setDialogOpen(false);
@@ -130,13 +136,15 @@ const AdminPage = () => {
 
   const handleDeleteProf = async (id: string, nome: string) => {
     if (!confirm(`Excluir ${nome}? Esta ação não pode ser desfeita.`)) return;
-    const { error } = await supabase.from('professors').delete().eq('id', id);
-    if (error) { toast.error('Erro ao excluir: ' + error.message); return; }
+    const { data, error } = await supabase.functions.invoke(`admin-api?action=delete_professor&id=${id}`, {
+      method: 'DELETE',
+      headers: authHeaders,
+    });
+    if (error || data?.error) { toast.error(data?.error || 'Erro ao excluir.'); return; }
     toast.success('Professor excluído!');
     fetchData();
   };
 
-  // CSV Import
   const handleCSVImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -150,20 +158,12 @@ const AdminPage = () => {
       headers.forEach((h, i) => { obj[h] = values[i] || ''; });
       return obj;
     });
-    const toInsert = rows.map(r => ({
-      nome: r.nome || '', cpf: r.cpf || '', matricula: r.matricula || '',
-      senha: r.data_nascimento?.replace(/\D/g, '') || r.senha || '',
-      data_nascimento: r.data_nascimento || '', vinculo_inicio: r.vinculo_inicio || '',
-      vinculo_fim: r.vinculo_fim || '', total_cotas: parseInt(r.total_cotas) || 0,
-      status: r.status || 'Pendente', role: 'professor',
-    }));
-    const { error } = await supabase.from('professors').insert(toInsert);
-    if (error) toast.error('Erro: ' + error.message);
-    else { toast.success(`${toInsert.length} professor(es) importado(s)!`); fetchData(); }
+    const { data, error } = await apiCall('POST', 'import_csv', { rows });
+    if (error || data?.error) toast.error(data?.error || 'Erro na importação.');
+    else { toast.success(`${data?.count || rows.length} professor(es) importado(s)!`); fetchData(); }
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Export contestações
   const exportContestacoes = () => {
     if (contestacoes.length === 0) { toast.error('Nenhuma contestação.'); return; }
     const csvRows = [
@@ -184,17 +184,12 @@ const AdminPage = () => {
     toast.success('Relatório exportado!');
   };
 
-  // Save settings
   const handleSaveSettings = async () => {
     setSavingSettings(true);
-    const { data: existing } = await supabase.from('system_settings').select('id').eq('key', 'email_destino').maybeSingle();
-    if (existing) {
-      await supabase.from('system_settings').update({ value: emailDestino }).eq('id', existing.id);
-    } else {
-      await supabase.from('system_settings').insert({ key: 'email_destino', value: emailDestino });
-    }
+    const { data, error } = await apiCall('PUT', 'save_settings', { key: 'email_destino', value: emailDestino });
     setSavingSettings(false);
-    toast.success('Configurações salvas!');
+    if (error || data?.error) toast.error(data?.error || 'Erro ao salvar.');
+    else toast.success('Configurações salvas!');
   };
 
   if (!professor || professor.role !== 'admin') return null;
@@ -227,7 +222,6 @@ const AdminPage = () => {
             </TabsTrigger>
           </TabsList>
 
-          {/* Professors Tab */}
           <TabsContent value="professors" className="space-y-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
@@ -284,7 +278,6 @@ const AdminPage = () => {
             </Card>
           </TabsContent>
 
-          {/* Contestações Tab */}
           <TabsContent value="contestacoes" className="space-y-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
@@ -330,7 +323,6 @@ const AdminPage = () => {
             </Card>
           </TabsContent>
 
-          {/* Settings Tab */}
           <TabsContent value="settings" className="space-y-4">
             <Card>
               <CardHeader>
@@ -357,7 +349,6 @@ const AdminPage = () => {
         </Tabs>
       </main>
 
-      {/* Add/Edit Professor Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -404,6 +395,12 @@ const AdminPage = () => {
                 <Input value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})} placeholder="Pendente" />
               </div>
             </div>
+            {!editingProf && (
+              <div className="space-y-2">
+                <Label>Senha (deixe vazio para usar data de nascimento)</Label>
+                <Input type="password" value={formData.senha} onChange={e => setFormData({...formData, senha: e.target.value})} />
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>

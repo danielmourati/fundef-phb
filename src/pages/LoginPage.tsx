@@ -24,11 +24,10 @@ const LoginPage = () => {
     setIsLoading(false);
 
     if (result.success) {
-      // Check role from the stored session to redirect properly
       const stored = localStorage.getItem('fundef_session');
       if (stored) {
-        const prof = JSON.parse(stored);
-        navigate(prof.role === 'admin' ? '/admin' : '/dashboard');
+        const session = JSON.parse(stored);
+        navigate(session.professor?.role === 'admin' ? '/admin' : '/dashboard');
       } else {
         navigate('/dashboard');
       }

@@ -19,7 +19,7 @@ const statusColors: Record<string, string> = {
 };
 
 const DashboardPage = () => {
-  const { professor, logout } = useAuth();
+  const { professor, token, logout } = useAuth();
   const navigate = useNavigate();
   const [motivo, setMotivo] = useState('');
   const [descricao, setDescricao] = useState('');
@@ -28,7 +28,6 @@ const DashboardPage = () => {
 
   if (!professor) return null;
   
-  // Redirect admin to admin panel
   if (professor.role === 'admin') {
     navigate('/admin');
     return null;
@@ -47,27 +46,29 @@ const DashboardPage = () => {
     }
     setSubmitting(true);
 
-    const { error } = await supabase.from('contestacoes').insert({
-      professor_id: professor.id,
-      motivo,
-      descricao,
-      whatsapp: whatsapp || null,
-    });
+    try {
+      const { data, error } = await supabase.functions.invoke('professor-api?action=create_contestacao', {
+        body: { motivo, descricao, whatsapp },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (error || (data && data.error)) {
+        toast.error(data?.error || 'Erro ao enviar contestação.');
+      } else {
+        toast.success('Contestação enviada com sucesso!');
+        setMotivo('');
+        setDescricao('');
+        setWhatsapp('');
+      }
+    } catch {
+      toast.error('Erro de conexão.');
+    }
 
     setSubmitting(false);
-    if (error) {
-      toast.error('Erro ao enviar contestação.');
-    } else {
-      toast.success('Contestação enviada com sucesso!');
-      setMotivo('');
-      setDescricao('');
-      setWhatsapp('');
-    }
   };
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="bg-primary text-primary-foreground py-4 px-4 shadow-md">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div>
@@ -81,7 +82,6 @@ const DashboardPage = () => {
       </header>
 
       <main className="max-w-4xl mx-auto p-4 space-y-6 pb-20">
-        {/* Welcome Card */}
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -126,7 +126,6 @@ const DashboardPage = () => {
           </CardContent>
         </Card>
 
-        {/* Contestation Form */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
