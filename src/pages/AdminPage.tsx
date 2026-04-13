@@ -67,22 +67,13 @@ const AdminPage = () => {
     fetchSettings();
   }, [professor, navigate]);
 
-  const apiCall = async (method: string, action: string, body?: unknown) => {
-    const opts: any = { headers: authHeaders };
-    if (body) opts.body = body;
-    // For GET requests, use method override via query param
-    if (method === 'GET') {
-      const { data, error } = await supabase.functions.invoke(`admin-api?action=${action}`, {
-        method: 'GET',
-        headers: authHeaders,
-      });
-      return { data, error };
-    }
-    const { data, error } = await supabase.functions.invoke(`admin-api?action=${action}`, {
+  const apiCall = async (method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH", action: string, body?: unknown) => {
+    const opts: { method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH"; headers: Record<string, string>; body?: unknown } = {
       method,
       headers: authHeaders,
-      body,
-    });
+    };
+    if (body) opts.body = body;
+    const { data, error } = await supabase.functions.invoke(`admin-api?action=${action}`, opts);
     return { data, error };
   };
 
