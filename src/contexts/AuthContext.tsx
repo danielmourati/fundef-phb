@@ -16,6 +16,7 @@ interface Professor {
 
 interface AuthContextType {
   professor: Professor | null;
+  token: string | null;
   loading: boolean;
   login: (matricula: string, senha: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
@@ -25,13 +26,25 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [professor, setProfessor] = useState<Professor | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const stored = localStorage.getItem('fundef_session');
     if (stored) {
       try {
-        setProfessor(JSON.parse(stored));
+        const parsed = JSON.parse(stored);
+        // Validate token expiry client-side
+        const payloadB64 = parsed.token?.split('.')[0];
+        if (payloadB64) {
+          const payload = JSON.parse(atob(payloadB64));
+          if (payload.exp > Date.now()) {
+            setProfessor(parsed.professor);
+            setToken(parsed.token);
+          } else {
+            localStorage.removeItem('fundef_session');
+          }
+        }
       } catch {
         localStorage.removeItem('fundef_session');
       }
@@ -40,29 +53,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = async (matricula: string, senha: string) => {
-    const { data, error } = await supabase
-      .from('professors')
-      .select('id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, status, role')
-      .eq('matricula', matricula)
-      .eq('senha', senha)
-      .maybeSingle();
+    try {
+      const { data, error } = await supabase.functions.invoke('custom-login', {
+        body: { matricula, senha },
+      });
 
-    if (error || !data) {
-      return { success: false, error: 'Matrícula ou senha incorretos.' };
+      if (error || !data?.professor) {
+        return { success: false, error: data?.error || 'Matrícula ou senha incorretos.' };
+      }
+
+      setProfessor(data.professor);
+      setToken(data.token);
+      localStorage.setItem('fundef_session', JSON.stringify({ professor: data.professor, token: data.token }));
+      return { success: true };
+    } catch {
+      return { success: false, error: 'Erro de conexão com o servidor.' };
     }
-
-    setProfessor(data);
-    localStorage.setItem('fundef_session', JSON.stringify(data));
-    return { success: true };
   };
 
   const logout = () => {
     setProfessor(null);
+    setToken(null);
     localStorage.removeItem('fundef_session');
   };
 
   return (
-    <AuthContext.Provider value={{ professor, loading, login, logout }}>
+    <AuthContext.Provider value={{ professor, token, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
