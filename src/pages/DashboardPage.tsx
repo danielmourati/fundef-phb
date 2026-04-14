@@ -147,15 +147,15 @@ const DashboardPage = () => {
             {/* Stepper */}
             <div className="px-5 py-4">
               <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-3">Situação do Processo</p>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center">
                 {STEPS.map((step, i) => {
                   const isActive = i <= currentStepIndex;
                   const isCurrent = i === currentStepIndex;
                   const colors = stepColors[step];
                   return (
-                    <div key={step} className="flex items-center flex-1">
-                      <div className="flex flex-col items-center gap-1.5">
-                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${
+                    <div key={step} className="flex items-center flex-1 last:flex-none">
+                      <div className="flex flex-col items-center gap-1.5 min-w-[60px]">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${
                           isCurrent
                             ? `${colors.dot} text-white border-transparent shadow-md`
                             : isActive
@@ -164,12 +164,12 @@ const DashboardPage = () => {
                         }`}>
                           {i + 1}
                         </div>
-                        <span className={`text-[10px] font-medium ${isCurrent ? colors.active : isActive ? 'text-foreground/70' : 'text-muted-foreground'}`}>
+                        <span className={`text-[11px] font-medium ${isCurrent ? colors.active : isActive ? 'text-foreground/70' : 'text-muted-foreground'}`}>
                           {step}
                         </span>
                       </div>
                       {i < STEPS.length - 1 && (
-                        <div className={`flex-1 h-0.5 mx-2 mt-[-14px] rounded ${isActive && i < currentStepIndex ? 'bg-primary/40' : 'bg-border'}`} />
+                        <div className={`flex-1 h-0.5 mx-1 mt-[-18px] rounded ${isActive && i < currentStepIndex ? 'bg-primary/40' : 'bg-border'}`} />
                       )}
                     </div>
                   );
