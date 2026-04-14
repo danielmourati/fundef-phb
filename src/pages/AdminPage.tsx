@@ -3,14 +3,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { LogOut, Upload, Download, Users, AlertTriangle, Settings, Plus, Pencil, Trash2, Save } from 'lucide-react';
+import {
+  LogOut, Upload, Download, Users, AlertTriangle, Settings, Plus, Pencil, Trash2, Save,
+  LayoutDashboard, FileText, Search,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Professor {
@@ -41,6 +43,15 @@ const emptyProfessor = {
   vinculo_inicio: '', vinculo_fim: '', total_cotas: 0, status: 'Pendente', role: 'professor',
 };
 
+type ActiveTab = 'dashboard' | 'professors' | 'contestacoes' | 'settings';
+
+const navItems: { key: ActiveTab; label: string; icon: React.ElementType }[] = [
+  { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { key: 'professors', label: 'Professores', icon: Users },
+  { key: 'contestacoes', label: 'Contestações', icon: AlertTriangle },
+  { key: 'settings', label: 'Configurações', icon: Settings },
+];
+
 const AdminPage = () => {
   const { professor, token, logout } = useAuth();
   const navigate = useNavigate();
@@ -48,6 +59,8 @@ const AdminPage = () => {
   const [contestacoes, setContestacoes] = useState<Contestacao[]>([]);
   const [loading, setLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProf, setEditingProf] = useState<any>(null);
@@ -120,7 +133,6 @@ const AdminPage = () => {
       toast.error('Nome, Matrícula e CPF são obrigatórios.');
       return;
     }
-
     if (editingProf) {
       const { data, error } = await apiCall('PUT', 'update_professor', { ...formData, id: editingProf.id });
       if (error || data?.error) { toast.error(data?.error || 'Erro ao atualizar.'); return; }
@@ -194,77 +206,217 @@ const AdminPage = () => {
 
   if (!professor || professor.role !== 'admin') return null;
 
+  const nonAdminProfs = professors.filter(p => p.role !== 'admin');
+  const filteredProfs = nonAdminProfs.filter(p =>
+    !searchQuery ||
+    p.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.matricula.includes(searchQuery) ||
+    p.cpf.includes(searchQuery)
+  );
+  const validados = nonAdminProfs.filter(p => p.status === 'Validado').length;
+  const pendentes = nonAdminProfs.filter(p => p.status === 'Pendente').length;
+  const emAnalise = nonAdminProfs.filter(p => p.status === 'Em Análise').length;
+
+  const statCards = [
+    { label: 'Total Professores', value: nonAdminProfs.length, icon: Users, color: 'bg-primary/10 text-primary' },
+    { label: 'Validados', value: validados, icon: FileText, color: 'bg-green-50 text-green-600' },
+    { label: 'Pendentes', value: pendentes, icon: AlertTriangle, color: 'bg-yellow-50 text-yellow-600' },
+    { label: 'Contestações', value: contestacoes.length, icon: AlertTriangle, color: 'bg-red-50 text-red-600' },
+  ];
+
   return (
-    <div className="min-h-screen bg-background">
-      <header className="bg-primary text-primary-foreground py-4 px-4 shadow-md">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-bold">Painel Administrativo</h1>
-            <p className="text-xs opacity-80">FUNDEF - SEDUC Parnaíba</p>
+    <div className="min-h-screen flex bg-muted/30">
+      {/* Sidebar */}
+      <aside className="w-64 bg-card border-r border-border flex flex-col min-h-screen sticky top-0">
+        <div className="p-6 border-b border-border">
+          <h1 className="text-lg font-bold text-foreground">FUNDEF</h1>
+          <p className="text-xs text-muted-foreground">SEDUC Parnaíba</p>
+        </div>
+
+        <nav className="flex-1 p-3 space-y-1">
+          {navItems.map(item => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.key;
+            return (
+              <button
+                key={item.key}
+                onClick={() => setActiveTab(item.key)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  isActive
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {item.label}
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="p-4 border-t border-border">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+              <Users className="w-4 h-4 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-foreground truncate">{professor.nome}</p>
+              <p className="text-xs text-muted-foreground">Administrador</p>
+            </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={handleLogout} className="text-primary-foreground hover:bg-primary/80">
-            <LogOut className="w-4 h-4 mr-1" /> Sair
+          <Button variant="ghost" size="sm" onClick={handleLogout} className="w-full justify-start text-muted-foreground hover:text-destructive">
+            <LogOut className="w-4 h-4 mr-2" /> Sair
           </Button>
         </div>
-      </header>
+      </aside>
 
-      <main className="max-w-6xl mx-auto p-4 space-y-6 pb-20">
-        <Tabs defaultValue="professors">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="professors" className="flex items-center gap-2">
-              <Users className="w-4 h-4" /> Professores
-            </TabsTrigger>
-            <TabsTrigger value="contestacoes" className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4" /> Contestações
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center gap-2">
-              <Settings className="w-4 h-4" /> Configurações
-            </TabsTrigger>
-          </TabsList>
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col min-h-screen">
+        {/* Top Bar */}
+        <header className="bg-card border-b border-border px-8 py-4 flex items-center justify-between sticky top-0 z-10">
+          <div>
+            <h2 className="text-xl font-semibold text-foreground">
+              {navItems.find(n => n.key === activeTab)?.label}
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Painel Administrativo • Última atualização: agora
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            {(activeTab === 'professors' || activeTab === 'dashboard') && (
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar..."
+                  className="pl-9 w-64 h-9"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+        </header>
 
-          <TabsContent value="professors" className="space-y-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
-                <CardTitle className="text-lg">Professores ({professors.filter(p => p.role !== 'admin').length})</CardTitle>
-                <div className="flex gap-2">
-                  <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleCSVImport} />
-                  <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}>
-                    <Upload className="w-4 h-4 mr-1" /> Importar CSV
-                  </Button>
-                  <Button size="sm" onClick={openAddDialog}>
-                    <Plus className="w-4 h-4 mr-1" /> Adicionar
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {loading ? <p className="text-muted-foreground text-sm">Carregando...</p> : (
+        <main className="flex-1 p-8 space-y-6">
+          {/* Dashboard Tab */}
+          {activeTab === 'dashboard' && (
+            <>
+              {/* Stat Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {statCards.map(stat => {
+                  const Icon = stat.icon;
+                  return (
+                    <Card key={stat.label} className="border">
+                      <CardContent className="p-5">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="text-xs text-muted-foreground font-medium">{stat.label}</p>
+                            <p className="text-2xl font-bold text-foreground mt-1">{stat.value}</p>
+                          </div>
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${stat.color}`}>
+                            <Icon className="w-5 h-5" />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+
+              {/* Quick Table */}
+              <Card>
+                <CardContent className="p-0">
+                  <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+                    <h3 className="font-semibold text-foreground">Professores Recentes</h3>
+                    <Button size="sm" variant="ghost" onClick={() => setActiveTab('professors')} className="text-primary text-xs">
+                      Ver todos →
+                    </Button>
+                  </div>
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
-                        <TableRow>
-                          <TableHead>Matrícula</TableHead>
-                          <TableHead>Nome</TableHead>
-                          <TableHead>CPF</TableHead>
-                          <TableHead>Cotas</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="text-right">Ações</TableHead>
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead className="text-xs font-medium text-muted-foreground">Matrícula</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">Nome</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">CPF</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">Cotas</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">Status</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {professors.filter(p => p.role !== 'admin').map(p => (
+                        {filteredProfs.slice(0, 5).map(p => (
                           <TableRow key={p.id}>
-                            <TableCell className="font-mono">{p.matricula}</TableCell>
-                            <TableCell>{p.nome}</TableCell>
-                            <TableCell className="font-mono">{p.cpf}</TableCell>
-                            <TableCell>{p.total_cotas || 0}</TableCell>
+                            <TableCell className="font-mono text-sm">{p.matricula}</TableCell>
+                            <TableCell className="text-sm">{p.nome}</TableCell>
+                            <TableCell className="font-mono text-sm">{p.cpf}</TableCell>
+                            <TableCell className="text-sm">{p.total_cotas || 0}</TableCell>
                             <TableCell>
-                              <Badge variant={p.status === 'Validado' ? 'default' : 'secondary'}>{p.status}</Badge>
+                              <Badge className={`text-xs font-medium ${
+                                p.status === 'Validado' ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-100' :
+                                p.status === 'Em Análise' ? 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100' :
+                                'bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-100'
+                              } border`}>{p.status}</Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
+
+          {/* Professors Tab */}
+          {activeTab === 'professors' && (
+            <Card>
+              <CardContent className="p-0">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+                  <h3 className="font-semibold text-foreground">Professores ({nonAdminProfs.length})</h3>
+                  <div className="flex gap-2">
+                    <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleCSVImport} />
+                    <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}>
+                      <Upload className="w-4 h-4 mr-1.5" /> Importar CSV
+                    </Button>
+                    <Button size="sm" onClick={openAddDialog}>
+                      <Plus className="w-4 h-4 mr-1.5" /> Adicionar
+                    </Button>
+                  </div>
+                </div>
+                {loading ? (
+                  <div className="p-6 text-muted-foreground text-sm">Carregando...</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead className="text-xs font-medium text-muted-foreground">Matrícula</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">Nome</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">CPF</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">Cotas</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">Status</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground text-right">Ações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredProfs.map(p => (
+                          <TableRow key={p.id}>
+                            <TableCell className="font-mono text-sm">{p.matricula}</TableCell>
+                            <TableCell className="text-sm">{p.nome}</TableCell>
+                            <TableCell className="font-mono text-sm">{p.cpf}</TableCell>
+                            <TableCell className="text-sm">{p.total_cotas || 0}</TableCell>
+                            <TableCell>
+                              <Badge className={`text-xs font-medium ${
+                                p.status === 'Validado' ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-100' :
+                                p.status === 'Em Análise' ? 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100' :
+                                'bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-100'
+                              } border`}>{p.status}</Badge>
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button size="icon" variant="ghost" onClick={() => openEditDialog(p)}>
+                              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditDialog(p)}>
                                 <Pencil className="w-4 h-4" />
                               </Button>
-                              <Button size="icon" variant="ghost" className="text-destructive" onClick={() => handleDeleteProf(p.id, p.nome)}>
+                              <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDeleteProf(p.id, p.nome)}>
                                 <Trash2 className="w-4 h-4" />
                               </Button>
                             </TableCell>
@@ -276,43 +428,46 @@ const AdminPage = () => {
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
+          )}
 
-          <TabsContent value="contestacoes" className="space-y-4">
+          {/* Contestações Tab */}
+          {activeTab === 'contestacoes' && (
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-lg">Contestações ({contestacoes.length})</CardTitle>
-                <Button size="sm" variant="outline" onClick={exportContestacoes}>
-                  <Download className="w-4 h-4 mr-1" /> Exportar CSV
-                </Button>
-              </CardHeader>
-              <CardContent>
-                {loading ? <p className="text-muted-foreground text-sm">Carregando...</p>
-                  : contestacoes.length === 0 ? <p className="text-muted-foreground text-sm">Nenhuma contestação registrada.</p>
-                  : (
+              <CardContent className="p-0">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+                  <h3 className="font-semibold text-foreground">Contestações ({contestacoes.length})</h3>
+                  <Button size="sm" variant="outline" onClick={exportContestacoes}>
+                    <Download className="w-4 h-4 mr-1.5" /> Exportar CSV
+                  </Button>
+                </div>
+                {loading ? (
+                  <div className="p-6 text-muted-foreground text-sm">Carregando...</div>
+                ) : contestacoes.length === 0 ? (
+                  <div className="p-6 text-muted-foreground text-sm">Nenhuma contestação registrada.</div>
+                ) : (
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
-                        <TableRow>
-                          <TableHead>Matrícula</TableHead>
-                          <TableHead>Nome</TableHead>
-                          <TableHead>Motivo</TableHead>
-                          <TableHead>Descrição</TableHead>
-                          <TableHead>WhatsApp</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Data</TableHead>
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead className="text-xs font-medium text-muted-foreground">Matrícula</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">Nome</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">Motivo</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">Descrição</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">WhatsApp</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">Status</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">Data</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {contestacoes.map(c => (
                           <TableRow key={c.id}>
-                            <TableCell className="font-mono">{c.professors?.matricula}</TableCell>
-                            <TableCell>{c.professors?.nome}</TableCell>
-                            <TableCell>{c.motivo}</TableCell>
-                            <TableCell className="max-w-[200px] truncate">{c.descricao}</TableCell>
-                            <TableCell>{c.whatsapp || '-'}</TableCell>
-                            <TableCell><Badge variant="secondary">{c.status}</Badge></TableCell>
-                            <TableCell>{new Date(c.created_at).toLocaleDateString('pt-BR')}</TableCell>
+                            <TableCell className="font-mono text-sm">{c.professors?.matricula}</TableCell>
+                            <TableCell className="text-sm">{c.professors?.nome}</TableCell>
+                            <TableCell className="text-sm">{c.motivo}</TableCell>
+                            <TableCell className="max-w-[200px] truncate text-sm">{c.descricao}</TableCell>
+                            <TableCell className="text-sm">{c.whatsapp || '—'}</TableCell>
+                            <TableCell><Badge variant="secondary" className="text-xs">{c.status}</Badge></TableCell>
+                            <TableCell className="text-sm">{new Date(c.created_at).toLocaleDateString('pt-BR')}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -321,14 +476,16 @@ const AdminPage = () => {
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
+          )}
 
-          <TabsContent value="settings" className="space-y-4">
+          {/* Settings Tab */}
+          {activeTab === 'settings' && (
             <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Configurações do Sistema</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="p-6 space-y-6">
+                <div>
+                  <h3 className="font-semibold text-foreground mb-1">Configurações do Sistema</h3>
+                  <p className="text-xs text-muted-foreground">Gerencie as configurações gerais do sistema.</p>
+                </div>
                 <div className="space-y-2 max-w-md">
                   <Label htmlFor="email_destino">E-mail de destino das contestações</Label>
                   <Input
@@ -341,14 +498,19 @@ const AdminPage = () => {
                   <p className="text-xs text-muted-foreground">As contestações serão notificadas para este e-mail.</p>
                 </div>
                 <Button onClick={handleSaveSettings} disabled={savingSettings}>
-                  <Save className="w-4 h-4 mr-1" /> {savingSettings ? 'Salvando...' : 'Salvar Configurações'}
+                  <Save className="w-4 h-4 mr-1.5" /> {savingSettings ? 'Salvando...' : 'Salvar Configurações'}
                 </Button>
               </CardContent>
             </Card>
-          </TabsContent>
-        </Tabs>
-      </main>
+          )}
+        </main>
 
+        <footer className="py-3 text-center text-xs text-muted-foreground border-t border-border bg-card">
+          Desenvolvido pelo Núcleo de Tecnologia e Dados - SEDUC Parnaíba
+        </footer>
+      </div>
+
+      {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -408,10 +570,6 @@ const AdminPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <footer className="fixed bottom-0 left-0 right-0 py-3 text-center text-xs text-muted-foreground border-t bg-background">
-        Desenvolvido pelo Núcleo de Tecnologia e Dados - SEDUC Parnaíba
-      </footer>
     </div>
   );
 };
