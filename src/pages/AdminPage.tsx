@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import logoSeduc from '@/assets/logo-seduc.png';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -228,9 +229,8 @@ const AdminPage = () => {
     <div className="min-h-screen flex bg-muted/30">
       {/* Sidebar */}
       <aside className="w-64 bg-card border-r border-border flex flex-col min-h-screen sticky top-0">
-        <div className="p-6 border-b border-border">
-          <h1 className="text-lg font-bold text-foreground">FUNDEF</h1>
-          <p className="text-xs text-muted-foreground">SEDUC Parnaíba</p>
+        <div className="p-4 border-b border-border flex items-center gap-3">
+          <img src={logoSeduc} alt="SEDUC Parnaíba" className="h-12 object-contain" />
         </div>
 
         <nav className="flex-1 p-3 space-y-1">
