@@ -226,6 +226,40 @@ const AdminPage = () => {
     else toast.success('Configurações salvas!');
   };
 
+  const handleSendMessage = async () => {
+    if (!msgTitle || !msgContent) {
+      toast.error('Título e conteúdo são obrigatórios.');
+      return;
+    }
+    setSendingMsg(true);
+    const { data, error } = await apiCall('POST', 'create_message', {
+      title: msgTitle,
+      content: msgContent,
+      scheduled_at: msgScheduled || null,
+    });
+    setSendingMsg(false);
+    if (error || data?.error) {
+      toast.error(data?.error || 'Erro ao enviar.');
+      return;
+    }
+    toast.success(msgScheduled ? 'Mensagem programada!' : 'Mensagem enviada!');
+    setMsgTitle('');
+    setMsgContent('');
+    setMsgScheduled('');
+    setMsgDialogOpen(false);
+    fetchData();
+  };
+
+  const handleDeleteMessage = async (id: string) => {
+    if (!confirm('Excluir esta mensagem?')) return;
+    const { data, error } = await supabase.functions.invoke(`admin-api?action=delete_message&id=${id}`, {
+      method: 'DELETE',
+      headers: authHeaders,
+    });
+    if (error || data?.error) toast.error(data?.error || 'Erro ao excluir.');
+    else { toast.success('Mensagem excluída!'); fetchData(); }
+  };
+
   if (!professor || professor.role !== 'admin') return null;
 
   const nonAdminProfs = professors.filter(p => p.role !== 'admin');
