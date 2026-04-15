@@ -4,14 +4,27 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Shield } from 'lucide-react';
+import { AlertCircle, MessageCircle } from 'lucide-react';
+import loginImage from '@/assets/login-education.jpg';
+import logoSeduc from '@/assets/logo-seduc-azul.png';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from '@/hooks/use-toast';
 
 const LoginPage = () => {
   const [matricula, setMatricula] = useState('');
   const [senha, setSenha] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportMatricula, setReportMatricula] = useState('');
+  const [reportMessage, setReportMessage] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -36,63 +49,165 @@ const LoginPage = () => {
     }
   };
 
+  const handleReport = () => {
+    toast({
+      title: 'Relatório enviado',
+      description: 'Sua solicitação foi registrada. A equipe de suporte entrará em contato.',
+    });
+    setReportOpen(false);
+    setReportMatricula('');
+    setReportMessage('');
+  };
+
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-6">
-        <div className="text-center space-y-2">
-          <div className="mx-auto w-16 h-16 bg-primary rounded-2xl flex items-center justify-center">
-            <Shield className="w-8 h-8 text-primary-foreground" />
-          </div>
-          <h1 className="text-2xl font-bold text-foreground">FUNDEF - Precatórios</h1>
-          <p className="text-muted-foreground text-sm">SEDUC Parnaíba - Sistema de Gestão e Consulta</p>
+    <div className="min-h-screen flex flex-col lg:flex-row bg-background">
+      {/* Left side - Image */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
+        <img
+          src={loginImage}
+          alt="Professores em sala de aula"
+          className="absolute inset-0 w-full h-full object-cover"
+          width={960}
+          height={1080}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-primary/80 via-primary/40 to-primary/20" />
+        <div className="relative z-10 flex flex-col justify-end p-12 text-white">
+          <h2 className="text-3xl font-bold mb-3">FUNDEF - Precatórios</h2>
+          <p className="text-lg text-white/90 max-w-md">
+            Sistema de Gestão e Consulta de Precatórios da SEDUC Parnaíba.
+          </p>
         </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Acesse sua conta</CardTitle>
-            <CardDescription>Informe sua matrícula e senha para continuar</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="matricula">Matrícula</Label>
-                <Input
-                  id="matricula"
-                  placeholder="Digite sua matrícula"
-                  value={matricula}
-                  onChange={(e) => setMatricula(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="senha">Senha</Label>
-                <Input
-                  id="senha"
-                  type="password"
-                  placeholder="Data de nascimento (somente números)"
-                  value={senha}
-                  onChange={(e) => setSenha(e.target.value)}
-                  required
-                />
-              </div>
-              {error && (
-                <p className="text-sm text-destructive">{error}</p>
-              )}
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? 'Entrando...' : 'Entrar'}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <p className="text-center text-xs text-muted-foreground">
-          A senha padrão é sua data de nascimento (somente números).
-        </p>
       </div>
 
-      <footer className="fixed bottom-0 left-0 right-0 py-4 text-center text-xs text-muted-foreground border-t bg-background">
-        Desenvolvido pelo Núcleo de Tecnologia e Dados - SEDUC Parnaíba
-      </footer>
+      {/* Right side - Form */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 lg:px-16">
+        <div className="w-full max-w-md space-y-8">
+          {/* Logo */}
+          <div className="flex flex-col items-center space-y-6">
+            <img
+              src={logoSeduc}
+              alt="SEDUC Parnaíba"
+              className="h-16 object-contain"
+            />
+            <div className="text-center">
+              <h1 className="text-2xl font-bold text-foreground">Bem-vindo(a) 👋</h1>
+              <p className="text-muted-foreground mt-1">Informe seus dados para acessar o sistema</p>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-3 text-muted-foreground">acesso ao sistema</span>
+            </div>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="matricula" className="text-sm font-medium">
+                Matrícula <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="matricula"
+                placeholder="Digite sua matrícula"
+                value={matricula}
+                onChange={(e) => setMatricula(e.target.value)}
+                required
+                className="h-12 rounded-lg"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="senha" className="text-sm font-medium">
+                Senha <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="senha"
+                type="password"
+                placeholder="Data de nascimento (DDMMAAAA)"
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                required
+                className="h-12 rounded-lg"
+              />
+            </div>
+
+            {error && (
+              <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-lg">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <Button
+              type="submit"
+              className="w-full h-12 rounded-lg text-base font-semibold"
+              disabled={isLoading}
+            >
+              {isLoading ? 'Entrando...' : 'Entrar'}
+            </Button>
+          </form>
+
+          {/* Report button */}
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={() => setReportOpen(true)}
+              className="text-sm text-primary hover:underline inline-flex items-center gap-1.5 font-medium"
+            >
+              <MessageCircle className="w-4 h-4" />
+              Não consegue acessar? Reportar problema
+            </button>
+          </div>
+
+          <p className="text-center text-xs text-muted-foreground">
+            A senha padrão é sua data de nascimento (somente números).
+          </p>
+        </div>
+
+        <footer className="mt-12 text-center text-xs text-muted-foreground">
+          Desenvolvido pelo Núcleo de Tecnologia e Dados - SEDUC Parnaíba
+        </footer>
+      </div>
+
+      {/* Report Dialog */}
+      <Dialog open={reportOpen} onOpenChange={setReportOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reportar problema de acesso</DialogTitle>
+            <DialogDescription>
+              Preencha as informações abaixo para que a equipe de suporte possa ajudá-lo.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div className="space-y-2">
+              <Label htmlFor="report-matricula">Matrícula (se souber)</Label>
+              <Input
+                id="report-matricula"
+                placeholder="Sua matrícula"
+                value={reportMatricula}
+                onChange={(e) => setReportMatricula(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="report-msg">Descreva o problema</Label>
+              <Textarea
+                id="report-msg"
+                placeholder="Ex: Não consigo acessar, esqueci minha senha..."
+                value={reportMessage}
+                onChange={(e) => setReportMessage(e.target.value)}
+                rows={4}
+              />
+            </div>
+            <Button onClick={handleReport} className="w-full" disabled={!reportMessage.trim()}>
+              Enviar relatório
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
