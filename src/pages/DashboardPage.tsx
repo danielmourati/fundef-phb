@@ -1,5 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
-import { LogOut, User, AlertTriangle } from 'lucide-react';
+import { LogOut, User, AlertTriangle, Bell, Check, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 
 const STEPS = ['Pendente', 'Em Análise', 'Validado'] as const;
@@ -21,6 +21,24 @@ const stepColors: Record<string, { active: string; dot: string }> = {
   'Validado': { active: 'text-green-600', dot: 'bg-green-500' },
 };
 
+interface Message {
+  id: string;
+  title: string;
+  content: string;
+  created_at: string;
+  read: boolean;
+}
+
+interface Contestacao {
+  id: string;
+  motivo: string;
+  descricao: string;
+  status: string;
+  created_at: string;
+  protocolo: string | null;
+  resposta: string | null;
+}
+
 const DashboardPage = () => {
   const { professor, token, logout } = useAuth();
   const navigate = useNavigate();
@@ -29,13 +47,49 @@ const DashboardPage = () => {
   const [whatsapp, setWhatsapp] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [contestacoes, setContestacoes] = useState<Contestacao[]>([]);
+  const [activeSection, setActiveSection] = useState<'dados' | 'mensagens' | 'contestacoes'>('dados');
+
+  const authHeaders = { Authorization: `Bearer ${token}` };
+
+  useEffect(() => {
+    if (!professor) return;
+    if (professor.role === 'admin') { navigate('/admin'); return; }
+    if (professor.role === 'juridico') { navigate('/juridico'); return; }
+    if (token) {
+      fetchMessages();
+      fetchContestacoes();
+    }
+  }, [professor, token]);
 
   if (!professor) return null;
+  if (professor.role === 'admin' || professor.role === 'juridico') return null;
 
-  if (professor.role === 'admin') {
-    navigate('/admin');
-    return null;
-  }
+  const fetchMessages = async () => {
+    const { data } = await supabase.functions.invoke('professor-api?action=messages', {
+      method: 'GET',
+      headers: authHeaders,
+    });
+    if (data && Array.isArray(data)) setMessages(data);
+  };
+
+  const fetchContestacoes = async () => {
+    const { data } = await supabase.functions.invoke('professor-api?action=contestacoes', {
+      method: 'GET',
+      headers: authHeaders,
+    });
+    if (data && Array.isArray(data)) setContestacoes(data);
+  };
+
+  const markAsRead = async (messageId: string) => {
+    await supabase.functions.invoke('professor-api?action=mark_read', {
+      method: 'POST',
+      headers: authHeaders,
+      body: { message_id: messageId },
+    });
+    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, read: true } : m));
+  };
 
   const handleLogout = () => {
     logout();
@@ -43,8 +97,8 @@ const DashboardPage = () => {
   };
 
   const currentStepIndex = STEPS.indexOf(professor.status as typeof STEPS[number]);
-
   const formatCpf = (cpf: string) => cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  const unreadCount = messages.filter(m => !m.read).length;
 
   const handleContestacao = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,23 +111,33 @@ const DashboardPage = () => {
     try {
       const { data, error } = await supabase.functions.invoke('professor-api?action=create_contestacao', {
         body: { motivo, descricao, whatsapp },
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders,
       });
 
       if (error || (data && data.error)) {
         toast.error(data?.error || 'Erro ao enviar contestação.');
       } else {
-        toast.success('Contestação enviada com sucesso!');
+        toast.success(`Contestação enviada! Protocolo: ${data?.protocolo || 'gerado'}`);
         setMotivo('');
         setDescricao('');
         setWhatsapp('');
         setSheetOpen(false);
+        fetchContestacoes();
       }
     } catch {
       toast.error('Erro de conexão.');
     }
 
     setSubmitting(false);
+  };
+
+  const contestStatusColor = (status: string) => {
+    switch (status) {
+      case 'Deferido': return 'bg-green-100 text-green-700 border-green-200';
+      case 'Indeferido': return 'bg-red-100 text-red-700 border-red-200';
+      case 'Pendente': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+      default: return 'bg-blue-100 text-blue-700 border-blue-200';
+    }
   };
 
   return (
@@ -84,9 +148,19 @@ const DashboardPage = () => {
             <h1 className="text-lg font-bold">FUNDEF - Precatórios</h1>
             <p className="text-xs opacity-80">SEDUC Parnaíba</p>
           </div>
-          <Button variant="ghost" size="sm" onClick={handleLogout} className="text-primary-foreground hover:bg-primary/80">
-            <LogOut className="w-4 h-4 mr-1" /> Sair
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setActiveSection('mensagens')} className="text-primary-foreground hover:bg-primary/80 relative">
+              <Bell className="w-4 h-4" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">
+                  {unreadCount}
+                </span>
+              )}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleLogout} className="text-primary-foreground hover:bg-primary/80">
+              <LogOut className="w-4 h-4 mr-1" /> Sair
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -102,97 +176,199 @@ const DashboardPage = () => {
           </div>
         </div>
 
-        {/* Main Card */}
-        <Card className="overflow-hidden">
-          <CardContent className="p-0">
-            {/* Header row */}
-            <div className="flex items-center justify-between px-5 pt-5 pb-3">
-              <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Matrícula</p>
-                <p className="text-2xl font-bold tracking-tight">{professor.matricula}</p>
-              </div>
-              <Badge className={`${
-                professor.status === 'Validado' ? 'bg-green-100 text-green-700 border-green-200' :
-                professor.status === 'Em Análise' ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                'bg-yellow-100 text-yellow-700 border-yellow-200'
-              } border text-xs font-semibold`}>
-                {professor.status}
-              </Badge>
-            </div>
+        {/* Navigation Tabs */}
+        <div className="flex gap-1 bg-muted/50 rounded-lg p-1">
+          {[
+            { key: 'dados' as const, label: 'Meus Dados', icon: User },
+            { key: 'mensagens' as const, label: `Mensagens${unreadCount > 0 ? ` (${unreadCount})` : ''}`, icon: Bell },
+            { key: 'contestacoes' as const, label: 'Contestações', icon: FileText },
+          ].map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveSection(tab.key)}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium transition-colors ${
+                activeSection === tab.key
+                  ? 'bg-background shadow-sm text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <tab.icon className="w-3.5 h-3.5" />
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
-            <div className="border-t mx-5" />
+        {/* Dados Section */}
+        {activeSection === 'dados' && (
+          <>
+            <Card className="overflow-hidden">
+              <CardContent className="p-0">
+                <div className="flex items-center justify-between px-5 pt-5 pb-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Matrícula</p>
+                    <p className="text-2xl font-bold tracking-tight">{professor.matricula}</p>
+                  </div>
+                  <Badge className={`${
+                    professor.status === 'Validado' ? 'bg-green-100 text-green-700 border-green-200' :
+                    professor.status === 'Em Análise' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                    'bg-yellow-100 text-yellow-700 border-yellow-200'
+                  } border text-xs font-semibold`}>
+                    {professor.status}
+                  </Badge>
+                </div>
 
-            {/* Data grid */}
-            <div className="grid grid-cols-2 gap-x-6 gap-y-4 px-5 py-4">
-              <div>
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Vínculo Início</p>
-                <p className="font-medium text-sm">{professor.vinculo_inicio || '—'}</p>
-              </div>
-              <div>
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Vínculo Fim</p>
-                <p className="font-medium text-sm">{professor.vinculo_fim || '—'}</p>
-              </div>
-              <div>
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wider">CPF</p>
-                <p className="font-medium text-sm">{formatCpf(professor.cpf)}</p>
-              </div>
-              <div>
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Total de Cotas</p>
-                <p className="font-medium text-sm">{professor.total_cotas ?? '—'} meses</p>
-              </div>
-            </div>
+                <div className="border-t mx-5" />
 
-            <div className="border-t mx-5" />
+                <div className="grid grid-cols-2 gap-x-6 gap-y-4 px-5 py-4">
+                  <div>
+                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Vínculo Início</p>
+                    <p className="font-medium text-sm">{professor.vinculo_inicio || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Vínculo Fim</p>
+                    <p className="font-medium text-sm">{professor.vinculo_fim || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider">CPF</p>
+                    <p className="font-medium text-sm">{formatCpf(professor.cpf)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Total de Cotas</p>
+                    <p className="font-medium text-sm">{professor.total_cotas ?? '—'} meses</p>
+                  </div>
+                </div>
 
-            {/* Stepper */}
-            <div className="px-5 py-4">
-              <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-3">Situação do Processo</p>
-              <div className="flex items-center">
-                {STEPS.map((step, i) => {
-                  const isActive = i <= currentStepIndex;
-                  const isCurrent = i === currentStepIndex;
-                  const colors = stepColors[step];
-                  return (
-                    <div key={step} className="flex items-center flex-1 last:flex-none">
-                      <div className="flex flex-col items-center gap-1.5 min-w-[60px]">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${
-                          isCurrent
-                            ? `${colors.dot} text-white border-transparent shadow-md`
-                            : isActive
-                              ? `${colors.dot} text-white border-transparent opacity-70`
-                              : 'bg-muted border-border text-muted-foreground'
-                        }`}>
-                          {i + 1}
+                <div className="border-t mx-5" />
+
+                <div className="px-5 py-4">
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-3">Situação do Processo</p>
+                  <div className="flex items-center">
+                    {STEPS.map((step, i) => {
+                      const isActive = i <= currentStepIndex;
+                      const isCurrent = i === currentStepIndex;
+                      const colors = stepColors[step];
+                      return (
+                        <div key={step} className="flex items-center flex-1 last:flex-none">
+                          <div className="flex flex-col items-center gap-1.5 min-w-[60px]">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${
+                              isCurrent
+                                ? `${colors.dot} text-white border-transparent shadow-md`
+                                : isActive
+                                  ? `${colors.dot} text-white border-transparent opacity-70`
+                                  : 'bg-muted border-border text-muted-foreground'
+                            }`}>
+                              {i + 1}
+                            </div>
+                            <span className={`text-[11px] font-medium ${isCurrent ? colors.active : isActive ? 'text-foreground/70' : 'text-muted-foreground'}`}>
+                              {step}
+                            </span>
+                          </div>
+                          {i < STEPS.length - 1 && (
+                            <div className={`flex-1 h-0.5 mx-1 mt-[-18px] rounded ${isActive && i < currentStepIndex ? 'bg-primary/40' : 'bg-border'}`} />
+                          )}
                         </div>
-                        <span className={`text-[11px] font-medium ${isCurrent ? colors.active : isActive ? 'text-foreground/70' : 'text-muted-foreground'}`}>
-                          {step}
-                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="space-y-2">
+              <Button
+                onClick={() => setSheetOpen(true)}
+                variant="outline"
+                className="w-full border-destructive/30 text-destructive hover:bg-destructive/5"
+              >
+                <AlertTriangle className="w-4 h-4 mr-2" />
+                Contestar Dados
+              </Button>
+              <p className="text-xs text-muted-foreground text-center px-4">
+                Caso identifique alguma divergência nos seus dados, clique acima para abrir uma contestação. Nossa equipe jurídica analisará e retornará pelo contato informado.
+              </p>
+            </div>
+          </>
+        )}
+
+        {/* Mensagens Section */}
+        {activeSection === 'mensagens' && (
+          <div className="space-y-3">
+            {messages.length === 0 ? (
+              <Card>
+                <CardContent className="p-6 text-center text-muted-foreground text-sm">
+                  Nenhuma mensagem recebida.
+                </CardContent>
+              </Card>
+            ) : (
+              messages.map(m => (
+                <Card key={m.id} className={`${!m.read ? 'border-primary/30 bg-primary/5' : ''}`}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          {!m.read && <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />}
+                          <h4 className="font-semibold text-sm">{m.title}</h4>
+                        </div>
+                        <p className="text-sm text-muted-foreground">{m.content}</p>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          {new Date(m.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </p>
                       </div>
-                      {i < STEPS.length - 1 && (
-                        <div className={`flex-1 h-0.5 mx-1 mt-[-18px] rounded ${isActive && i < currentStepIndex ? 'bg-primary/40' : 'bg-border'}`} />
+                      {!m.read && (
+                        <Button size="sm" variant="ghost" onClick={() => markAsRead(m.id)} className="text-xs">
+                          <Check className="w-3.5 h-3.5 mr-1" /> Lida
+                        </Button>
                       )}
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        )}
 
-        {/* Contestar button + explanation */}
-        <div className="space-y-2">
-          <Button
-            onClick={() => setSheetOpen(true)}
-            variant="outline"
-            className="w-full border-destructive/30 text-destructive hover:bg-destructive/5"
-          >
-            <AlertTriangle className="w-4 h-4 mr-2" />
-            Contestar Dados
-          </Button>
-          <p className="text-xs text-muted-foreground text-center px-4">
-            Caso identifique alguma divergência nos seus dados, clique acima para abrir uma contestação. Nossa equipe jurídica analisará e retornará pelo contato informado.
-          </p>
-        </div>
+        {/* Contestações Section */}
+        {activeSection === 'contestacoes' && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-sm">Minhas Contestações</h3>
+              <Button size="sm" variant="outline" onClick={() => setSheetOpen(true)}>
+                <AlertTriangle className="w-3.5 h-3.5 mr-1.5" /> Nova
+              </Button>
+            </div>
+            {contestacoes.length === 0 ? (
+              <Card>
+                <CardContent className="p-6 text-center text-muted-foreground text-sm">
+                  Nenhuma contestação registrada.
+                </CardContent>
+              </Card>
+            ) : (
+              contestacoes.map(c => (
+                <Card key={c.id}>
+                  <CardContent className="p-4 space-y-2">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-mono text-xs text-muted-foreground">{c.protocolo || '—'}</p>
+                        <p className="font-semibold text-sm">{c.motivo}</p>
+                      </div>
+                      <Badge className={`text-[10px] border ${contestStatusColor(c.status)}`}>{c.status}</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{c.descricao}</p>
+                    {c.resposta && (
+                      <div className="bg-muted/50 rounded p-2 mt-2">
+                        <p className="text-xs text-muted-foreground font-medium mb-0.5">Parecer Jurídico:</p>
+                        <p className="text-xs">{c.resposta}</p>
+                      </div>
+                    )}
+                    <p className="text-[10px] text-muted-foreground">
+                      {new Date(c.created_at).toLocaleDateString('pt-BR')}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        )}
       </main>
 
       {/* Contestação Sheet */}

@@ -12,8 +12,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
   LogOut, Upload, Download, Users, AlertTriangle, Settings, Plus, Pencil, Trash2, Save,
-  LayoutDashboard, FileText, Search,
+  LayoutDashboard, FileText, Search, Send, MessageSquare,
 } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 
 interface Professor {
@@ -39,17 +40,27 @@ interface Contestacao {
   professors: { nome: string; matricula: string } | null;
 }
 
+interface Message {
+  id: string;
+  title: string;
+  content: string;
+  scheduled_at: string | null;
+  sent: boolean;
+  created_at: string;
+}
+
 const emptyProfessor = {
   nome: '', cpf: '', matricula: '', senha: '', data_nascimento: '',
   vinculo_inicio: '', vinculo_fim: '', total_cotas: 0, status: 'Pendente', role: 'professor',
 };
 
-type ActiveTab = 'dashboard' | 'professors' | 'contestacoes' | 'settings';
+type ActiveTab = 'dashboard' | 'professors' | 'contestacoes' | 'messages' | 'settings';
 
 const navItems: { key: ActiveTab; label: string; icon: React.ElementType }[] = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { key: 'professors', label: 'Professores', icon: Users },
   { key: 'contestacoes', label: 'Contestações', icon: AlertTriangle },
+  { key: 'messages', label: 'Mensagens', icon: MessageSquare },
   { key: 'settings', label: 'Configurações', icon: Settings },
 ];
 
@@ -58,6 +69,7 @@ const AdminPage = () => {
   const navigate = useNavigate();
   const [professors, setProfessors] = useState<Professor[]>([]);
   const [contestacoes, setContestacoes] = useState<Contestacao[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
@@ -69,6 +81,13 @@ const AdminPage = () => {
 
   const [emailDestino, setEmailDestino] = useState('');
   const [savingSettings, setSavingSettings] = useState(false);
+
+  // Message form state
+  const [msgTitle, setMsgTitle] = useState('');
+  const [msgContent, setMsgContent] = useState('');
+  const [msgScheduled, setMsgScheduled] = useState('');
+  const [sendingMsg, setSendingMsg] = useState(false);
+  const [msgDialogOpen, setMsgDialogOpen] = useState(false);
 
   const authHeaders = { Authorization: `Bearer ${token}` };
 
@@ -93,12 +112,14 @@ const AdminPage = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const [profRes, contRes] = await Promise.all([
+    const [profRes, contRes, msgRes] = await Promise.all([
       apiCall('GET', 'professors'),
       apiCall('GET', 'contestacoes'),
+      apiCall('GET', 'messages'),
     ]);
     if (profRes.data && Array.isArray(profRes.data)) setProfessors(profRes.data);
     if (contRes.data && Array.isArray(contRes.data)) setContestacoes(contRes.data);
+    if (msgRes.data && Array.isArray(msgRes.data)) setMessages(msgRes.data);
     setLoading(false);
   };
 
@@ -203,6 +224,40 @@ const AdminPage = () => {
     setSavingSettings(false);
     if (error || data?.error) toast.error(data?.error || 'Erro ao salvar.');
     else toast.success('Configurações salvas!');
+  };
+
+  const handleSendMessage = async () => {
+    if (!msgTitle || !msgContent) {
+      toast.error('Título e conteúdo são obrigatórios.');
+      return;
+    }
+    setSendingMsg(true);
+    const { data, error } = await apiCall('POST', 'create_message', {
+      title: msgTitle,
+      content: msgContent,
+      scheduled_at: msgScheduled || null,
+    });
+    setSendingMsg(false);
+    if (error || data?.error) {
+      toast.error(data?.error || 'Erro ao enviar.');
+      return;
+    }
+    toast.success(msgScheduled ? 'Mensagem programada!' : 'Mensagem enviada!');
+    setMsgTitle('');
+    setMsgContent('');
+    setMsgScheduled('');
+    setMsgDialogOpen(false);
+    fetchData();
+  };
+
+  const handleDeleteMessage = async (id: string) => {
+    if (!confirm('Excluir esta mensagem?')) return;
+    const { data, error } = await supabase.functions.invoke(`admin-api?action=delete_message&id=${id}`, {
+      method: 'DELETE',
+      headers: authHeaders,
+    });
+    if (error || data?.error) toast.error(data?.error || 'Erro ao excluir.');
+    else { toast.success('Mensagem excluída!'); fetchData(); }
   };
 
   if (!professor || professor.role !== 'admin') return null;
@@ -478,7 +533,84 @@ const AdminPage = () => {
             </Card>
           )}
 
-          {/* Settings Tab */}
+          {/* Messages Tab */}
+          {activeTab === 'messages' && (
+            <>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-foreground">Mensagens ({messages.length})</h3>
+                <Button size="sm" onClick={() => setMsgDialogOpen(true)}>
+                  <Plus className="w-4 h-4 mr-1.5" /> Nova Mensagem
+                </Button>
+              </div>
+
+              {messages.length === 0 ? (
+                <Card>
+                  <CardContent className="p-6 text-center text-muted-foreground text-sm">
+                    Nenhuma mensagem enviada ainda.
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-3">
+                  {messages.map(m => (
+                    <Card key={m.id}>
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h4 className="font-semibold text-sm">{m.title}</h4>
+                              <Badge variant={m.sent ? "default" : "secondary"} className="text-[10px]">
+                                {m.sent ? 'Enviada' : 'Programada'}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground line-clamp-2">{m.content}</p>
+                            <p className="text-xs text-muted-foreground mt-2">
+                              {new Date(m.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              {m.scheduled_at && ` • Programada para ${new Date(m.scheduled_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`}
+                            </p>
+                          </div>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => handleDeleteMessage(m.id)}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+
+              {/* New Message Dialog */}
+              <Dialog open={msgDialogOpen} onOpenChange={setMsgDialogOpen}>
+                <DialogContent className="max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>Nova Mensagem</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Título *</Label>
+                      <Input value={msgTitle} onChange={e => setMsgTitle(e.target.value)} placeholder="Assunto da mensagem" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Conteúdo *</Label>
+                      <Textarea value={msgContent} onChange={e => setMsgContent(e.target.value)} placeholder="Digite o conteúdo da mensagem..." rows={5} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Programar envio (opcional)</Label>
+                      <Input type="datetime-local" value={msgScheduled} onChange={e => setMsgScheduled(e.target.value)} />
+                      <p className="text-xs text-muted-foreground">Deixe vazio para enviar imediatamente.</p>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setMsgDialogOpen(false)}>Cancelar</Button>
+                    <Button onClick={handleSendMessage} disabled={sendingMsg}>
+                      <Send className="w-4 h-4 mr-1.5" />
+                      {sendingMsg ? 'Enviando...' : msgScheduled ? 'Programar' : 'Enviar Agora'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </>
+          )}
+
           {activeTab === 'settings' && (
             <Card>
               <CardContent className="p-6 space-y-6">

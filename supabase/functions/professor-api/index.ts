@@ -58,11 +58,11 @@ Deno.serve(async (req) => {
       return jsonResponse(data);
     }
 
-    // GET my contestacoes
+    // GET my contestacoes (with protocolo)
     if (req.method === "GET" && action === "contestacoes") {
       const { data, error } = await supabase
         .from("contestacoes")
-        .select("id, motivo, descricao, whatsapp, status, created_at")
+        .select("id, motivo, descricao, whatsapp, status, created_at, protocolo, resposta")
         .eq("professor_id", user.sub)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -89,10 +89,96 @@ Deno.serve(async (req) => {
         );
       }
 
-      const { error } = await supabase.from("contestacoes").insert({
+      const { data, error } = await supabase.from("contestacoes").insert({
         professor_id: user.sub,
         motivo, descricao, whatsapp,
-      });
+      }).select("protocolo").single();
+      if (error) throw error;
+      return jsonResponse({ success: true, protocolo: data?.protocolo });
+    }
+
+    // GET messages (sent messages for professor)
+    if (req.method === "GET" && action === "messages") {
+      const { data: messages, error } = await supabase
+        .from("messages")
+        .select("id, title, content, created_at")
+        .eq("sent", true)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+
+      // Get read status
+      const messageIds = (messages || []).map(m => m.id);
+      const { data: reads } = await supabase
+        .from("message_reads")
+        .select("message_id")
+        .eq("professor_id", user.sub)
+        .in("message_id", messageIds);
+
+      const readSet = new Set((reads || []).map(r => r.message_id));
+      const enriched = (messages || []).map(m => ({
+        ...m,
+        read: readSet.has(m.id),
+      }));
+      return jsonResponse(enriched);
+    }
+
+    // POST mark message as read
+    if (req.method === "POST" && action === "mark_read") {
+      const body = await req.json();
+      const messageId = body.message_id;
+      if (!messageId) throw new Error("message_id obrigatório");
+
+      await supabase.from("message_reads").upsert({
+        message_id: messageId,
+        professor_id: user.sub,
+      }, { onConflict: "message_id,professor_id" });
+      return jsonResponse({ success: true });
+    }
+
+    // === JURIDICO ACTIONS ===
+
+    // GET all contestacoes (for juridico role)
+    if (req.method === "GET" && action === "juridico_contestacoes") {
+      if (user.role !== "juridico") {
+        return new Response(JSON.stringify({ error: "Acesso negado." }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { data, error } = await supabase
+        .from("contestacoes")
+        .select("id, motivo, descricao, whatsapp, status, created_at, professor_id, protocolo, resposta")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+
+      const profIds = [...new Set((data || []).map(c => c.professor_id))];
+      const { data: profs } = await supabase
+        .from("professors")
+        .select("id, nome, matricula, cpf")
+        .in("id", profIds);
+
+      const profMap = new Map((profs || []).map(p => [p.id, p]));
+      const enriched = (data || []).map(c => ({
+        ...c,
+        professor: profMap.get(c.professor_id) || null,
+      }));
+      return jsonResponse(enriched);
+    }
+
+    // PUT update contestacao status (for juridico)
+    if (req.method === "PUT" && action === "update_contestacao") {
+      if (user.role !== "juridico") {
+        return new Response(JSON.stringify({ error: "Acesso negado." }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const body = await req.json();
+      const { id, status, resposta } = body;
+      if (!id || !status) throw new Error("ID e status obrigatórios");
+      
+      const update: Record<string, unknown> = { status };
+      if (resposta !== undefined) update.resposta = resposta;
+      
+      const { error } = await supabase.from("contestacoes").update(update).eq("id", id);
       if (error) throw error;
       return jsonResponse({ success: true });
     }

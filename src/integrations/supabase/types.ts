@@ -21,6 +21,8 @@ export type Database = {
           id: string
           motivo: string
           professor_id: string
+          protocolo: string | null
+          resposta: string | null
           status: string
           updated_at: string
           whatsapp: string | null
@@ -31,6 +33,8 @@ export type Database = {
           id?: string
           motivo: string
           professor_id: string
+          protocolo?: string | null
+          resposta?: string | null
           status?: string
           updated_at?: string
           whatsapp?: string | null
@@ -41,6 +45,8 @@ export type Database = {
           id?: string
           motivo?: string
           professor_id?: string
+          protocolo?: string | null
+          resposta?: string | null
           status?: string
           updated_at?: string
           whatsapp?: string | null
@@ -78,6 +84,83 @@ export type Database = {
           success?: boolean
         }
         Relationships: []
+      }
+      message_reads: {
+        Row: {
+          id: string
+          message_id: string
+          professor_id: string
+          read_at: string
+        }
+        Insert: {
+          id?: string
+          message_id: string
+          professor_id: string
+          read_at?: string
+        }
+        Update: {
+          id?: string
+          message_id?: string
+          professor_id?: string
+          read_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_reads_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_reads_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "professors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          content: string
+          created_at: string
+          created_by: string | null
+          id: string
+          scheduled_at: string | null
+          sent: boolean
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          scheduled_at?: string | null
+          sent?: boolean
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          scheduled_at?: string | null
+          sent?: boolean
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "professors"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       professors: {
         Row: {
