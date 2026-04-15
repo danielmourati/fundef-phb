@@ -37,6 +37,11 @@ const DashboardPage = () => {
     return null;
   }
 
+  if (professor.role === 'juridico') {
+    navigate('/juridico');
+    return null;
+  }
+
   const handleLogout = () => {
     logout();
     navigate('/');
