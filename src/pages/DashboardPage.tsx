@@ -54,23 +54,17 @@ const DashboardPage = () => {
   const authHeaders = { Authorization: `Bearer ${token}` };
 
   useEffect(() => {
-    if (professor && token) {
+    if (!professor) return;
+    if (professor.role === 'admin') { navigate('/admin'); return; }
+    if (professor.role === 'juridico') { navigate('/juridico'); return; }
+    if (token) {
       fetchMessages();
       fetchContestacoes();
     }
   }, [professor, token]);
 
   if (!professor) return null;
-
-  if (professor.role === 'admin') {
-    navigate('/admin');
-    return null;
-  }
-
-  if (professor.role === 'juridico') {
-    navigate('/juridico');
-    return null;
-  }
+  if (professor.role === 'admin' || professor.role === 'juridico') return null;
 
   const fetchMessages = async () => {
     const { data } = await supabase.functions.invoke('professor-api?action=messages', {
