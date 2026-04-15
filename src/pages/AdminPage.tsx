@@ -12,8 +12,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
   LogOut, Upload, Download, Users, AlertTriangle, Settings, Plus, Pencil, Trash2, Save,
-  LayoutDashboard, FileText, Search,
+  LayoutDashboard, FileText, Search, Send, MessageSquare,
 } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 
 interface Professor {
@@ -39,17 +40,27 @@ interface Contestacao {
   professors: { nome: string; matricula: string } | null;
 }
 
+interface Message {
+  id: string;
+  title: string;
+  content: string;
+  scheduled_at: string | null;
+  sent: boolean;
+  created_at: string;
+}
+
 const emptyProfessor = {
   nome: '', cpf: '', matricula: '', senha: '', data_nascimento: '',
   vinculo_inicio: '', vinculo_fim: '', total_cotas: 0, status: 'Pendente', role: 'professor',
 };
 
-type ActiveTab = 'dashboard' | 'professors' | 'contestacoes' | 'settings';
+type ActiveTab = 'dashboard' | 'professors' | 'contestacoes' | 'messages' | 'settings';
 
 const navItems: { key: ActiveTab; label: string; icon: React.ElementType }[] = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { key: 'professors', label: 'Professores', icon: Users },
   { key: 'contestacoes', label: 'Contestações', icon: AlertTriangle },
+  { key: 'messages', label: 'Mensagens', icon: MessageSquare },
   { key: 'settings', label: 'Configurações', icon: Settings },
 ];
 
@@ -58,6 +69,7 @@ const AdminPage = () => {
   const navigate = useNavigate();
   const [professors, setProfessors] = useState<Professor[]>([]);
   const [contestacoes, setContestacoes] = useState<Contestacao[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
@@ -69,6 +81,13 @@ const AdminPage = () => {
 
   const [emailDestino, setEmailDestino] = useState('');
   const [savingSettings, setSavingSettings] = useState(false);
+
+  // Message form state
+  const [msgTitle, setMsgTitle] = useState('');
+  const [msgContent, setMsgContent] = useState('');
+  const [msgScheduled, setMsgScheduled] = useState('');
+  const [sendingMsg, setSendingMsg] = useState(false);
+  const [msgDialogOpen, setMsgDialogOpen] = useState(false);
 
   const authHeaders = { Authorization: `Bearer ${token}` };
 
