@@ -112,12 +112,14 @@ const AdminPage = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const [profRes, contRes] = await Promise.all([
+    const [profRes, contRes, msgRes] = await Promise.all([
       apiCall('GET', 'professors'),
       apiCall('GET', 'contestacoes'),
+      apiCall('GET', 'messages'),
     ]);
     if (profRes.data && Array.isArray(profRes.data)) setProfessors(profRes.data);
     if (contRes.data && Array.isArray(contRes.data)) setContestacoes(contRes.data);
+    if (msgRes.data && Array.isArray(msgRes.data)) setMessages(msgRes.data);
     setLoading(false);
   };
 
