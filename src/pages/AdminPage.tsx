@@ -533,7 +533,84 @@ const AdminPage = () => {
             </Card>
           )}
 
-          {/* Settings Tab */}
+          {/* Messages Tab */}
+          {activeTab === 'messages' && (
+            <>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-foreground">Mensagens ({messages.length})</h3>
+                <Button size="sm" onClick={() => setMsgDialogOpen(true)}>
+                  <Plus className="w-4 h-4 mr-1.5" /> Nova Mensagem
+                </Button>
+              </div>
+
+              {messages.length === 0 ? (
+                <Card>
+                  <CardContent className="p-6 text-center text-muted-foreground text-sm">
+                    Nenhuma mensagem enviada ainda.
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-3">
+                  {messages.map(m => (
+                    <Card key={m.id}>
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h4 className="font-semibold text-sm">{m.title}</h4>
+                              <Badge variant={m.sent ? "default" : "secondary"} className="text-[10px]">
+                                {m.sent ? 'Enviada' : 'Programada'}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground line-clamp-2">{m.content}</p>
+                            <p className="text-xs text-muted-foreground mt-2">
+                              {new Date(m.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              {m.scheduled_at && ` • Programada para ${new Date(m.scheduled_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`}
+                            </p>
+                          </div>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => handleDeleteMessage(m.id)}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+
+              {/* New Message Dialog */}
+              <Dialog open={msgDialogOpen} onOpenChange={setMsgDialogOpen}>
+                <DialogContent className="max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>Nova Mensagem</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Título *</Label>
+                      <Input value={msgTitle} onChange={e => setMsgTitle(e.target.value)} placeholder="Assunto da mensagem" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Conteúdo *</Label>
+                      <Textarea value={msgContent} onChange={e => setMsgContent(e.target.value)} placeholder="Digite o conteúdo da mensagem..." rows={5} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Programar envio (opcional)</Label>
+                      <Input type="datetime-local" value={msgScheduled} onChange={e => setMsgScheduled(e.target.value)} />
+                      <p className="text-xs text-muted-foreground">Deixe vazio para enviar imediatamente.</p>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setMsgDialogOpen(false)}>Cancelar</Button>
+                    <Button onClick={handleSendMessage} disabled={sendingMsg}>
+                      <Send className="w-4 h-4 mr-1.5" />
+                      {sendingMsg ? 'Enviando...' : msgScheduled ? 'Programar' : 'Enviar Agora'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </>
+          )}
+
           {activeTab === 'settings' && (
             <Card>
               <CardContent className="p-6 space-y-6">
