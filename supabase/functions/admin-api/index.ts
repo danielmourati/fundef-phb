@@ -64,11 +64,10 @@ Deno.serve(async (req) => {
     if (req.method === "GET" && action === "contestacoes") {
       const { data, error } = await supabase
         .from("contestacoes")
-        .select("id, motivo, descricao, whatsapp, status, created_at, professor_id")
+        .select("id, motivo, descricao, whatsapp, status, created_at, professor_id, protocolo, resposta")
         .order("created_at", { ascending: false });
       if (error) throw error;
       
-      // Get professor names for each contestacao
       const profIds = [...new Set((data || []).map(c => c.professor_id))];
       const { data: profs } = await supabase
         .from("professors")
@@ -86,6 +85,16 @@ Deno.serve(async (req) => {
     // GET settings
     if (req.method === "GET" && action === "settings") {
       const { data } = await supabase.from("system_settings").select("key, value");
+      return jsonResponse(data);
+    }
+
+    // GET messages
+    if (req.method === "GET" && action === "messages") {
+      const { data, error } = await supabase
+        .from("messages")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
       return jsonResponse(data);
     }
 
@@ -121,7 +130,6 @@ Deno.serve(async (req) => {
         status: body.status || "Pendente",
         role: body.role || "professor",
       };
-      // If senha changed, rehash
       if (body.senha && body.senha !== "***") {
         const { data: hashData } = await supabase.rpc("hash_password", { plain_password: body.senha });
         update.senha_hash = hashData;
@@ -174,6 +182,37 @@ Deno.serve(async (req) => {
       } else {
         await supabase.from("system_settings").insert({ key, value });
       }
+      return jsonResponse({ success: true });
+    }
+
+    // POST message (create/send)
+    if (req.method === "POST" && action === "create_message") {
+      const body = await req.json();
+      const title = String(body.title || "").trim();
+      const content = String(body.content || "").trim();
+      const scheduledAt = body.scheduled_at || null;
+      const sent = scheduledAt ? false : true;
+
+      if (!title || !content) {
+        return new Response(JSON.stringify({ error: "Título e conteúdo são obrigatórios." }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { error } = await supabase.from("messages").insert({
+        title, content, created_by: user.sub,
+        scheduled_at: scheduledAt, sent,
+      });
+      if (error) throw error;
+      return jsonResponse({ success: true });
+    }
+
+    // DELETE message
+    if (req.method === "DELETE" && action === "delete_message") {
+      const id = url.searchParams.get("id");
+      if (!id) throw new Error("ID obrigatório");
+      const { error } = await supabase.from("messages").delete().eq("id", id);
+      if (error) throw error;
       return jsonResponse({ success: true });
     }
 
