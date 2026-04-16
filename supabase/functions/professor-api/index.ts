@@ -175,11 +175,40 @@ Deno.serve(async (req) => {
       const { id, status, resposta } = body;
       if (!id || !status) throw new Error("ID e status obrigatórios");
       
+      // Get contestacao to find professor_id and protocolo
+      const { data: contest, error: fetchErr } = await supabase
+        .from("contestacoes")
+        .select("professor_id, protocolo, status")
+        .eq("id", id)
+        .single();
+      if (fetchErr || !contest) throw new Error("Contestação não encontrada.");
+
       const update: Record<string, unknown> = { status };
       if (resposta !== undefined) update.resposta = resposta;
       
       const { error } = await supabase.from("contestacoes").update(update).eq("id", id);
       if (error) throw error;
+
+      // Auto-send notification message to the professor
+      if (contest.status !== status) {
+        const statusLabel: Record<string, string> = {
+          'Pendente': 'Pendente',
+          'Deferido': 'DEFERIDA ✅',
+          'Indeferido': 'INDEFERIDA ❌',
+          'Aberta': 'Aberta',
+        };
+        const msgTitle = `Contestação ${contest.protocolo || ''} — ${statusLabel[status] || status}`;
+        const msgContent = `Sua contestação (${contest.protocolo || 'sem protocolo'}) teve o status atualizado para: ${status}.${resposta ? '\n\nParecer: ' + resposta : ''}`;
+
+        // Insert as a personal message (created_by = professor so only they see it via their messages query)
+        await supabase.from("messages").insert({
+          title: msgTitle,
+          content: msgContent,
+          sent: true,
+          created_by: contest.professor_id,
+        });
+      }
+
       return jsonResponse({ success: true });
     }
 
