@@ -218,6 +218,9 @@ const JuridicoPage = () => {
             <p className="text-xs text-muted-foreground">Corpo Jurídico • Gerencie as contestações dos professores</p>
           </div>
           <div className="flex items-center gap-3">
+            <Button variant="outline" size="sm" onClick={handleExportPDF} className="h-9">
+              <Download className="w-4 h-4 mr-1.5" /> Exportar PDF
+            </Button>
             <Select value={filterStatus} onValueChange={setFilterStatus}>
               <SelectTrigger className="w-36 h-9">
                 <SelectValue />
