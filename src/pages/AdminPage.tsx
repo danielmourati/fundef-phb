@@ -12,8 +12,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
   LogOut, Upload, Download, Users, AlertTriangle, Settings, Plus, Pencil, Trash2, Save,
-  LayoutDashboard, FileText, Search, Send, MessageSquare,
+  LayoutDashboard, FileText, Search, Send, MessageSquare, UserX, UserCheck,
 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 
@@ -179,6 +180,14 @@ const AdminPage = () => {
     fetchData();
   };
 
+  const handleToggleStatus = async (p: Professor) => {
+    const newStatus = p.status === 'Inativo' ? 'Ativo' : 'Inativo';
+    const { data, error } = await apiCall('PUT', 'update_professor', { id: p.id, status: newStatus, nome: p.nome, cpf: p.cpf, matricula: p.matricula, role: p.role });
+    if (error || data?.error) { toast.error(data?.error || 'Erro ao alterar status.'); return; }
+    toast.success(`Usuário ${newStatus === 'Inativo' ? 'inativado' : 'ativado'}!`);
+    fetchData();
+  };
+
   const handleCSVImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -262,7 +271,7 @@ const AdminPage = () => {
 
   if (!professor || professor.role !== 'admin') return null;
 
-  const nonAdminProfs = professors.filter(p => p.role !== 'admin');
+  const nonAdminProfs = professors;
   const filteredProfs = nonAdminProfs.filter(p =>
     !searchQuery ||
     p.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -448,6 +457,7 @@ const AdminPage = () => {
                           <TableHead className="text-xs font-medium text-muted-foreground">Matrícula</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground">Nome</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground">CPF</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">Perfil</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground">Cotas</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground">Status</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground text-right">Ações</TableHead>
@@ -455,23 +465,36 @@ const AdminPage = () => {
                       </TableHeader>
                       <TableBody>
                         {filteredProfs.map(p => (
-                          <TableRow key={p.id}>
+                          <TableRow key={p.id} className={p.status === 'Inativo' ? 'opacity-50' : ''}>
                             <TableCell className="font-mono text-sm">{p.matricula}</TableCell>
                             <TableCell className="text-sm">{p.nome}</TableCell>
                             <TableCell className="font-mono text-sm">{p.cpf}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-xs capitalize">{p.role}</Badge>
+                            </TableCell>
                             <TableCell className="text-sm">{p.total_cotas || 0}</TableCell>
                             <TableCell>
                               <Badge className={`text-xs font-medium ${
-                                p.status === 'Validado' ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-100' :
+                                p.status === 'Validado' || p.status === 'Ativo' ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-100' :
+                                p.status === 'Inativo' ? 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-100' :
                                 p.status === 'Em Análise' ? 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100' :
                                 'bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-100'
                               } border`}>{p.status}</Badge>
                             </TableCell>
-                            <TableCell className="text-right">
-                              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditDialog(p)}>
+                            <TableCell className="text-right space-x-1">
+                              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditDialog(p)} title="Editar">
                                 <Pencil className="w-4 h-4" />
                               </Button>
-                              <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDeleteProf(p.id, p.nome)}>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className={`h-8 w-8 ${p.status === 'Inativo' ? 'text-green-600 hover:text-green-700' : 'text-orange-500 hover:text-orange-600'}`}
+                                onClick={() => handleToggleStatus(p)}
+                                title={p.status === 'Inativo' ? 'Ativar' : 'Inativar'}
+                              >
+                                {p.status === 'Inativo' ? <UserCheck className="w-4 h-4" /> : <UserX className="w-4 h-4" />}
+                              </Button>
+                              <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDeleteProf(p.id, p.nome)} title="Excluir">
                                 <Trash2 className="w-4 h-4" />
                               </Button>
                             </TableCell>
@@ -685,9 +708,33 @@ const AdminPage = () => {
                 <Input type="number" value={formData.total_cotas} onChange={e => setFormData({...formData, total_cotas: parseInt(e.target.value) || 0})} />
               </div>
               <div className="space-y-2">
-                <Label>Status</Label>
-                <Input value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})} placeholder="Pendente" />
+                <Label>Perfil (Role)</Label>
+                <Select value={formData.role} onValueChange={v => setFormData({...formData, role: v})}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="professor">Professor</SelectItem>
+                    <SelectItem value="admin">Administrador</SelectItem>
+                    <SelectItem value="juridico">Jurídico</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={formData.status} onValueChange={v => setFormData({...formData, status: v})}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Pendente">Pendente</SelectItem>
+                  <SelectItem value="Ativo">Ativo</SelectItem>
+                  <SelectItem value="Validado">Validado</SelectItem>
+                  <SelectItem value="Em Análise">Em Análise</SelectItem>
+                  <SelectItem value="Inativo">Inativo</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             {!editingProf && (
               <div className="space-y-2">

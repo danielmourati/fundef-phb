@@ -40,7 +40,8 @@ const LoginPage = () => {
       const stored = localStorage.getItem('fundef_session');
       if (stored) {
         const session = JSON.parse(stored);
-        navigate(session.professor?.role === 'admin' ? '/admin' : '/dashboard');
+        const role = session.professor?.role;
+        navigate(role === 'admin' ? '/admin' : role === 'juridico' ? '/juridico' : '/dashboard');
       } else {
         navigate('/dashboard');
       }
