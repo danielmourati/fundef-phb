@@ -1,28 +1,38 @@
 
 
-# Redesign do Dashboard do Professor
+# Plano: Área de Super Admin + Criação de Usuário Jurídico
 
-## O que muda
+## Resumo
+1. Criar uma área de **Super Admin** com gestão completa de usuários (criar, editar, inativar) — na prática, o admin atual já tem essa funcionalidade na aba "Professores". Vamos aprimorá-la para suportar todos os roles (professor, admin, juridico, superadmin) e adicionar a ação de **inativar/ativar** usuários.
+2. Criar o usuário do jurídico no banco de dados.
+3. Corrigir o redirecionamento pós-login para o role `juridico`.
 
-### 1. Card principal — layout inspirado no card de rastreamento
-Redesenhar o card de dados do professor seguindo o estilo visual da imagem de referência (card de tracking):
-- **Matrícula** em destaque no topo (grande, bold) com **Badge de status** ao lado
-- Layout em grid com labels pequenos em cinza e valores em destaque:
-  - **Vínculo**: início e fim (lado a lado, estilo "From / To")
-  - **Cadastrado em** e **Total de Cotas** (linha abaixo)
-- **Barra de progresso visual** com 3 etapas: `Pendente → Em Análise → Validado`, destacando a etapa atual com indicador colorido (inspirado no stepper da imagem)
-- CPF formatado abaixo
+## O que será feito
 
-### 2. Formulário de contestação — oculto, abre em Drawer (canvas)
-- Remover o card de contestação da página
-- Adicionar um botão **"Contestar Dados"** abaixo do card principal
-- Abaixo do botão, um texto explicativo pequeno: _"Caso identifique alguma divergência nos seus dados, clique acima para abrir uma contestação. Nossa equipe jurídica analisará e retornará pelo contato informado."_
-- Ao clicar, abre um **Sheet/Drawer** (componente Shadcn `Sheet` lateral) contendo o formulário completo de contestação (motivo, descrição, WhatsApp)
+### 1. Criar usuário jurídico no banco
+- Inserir na tabela `professors` um registro com:
+  - `matricula`: `juridico@seduc.com.br`
+  - `nome`: `Corpo Jurídico`
+  - `role`: `juridico`
+  - `senha_hash`: hash bcrypt de `seduc@123`
+  - `status`: `Ativo`
 
-### Arquivo afetado
-- `src/pages/DashboardPage.tsx` — reescrita do layout do card e migração do formulário para dentro de um `Sheet`
+### 2. Aprimorar gestão de usuários no AdminPage
+- No formulário de criar/editar professor, adicionar campo **Role** (select com opções: professor, admin, juridico).
+- Adicionar botão de **Inativar/Ativar** na listagem de professores (altera o status para "Inativo"/"Ativo").
+- Usuários inativos não poderão fazer login — adicionar verificação no `custom-login`.
 
-### Componentes utilizados
-- `Sheet` (já existe em `src/components/ui/sheet.tsx`) para o canvas lateral
-- Manter todos os componentes existentes (Badge, Card, Button, Select, Input, Textarea, Label)
+### 3. Bloquear login de usuários inativos
+- No `custom-login/index.ts`, após verificar a senha, checar se `professor.status === 'Inativo'` e retornar erro específico.
+
+### 4. Corrigir redirecionamento pós-login
+- No `LoginPage.tsx`, adicionar redirecionamento para `/juridico` quando o role for `juridico`.
+
+## Detalhes técnicos
+
+**Arquivos modificados:**
+- `src/pages/AdminPage.tsx` — campo role no formulário, botão inativar/ativar
+- `src/pages/LoginPage.tsx` — redirect para role juridico
+- `supabase/functions/custom-login/index.ts` — bloqueio de login para inativos
+- Inserção de dados via ferramenta de banco (usuário jurídico)
 
