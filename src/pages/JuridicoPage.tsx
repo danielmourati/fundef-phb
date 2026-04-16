@@ -12,10 +12,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
-  LogOut, Scale, Inbox, Search, FileText, Clock, CheckCircle, XCircle,
+  LogOut, Scale, Inbox, Search, FileText, Clock, CheckCircle, XCircle, Download,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import logoSeduc from '@/assets/logo-seduc.png';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface Contestacao {
   id: string;
@@ -98,6 +100,66 @@ const JuridicoPage = () => {
 
   const handleLogout = () => { logout(); navigate('/'); };
 
+  const handleExportPDF = async () => {
+    const doc = new jsPDF({ orientation: 'landscape' });
+
+    // Load logo
+    try {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = logoSeduc;
+      await new Promise<void>((resolve) => {
+        img.onload = () => resolve();
+        img.onerror = () => resolve();
+        setTimeout(() => resolve(), 2000);
+      });
+      if (img.complete && img.naturalWidth > 0) {
+        doc.addImage(img, 'PNG', 14, 8, 60, 18);
+      }
+    } catch { /* continue without logo */ }
+
+    doc.setFontSize(14);
+    doc.text('Relatório de Contestações — Corpo Jurídico', 148, 16, { align: 'center' });
+    doc.setFontSize(9);
+    doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 148, 22, { align: 'center' });
+    doc.text(`Total: ${filtered.length} contestação(ões)`, 148, 27, { align: 'center' });
+
+    const tableData = filtered.map(c => [
+      c.protocolo || '—',
+      c.professor?.matricula || '—',
+      c.professor?.nome || '—',
+      c.professor?.cpf || '—',
+      c.motivo,
+      c.whatsapp || '—',
+      c.status,
+      c.resposta || '—',
+      new Date(c.created_at).toLocaleDateString('pt-BR'),
+    ]);
+
+    autoTable(doc, {
+      startY: 32,
+      head: [['Protocolo', 'Matrícula', 'Nome', 'CPF', 'Motivo', 'WhatsApp', 'Status', 'Parecer', 'Data']],
+      body: tableData,
+      styles: { fontSize: 7, cellPadding: 2 },
+      headStyles: { fillColor: [29, 78, 216], textColor: 255, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [240, 245, 255] },
+      columnStyles: {
+        7: { cellWidth: 50 },
+      },
+    });
+
+    doc.setFontSize(7);
+    doc.text(
+      'Desenvolvido pelo Núcleo de Tecnologia e Dados - SEDUC Parnaíba',
+      148,
+      doc.internal.pageSize.height - 8,
+      { align: 'center' }
+    );
+
+    doc.save(`contestacoes_${new Date().toISOString().slice(0, 10)}.pdf`);
+    toast.success('PDF exportado com sucesso!');
+  };
+
   if (!professor || professor.role !== 'juridico') return null;
 
   const filtered = contestacoes.filter(c => {
@@ -156,6 +218,9 @@ const JuridicoPage = () => {
             <p className="text-xs text-muted-foreground">Corpo Jurídico • Gerencie as contestações dos professores</p>
           </div>
           <div className="flex items-center gap-3">
+            <Button variant="outline" size="sm" onClick={handleExportPDF} className="h-9">
+              <Download className="w-4 h-4 mr-1.5" /> Exportar PDF
+            </Button>
             <Select value={filterStatus} onValueChange={setFilterStatus}>
               <SelectTrigger className="w-36 h-9">
                 <SelectValue />

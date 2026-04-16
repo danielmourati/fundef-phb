@@ -97,26 +97,37 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: true, protocolo: data?.protocolo });
     }
 
-    // GET messages (sent messages for professor)
+    // GET messages (broadcast + personal notifications for professor)
     if (req.method === "GET" && action === "messages") {
-      const { data: messages, error } = await supabase
+      // Broadcast messages (created_by is null or an admin)
+      const { data: broadcastMsgs, error: bErr } = await supabase
         .from("messages")
-        .select("id, title, content, created_at")
+        .select("id, title, content, created_at, created_by")
         .eq("sent", true)
         .order("created_at", { ascending: false });
-      if (error) throw error;
+      if (bErr) throw bErr;
+
+      // Filter: broadcast (created_by is null or not the current user) + personal (created_by = user.sub)
+      const messages = (broadcastMsgs || []).filter(m =>
+        !m.created_by || m.created_by === user.sub
+      );
 
       // Get read status
-      const messageIds = (messages || []).map(m => m.id);
-      const { data: reads } = await supabase
-        .from("message_reads")
-        .select("message_id")
-        .eq("professor_id", user.sub)
-        .in("message_id", messageIds);
+      const messageIds = messages.map(m => m.id);
+      const { data: reads } = messageIds.length > 0
+        ? await supabase
+            .from("message_reads")
+            .select("message_id")
+            .eq("professor_id", user.sub)
+            .in("message_id", messageIds)
+        : { data: [] };
 
       const readSet = new Set((reads || []).map(r => r.message_id));
-      const enriched = (messages || []).map(m => ({
-        ...m,
+      const enriched = messages.map(m => ({
+        id: m.id,
+        title: m.title,
+        content: m.content,
+        created_at: m.created_at,
         read: readSet.has(m.id),
       }));
       return jsonResponse(enriched);
@@ -175,11 +186,40 @@ Deno.serve(async (req) => {
       const { id, status, resposta } = body;
       if (!id || !status) throw new Error("ID e status obrigatórios");
       
+      // Get contestacao to find professor_id and protocolo
+      const { data: contest, error: fetchErr } = await supabase
+        .from("contestacoes")
+        .select("professor_id, protocolo, status")
+        .eq("id", id)
+        .single();
+      if (fetchErr || !contest) throw new Error("Contestação não encontrada.");
+
       const update: Record<string, unknown> = { status };
       if (resposta !== undefined) update.resposta = resposta;
       
       const { error } = await supabase.from("contestacoes").update(update).eq("id", id);
       if (error) throw error;
+
+      // Auto-send notification message to the professor
+      if (contest.status !== status) {
+        const statusLabel: Record<string, string> = {
+          'Pendente': 'Pendente',
+          'Deferido': 'DEFERIDA ✅',
+          'Indeferido': 'INDEFERIDA ❌',
+          'Aberta': 'Aberta',
+        };
+        const msgTitle = `Contestação ${contest.protocolo || ''} — ${statusLabel[status] || status}`;
+        const msgContent = `Sua contestação (${contest.protocolo || 'sem protocolo'}) teve o status atualizado para: ${status}.${resposta ? '\n\nParecer: ' + resposta : ''}`;
+
+        // Insert as a personal message (created_by = professor so only they see it via their messages query)
+        await supabase.from("messages").insert({
+          title: msgTitle,
+          content: msgContent,
+          sent: true,
+          created_by: contest.professor_id,
+        });
+      }
+
       return jsonResponse({ success: true });
     }
 
