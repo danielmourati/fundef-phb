@@ -97,26 +97,37 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: true, protocolo: data?.protocolo });
     }
 
-    // GET messages (sent messages for professor)
+    // GET messages (broadcast + personal notifications for professor)
     if (req.method === "GET" && action === "messages") {
-      const { data: messages, error } = await supabase
+      // Broadcast messages (created_by is null or an admin)
+      const { data: broadcastMsgs, error: bErr } = await supabase
         .from("messages")
-        .select("id, title, content, created_at")
+        .select("id, title, content, created_at, created_by")
         .eq("sent", true)
         .order("created_at", { ascending: false });
-      if (error) throw error;
+      if (bErr) throw bErr;
+
+      // Filter: broadcast (created_by is null or not the current user) + personal (created_by = user.sub)
+      const messages = (broadcastMsgs || []).filter(m =>
+        !m.created_by || m.created_by === user.sub
+      );
 
       // Get read status
-      const messageIds = (messages || []).map(m => m.id);
-      const { data: reads } = await supabase
-        .from("message_reads")
-        .select("message_id")
-        .eq("professor_id", user.sub)
-        .in("message_id", messageIds);
+      const messageIds = messages.map(m => m.id);
+      const { data: reads } = messageIds.length > 0
+        ? await supabase
+            .from("message_reads")
+            .select("message_id")
+            .eq("professor_id", user.sub)
+            .in("message_id", messageIds)
+        : { data: [] };
 
       const readSet = new Set((reads || []).map(r => r.message_id));
-      const enriched = (messages || []).map(m => ({
-        ...m,
+      const enriched = messages.map(m => ({
+        id: m.id,
+        title: m.title,
+        content: m.content,
+        created_at: m.created_at,
         read: readSet.has(m.id),
       }));
       return jsonResponse(enriched);
