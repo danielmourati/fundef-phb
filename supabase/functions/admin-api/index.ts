@@ -6,17 +6,15 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-async function verifyToken(authHeader: string | null): Promise<{ sub: string; role: string } | null> {
+async function verifyToken(authHeader: string | null): Promise<{ sub: string; role: string; uid?: string } | null> {
   if (!authHeader?.startsWith("Bearer ")) return null;
   const token = authHeader.slice(7);
   const dotIdx = token.lastIndexOf(".");
   if (dotIdx < 0) return null;
 
-  const payloadB64 = token.slice(0, dotIdx);
-  const sigHex = token.slice(dotIdx + 1);
-
   try {
-    const payloadStr = atob(payloadB64);
+    const payloadStr = atob(token.slice(0, dotIdx));
+    const sigHex = token.slice(dotIdx + 1);
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
       "raw", encoder.encode(SERVICE_ROLE_KEY),
@@ -25,10 +23,9 @@ async function verifyToken(authHeader: string | null): Promise<{ sub: string; ro
     const sigBytes = new Uint8Array(sigHex.match(/.{2}/g)!.map(b => parseInt(b, 16)));
     const valid = await crypto.subtle.verify("HMAC", key, sigBytes, encoder.encode(payloadStr));
     if (!valid) return null;
-
     const payload = JSON.parse(payloadStr);
     if (payload.exp < Date.now()) return null;
-    return { sub: payload.sub, role: payload.role };
+    return { sub: payload.sub, role: payload.role, uid: payload.uid };
   } catch {
     return null;
   }
@@ -54,7 +51,7 @@ Deno.serve(async (req) => {
     if (req.method === "GET" && action === "professors") {
       const { data, error } = await supabase
         .from("professors")
-        .select("id, matricula, nome, cpf, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, status, role")
+        .select("id, matricula, nome, cpf, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, status, role, user_id")
         .order("nome");
       if (error) throw error;
       return jsonResponse(data);
@@ -99,19 +96,64 @@ Deno.serve(async (req) => {
     }
 
     // POST professor (create)
+    // Now handles users table: finds or creates user by CPF, then inserts professor
     if (req.method === "POST" && action === "create_professor") {
       const body = await req.json();
+      const cpf = String(body.cpf || "").replace(/\D/g, "");
+      const role = body.role || "professor";
+
+      if (!cpf || !body.nome || !body.matricula) {
+        throw new Error("Nome, CPF e Matrícula são obrigatórios.");
+      }
+
+      // Determine password: for professors use data_nascimento, for admin/juridico use explicit senha
       const senha = body.senha || body.data_nascimento?.replace(/\D/g, "") || "";
       const { data: hashData } = await supabase.rpc("hash_password", { plain_password: senha });
+
+      // Find or create user by CPF
+      let userId: string;
+      const { data: existingUser } = await supabase
+        .from("users")
+        .select("id")
+        .eq("cpf", cpf)
+        .maybeSingle();
+
+      if (existingUser) {
+        userId = existingUser.id;
+      } else {
+        const userInsert: Record<string, unknown> = {
+          cpf,
+          senha_hash: hashData,
+          role,
+          status: "Ativo",
+        };
+        // Admin/juridico get email field
+        if ((role === "admin" || role === "juridico") && body.email) {
+          userInsert.email = body.email;
+        }
+        const { data: newUser, error: userErr } = await supabase
+          .from("users")
+          .insert(userInsert)
+          .select("id")
+          .single();
+        if (userErr || !newUser) throw new Error("Erro ao criar usuário: " + (userErr?.message || ""));
+        userId = newUser.id;
+      }
+
+      // Insert professor record
       const payload = {
-        nome: body.nome, cpf: body.cpf, matricula: body.matricula,
-        senha: "***", senha_hash: hashData,
+        user_id: userId,
+        nome: body.nome,
+        cpf,
+        matricula: body.matricula,
+        senha: "***",
+        senha_hash: hashData,
         data_nascimento: body.data_nascimento || null,
         vinculo_inicio: body.vinculo_inicio || null,
         vinculo_fim: body.vinculo_fim || null,
         total_cotas: Number(body.total_cotas) || 0,
         status: body.status || "Pendente",
-        role: body.role || "professor",
+        role,
       };
       const { error } = await supabase.from("professors").insert(payload);
       if (error) throw error;
@@ -122,7 +164,9 @@ Deno.serve(async (req) => {
     if (req.method === "PUT" && action === "update_professor") {
       const body = await req.json();
       const update: Record<string, unknown> = {
-        nome: body.nome, cpf: body.cpf, matricula: body.matricula,
+        nome: body.nome,
+        cpf: body.cpf,
+        matricula: body.matricula,
         data_nascimento: body.data_nascimento || null,
         vinculo_inicio: body.vinculo_inicio || null,
         vinculo_fim: body.vinculo_fim || null,
@@ -134,7 +178,30 @@ Deno.serve(async (req) => {
         const { data: hashData } = await supabase.rpc("hash_password", { plain_password: body.senha });
         update.senha_hash = hashData;
         update.senha = "***";
+
+        // Also update users table password
+        const { data: prof } = await supabase
+          .from("professors")
+          .select("user_id")
+          .eq("id", body.id)
+          .single();
+        if (prof?.user_id) {
+          await supabase.from("users").update({ senha_hash: hashData }).eq("id", prof.user_id);
+        }
       }
+
+      // Update email on users table if provided (admin/juridico)
+      if (body.email && body.id) {
+        const { data: prof } = await supabase
+          .from("professors")
+          .select("user_id")
+          .eq("id", body.id)
+          .single();
+        if (prof?.user_id) {
+          await supabase.from("users").update({ email: body.email }).eq("id", prof.user_id);
+        }
+      }
+
       const { error } = await supabase.from("professors").update(update).eq("id", body.id);
       if (error) throw error;
       return jsonResponse({ success: true });
@@ -144,8 +211,24 @@ Deno.serve(async (req) => {
     if (req.method === "DELETE" && action === "delete_professor") {
       const id = url.searchParams.get("id");
       if (!id) throw new Error("ID obrigatório");
+
+      // Check if user has other professors linked before deleting user record
+      const { data: prof } = await supabase.from("professors").select("user_id").eq("id", id).single();
+      
       const { error } = await supabase.from("professors").delete().eq("id", id);
       if (error) throw error;
+
+      // If no other professors share this user, delete the user too
+      if (prof?.user_id) {
+        const { count } = await supabase
+          .from("professors")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", prof.user_id);
+        if ((count || 0) === 0) {
+          await supabase.from("users").delete().eq("id", prof.user_id);
+        }
+      }
+
       return jsonResponse({ success: true });
     }
 
@@ -154,17 +237,45 @@ Deno.serve(async (req) => {
       const body = await req.json();
       const rows = body.rows as Array<Record<string, string>>;
       const toInsert = [];
+
       for (const r of rows) {
+        const cpf = (r.cpf || "").replace(/\D/g, "");
         const senha = r.data_nascimento?.replace(/\D/g, "") || r.senha || "";
         const { data: hashData } = await supabase.rpc("hash_password", { plain_password: senha });
+
+        // Find or create user
+        let userId: string;
+        const { data: existingUser } = await supabase
+          .from("users")
+          .select("id")
+          .eq("cpf", cpf)
+          .maybeSingle();
+
+        if (existingUser) {
+          userId = existingUser.id;
+        } else {
+          const { data: newUser, error: userErr } = await supabase
+            .from("users")
+            .insert({ cpf, senha_hash: hashData, role: "professor", status: "Ativo" })
+            .select("id")
+            .single();
+          if (userErr || !newUser) continue;
+          userId = newUser.id;
+        }
+
         toInsert.push({
-          nome: r.nome || "", cpf: r.cpf || "", matricula: r.matricula || "",
-          senha: "***", senha_hash: hashData,
+          user_id: userId,
+          nome: r.nome || "",
+          cpf,
+          matricula: r.matricula || "",
+          senha: "***",
+          senha_hash: hashData,
           data_nascimento: r.data_nascimento || null,
           vinculo_inicio: r.vinculo_inicio || null,
           vinculo_fim: r.vinculo_fim || null,
           total_cotas: parseInt(r.total_cotas) || 0,
-          status: r.status || "Pendente", role: "professor",
+          status: r.status || "Pendente",
+          role: "professor",
         });
       }
       const { error } = await supabase.from("professors").insert(toInsert);

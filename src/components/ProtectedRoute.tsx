@@ -16,6 +16,14 @@ const getHomeByRole = (role: string) => {
   }
 };
 
+const getLoginByRole = (allowedRoles?: string[]) => {
+  // If the route is for admin or juridico, redirect to admin login
+  if (allowedRoles?.some(r => r === 'admin' || r === 'juridico')) {
+    return '/login/admin';
+  }
+  return '/login';
+};
+
 const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
   const { professor, loading } = useAuth();
   const location = useLocation();
@@ -25,7 +33,7 @@ const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
   }
 
   if (!professor) {
-    return <Navigate to="/login" replace state={{ from: location }} />;
+    return <Navigate to={getLoginByRole(allowedRoles)} replace state={{ from: location }} />;
   }
 
   if (allowedRoles && !allowedRoles.includes(professor.role)) {

@@ -10,7 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
-import { LogOut, User, AlertTriangle, Bell, Check, FileText } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { LogOut, User, AlertTriangle, Bell, Check, FileText, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
 
 const STEPS = ['Pendente', 'Em Análise', 'Validado'] as const;
@@ -50,6 +51,13 @@ const DashboardPage = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [contestacoes, setContestacoes] = useState<Contestacao[]>([]);
   const [activeSection, setActiveSection] = useState<'dados' | 'mensagens' | 'contestacoes'>('dados');
+
+  // Password change state
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [senhaAtual, setSenhaAtual] = useState('');
+  const [senhaNova, setSenhaNova] = useState('');
+  const [senhaConfirm, setSenhaConfirm] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
 
   const authHeaders = { Authorization: `Bearer ${token}` };
 
@@ -129,6 +137,41 @@ const DashboardPage = () => {
     }
 
     setSubmitting(false);
+  };
+
+  const handleChangePassword = async () => {
+    if (!senhaAtual || !senhaNova || !senhaConfirm) {
+      toast.error('Preencha todos os campos.');
+      return;
+    }
+    if (senhaNova.length < 6) {
+      toast.error('A nova senha deve ter pelo menos 6 caracteres.');
+      return;
+    }
+    if (senhaNova !== senhaConfirm) {
+      toast.error('A nova senha e a confirmação não coincidem.');
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('professor-api?action=change_password', {
+        method: 'POST',
+        headers: authHeaders,
+        body: { senha_atual: senhaAtual, senha_nova: senhaNova },
+      });
+      if (error || data?.error) {
+        toast.error(data?.error || 'Erro ao alterar senha.');
+      } else {
+        toast.success('Senha alterada com sucesso!');
+        setPasswordDialogOpen(false);
+        setSenhaAtual('');
+        setSenhaNova('');
+        setSenhaConfirm('');
+      }
+    } catch {
+      toast.error('Erro de conexão.');
+    }
+    setChangingPassword(false);
   };
 
   const contestStatusColor = (status: string) => {
@@ -287,6 +330,18 @@ const DashboardPage = () => {
                 Caso identifique alguma divergência nos seus dados, clique acima para abrir uma contestação. Nossa equipe jurídica analisará e retornará pelo contato informado.
               </p>
             </div>
+
+            {/* Change Password Button */}
+            <div className="pt-2">
+              <Button
+                onClick={() => setPasswordDialogOpen(true)}
+                variant="outline"
+                className="w-full"
+              >
+                <KeyRound className="w-4 h-4 mr-2" />
+                Alterar Senha
+              </Button>
+            </div>
           </>
         )}
 
@@ -422,6 +477,56 @@ const DashboardPage = () => {
           </form>
         </SheetContent>
       </Sheet>
+
+      {/* Password Change Dialog */}
+      <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Alterar Senha</DialogTitle>
+            <DialogDescription>
+              Preencha os campos abaixo para alterar sua senha de acesso.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div className="space-y-2">
+              <Label htmlFor="senha-atual">Senha atual *</Label>
+              <Input
+                id="senha-atual"
+                type="password"
+                placeholder="Digite sua senha atual"
+                value={senhaAtual}
+                onChange={(e) => setSenhaAtual(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="senha-nova">Nova senha *</Label>
+              <Input
+                id="senha-nova"
+                type="password"
+                placeholder="Mínimo 6 caracteres"
+                value={senhaNova}
+                onChange={(e) => setSenhaNova(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="senha-confirm">Confirmar nova senha *</Label>
+              <Input
+                id="senha-confirm"
+                type="password"
+                placeholder="Repita a nova senha"
+                value={senhaConfirm}
+                onChange={(e) => setSenhaConfirm(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setPasswordDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleChangePassword} disabled={changingPassword}>
+              {changingPassword ? 'Salvando...' : 'Salvar Nova Senha'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <footer className="fixed bottom-0 left-0 right-0 py-3 text-center text-xs text-muted-foreground border-t bg-background">
         Desenvolvido pelo Núcleo de Tecnologia e Dados - SEDUC Parnaíba

@@ -9,7 +9,7 @@ const Index = () => {
   useEffect(() => {
     if (loading) return;
     if (professor) {
-      navigate(professor.role === 'admin' ? '/admin' : '/dashboard');
+      navigate(professor.role === 'admin' ? '/admin' : professor.role === 'juridico' ? '/juridico' : '/dashboard');
     } else {
       navigate('/login');
     }

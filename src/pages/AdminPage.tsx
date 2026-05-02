@@ -51,7 +51,7 @@ interface Message {
 }
 
 const emptyProfessor = {
-  nome: '', cpf: '', matricula: '', senha: '', data_nascimento: '',
+  nome: '', cpf: '', matricula: '', senha: '', data_nascimento: '', email: '',
   vinculo_inicio: '', vinculo_fim: '', total_cotas: 0, status: 'Pendente', role: 'professor',
 };
 
@@ -143,7 +143,7 @@ const AdminPage = () => {
   const openEditDialog = (p: Professor) => {
     setEditingProf(p);
     setFormData({
-      nome: p.nome, cpf: p.cpf, matricula: p.matricula, senha: '',
+      nome: p.nome, cpf: p.cpf, matricula: p.matricula, senha: '', email: '',
       data_nascimento: p.data_nascimento || '', vinculo_inicio: p.vinculo_inicio || '',
       vinculo_fim: p.vinculo_fim || '', total_cotas: p.total_cotas || 0,
       status: p.status, role: p.role,
@@ -736,6 +736,18 @@ const AdminPage = () => {
                 </SelectContent>
               </Select>
             </div>
+            {(formData.role === 'admin' || formData.role === 'juridico') && (
+              <div className="space-y-2">
+                <Label>E-mail de acesso (login admin)</Label>
+                <Input
+                  type="email"
+                  placeholder="admin@email.com"
+                  value={formData.email}
+                  onChange={e => setFormData({...formData, email: e.target.value})}
+                />
+                <p className="text-xs text-muted-foreground">Este e-mail será usado para login em /login/admin</p>
+              </div>
+            )}
             {!editingProf && (
               <div className="space-y-2">
                 <Label>Senha (deixe vazio para usar data de nascimento)</Label>

@@ -17,15 +17,39 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
 
+interface MatriculaOption {
+  id: string;
+  nome: string;
+  matricula: string;
+  vinculo_inicio: string | null;
+  vinculo_fim: string | null;
+  total_cotas: number | null;
+  status: string;
+}
+
+const formatCpfInput = (value: string): string => {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
+  if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+};
+
 const LoginPage = () => {
-  const [matricula, setMatricula] = useState('');
+  const [cpf, setCpf] = useState('');
   const [senha, setSenha] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportMatricula, setReportMatricula] = useState('');
   const [reportMessage, setReportMessage] = useState('');
-  const { login } = useAuth();
+
+  // Multi-matrícula selection
+  const [matriculaDialogOpen, setMatriculaDialogOpen] = useState(false);
+  const [matriculas, setMatriculas] = useState<MatriculaOption[]>([]);
+  const [selectingMatricula, setSelectingMatricula] = useState(false);
+
+  const { login, selectMatricula } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -33,8 +57,14 @@ const LoginPage = () => {
     setError('');
     setIsLoading(true);
 
-    const result = await login(matricula, senha);
+    const result = await login(cpf.replace(/\D/g, ''), senha);
     setIsLoading(false);
+
+    if (result.multiple_matriculas && result.matriculas) {
+      setMatriculas(result.matriculas);
+      setMatriculaDialogOpen(true);
+      return;
+    }
 
     if (result.success) {
       const stored = localStorage.getItem('fundef_session');
@@ -47,6 +77,19 @@ const LoginPage = () => {
       }
     } else {
       setError(result.error || 'Erro ao fazer login.');
+    }
+  };
+
+  const handleSelectMatricula = async (matriculaId: string) => {
+    setSelectingMatricula(true);
+    const result = await selectMatricula(cpf.replace(/\D/g, ''), senha, matriculaId);
+    setSelectingMatricula(false);
+
+    if (result.success) {
+      setMatriculaDialogOpen(false);
+      navigate('/dashboard');
+    } else {
+      setError(result.error || 'Erro ao selecionar matrícula.');
     }
   };
 
@@ -109,16 +152,18 @@ const LoginPage = () => {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="matricula" className="text-sm font-medium">
-                Matrícula <span className="text-destructive">*</span>
+              <Label htmlFor="cpf" className="text-sm font-medium">
+                CPF <span className="text-destructive">*</span>
               </Label>
               <Input
-                id="matricula"
-                placeholder="Digite sua matrícula"
-                value={matricula}
-                onChange={(e) => setMatricula(e.target.value)}
+                id="cpf"
+                placeholder="000.000.000-00"
+                value={cpf}
+                onChange={(e) => setCpf(formatCpfInput(e.target.value))}
                 required
                 className="h-12 rounded-lg"
+                maxLength={14}
+                inputMode="numeric"
               />
             </div>
             <div className="space-y-2">
@@ -174,6 +219,48 @@ const LoginPage = () => {
         </footer>
       </div>
 
+      {/* Matrícula Selection Dialog */}
+      <Dialog open={matriculaDialogOpen} onOpenChange={setMatriculaDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Selecionar Matrícula</DialogTitle>
+            <DialogDescription>
+              Seu CPF possui mais de uma matrícula vinculada. Selecione qual deseja acessar:
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 mt-2 max-h-[400px] overflow-y-auto">
+            {matriculas.map((m) => (
+              <button
+                key={m.id}
+                onClick={() => handleSelectMatricula(m.id)}
+                disabled={selectingMatricula}
+                className="w-full text-left p-4 rounded-lg border border-border hover:border-primary hover:bg-primary/5 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="font-semibold text-sm">{m.nome}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Matrícula: <span className="font-mono font-medium text-foreground">{m.matricula}</span>
+                    </p>
+                  </div>
+                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${
+                    m.status === 'Validado' ? 'bg-green-100 text-green-700 border-green-200' :
+                    m.status === 'Em Análise' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                    'bg-yellow-100 text-yellow-700 border-yellow-200'
+                  }`}>
+                    {m.status}
+                  </span>
+                </div>
+                <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+                  <span>Vínculo: {m.vinculo_inicio || '—'} a {m.vinculo_fim || '—'}</span>
+                  <span>Cotas: {m.total_cotas ?? '—'}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Report Dialog */}
       <Dialog open={reportOpen} onOpenChange={setReportOpen}>
         <DialogContent className="sm:max-w-md">
@@ -185,10 +272,10 @@ const LoginPage = () => {
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="space-y-2">
-              <Label htmlFor="report-matricula">Matrícula (se souber)</Label>
+              <Label htmlFor="report-matricula">CPF ou Matrícula (se souber)</Label>
               <Input
                 id="report-matricula"
-                placeholder="Sua matrícula"
+                placeholder="Seu CPF ou matrícula"
                 value={reportMatricula}
                 onChange={(e) => setReportMatricula(e.target.value)}
               />
