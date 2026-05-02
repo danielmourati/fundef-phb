@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
-  LogOut, User, AlertTriangle, Bell, Check, Users, Search, Plus, Upload, Trash2, Settings, MessageSquare, Send, Save, LayoutDashboard, KeyRound, Eye, EyeOff,
+  LogOut, User, AlertTriangle, Bell, Check, Users, Search, Plus, Upload, Trash2, Settings, MessageSquare, Send, Save, LayoutDashboard, KeyRound, Eye, EyeOff, Download, Pencil, FileText, UserX, UserCheck
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
