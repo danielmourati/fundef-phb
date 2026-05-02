@@ -283,6 +283,60 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: true, count: toInsert.length });
     }
 
+    // POST change_password
+    if (req.method === "POST" && action === "change_password") {
+      const body = await req.json();
+      const senhaAtual = String(body.senha_atual || "").trim();
+      const senhaNova = String(body.senha_nova || "").trim();
+
+      if (!senhaAtual || !senhaNova) {
+        return new Response(JSON.stringify({ error: "Senha atual e nova senha são obrigatórias." }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+
+      if (senhaNova.length < 6) {
+        return new Response(JSON.stringify({ error: "A nova senha deve ter pelo menos 6 caracteres." }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+
+      // Verify current password
+      const { data: userData } = await supabase
+        .from("users")
+        .select("senha_hash")
+        .eq("id", user.sub)
+        .single();
+
+      if (!userData) {
+        return new Response(JSON.stringify({ error: "Usuário não encontrado." }), {
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+
+      const { data: isValid } = await supabase.rpc("verify_password", {
+        plain_password: senhaAtual,
+        hashed_password: userData.senha_hash
+      });
+
+      if (!isValid) {
+        return new Response(JSON.stringify({ error: "Senha atual incorreta." }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+
+      const { data: hashData } = await supabase.rpc("hash_password", { plain_password: senhaNova });
+
+      const { error: updateErr } = await supabase
+        .from("users")
+        .update({ senha_hash: hashData })
+        .eq("id", user.sub);
+
+      if (updateErr) throw updateErr;
+
+      return jsonResponse({ success: true });
+    }
+
     // PUT settings
     if (req.method === "PUT" && action === "save_settings") {
       const body = await req.json();
