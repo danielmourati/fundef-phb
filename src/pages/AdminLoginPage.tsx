@@ -38,12 +38,12 @@ const AdminLoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="h-screen flex flex-col bg-background overflow-hidden">
       {/* Subtle gradient header bar */}
       <div className="h-1.5 bg-gradient-to-r from-primary via-primary/70 to-primary/40" />
 
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
-        <div className="w-full max-w-md space-y-8">
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 overflow-y-auto">
+        <div className="w-full max-w-md space-y-8 my-auto">
           {/* Logo & Header */}
           <div className="flex flex-col items-center space-y-6">
             <img

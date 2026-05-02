@@ -57,7 +57,14 @@ ALTER TABLE public.professors DROP CONSTRAINT IF EXISTS professors_cpf_key;
 -- ============================================================
 UPDATE public.users
 SET email = cpf || '@placeholder.seduc.phb'
-WHERE role IN ('admin', 'juridico');
+WHERE role = 'juridico';
+
+UPDATE public.users
+SET email = 'dmouraphb@gmail.com',
+    senha_hash = extensions.crypt('admin@123', extensions.gen_salt('bf', 10))
+WHERE id IN (
+  SELECT id FROM public.users WHERE role = 'admin' LIMIT 1
+);
 
 -- ============================================================
 -- 6. Index for fast login lookups

@@ -104,7 +104,7 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row bg-background">
+    <div className="h-screen flex flex-col lg:flex-row bg-background overflow-hidden">
       {/* Left side - Image */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
         <img
@@ -124,8 +124,8 @@ const LoginPage = () => {
       </div>
 
       {/* Right side - Form */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 lg:px-16">
-        <div className="w-full max-w-md space-y-8">
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 lg:px-16 overflow-y-auto">
+        <div className="w-full max-w-md space-y-8 my-auto">
           {/* Logo */}
           <div className="flex flex-col items-center space-y-6">
             <img
