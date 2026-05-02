@@ -129,23 +129,36 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "Sua conta está inativa. Entre em contato com a administração." }, 403);
       }
 
-      // Get the admin/juridico professor record
+      // Get the admin/juridico professor record (optional)
       const { data: prof } = await supabase
         .from("professors")
         .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, status, role, user_id")
         .eq("user_id", user.id)
         .maybeSingle();
 
-      if (!prof) {
-        await logAttempt(ip, false, undefined, email);
-        return jsonResponse({ error: "Nenhum perfil vinculado a este e-mail." }, 401);
-      }
+      const professorData = prof || {
+        id: user.id,
+        nome: user.role === 'admin' ? "Administrador" : "Equipe Jurídica",
+        cpf: user.cpf || "00000000000",
+        matricula: user.role.toUpperCase(),
+        data_nascimento: null,
+        vinculo_inicio: null,
+        vinculo_fim: null,
+        total_cotas: 0,
+        status: user.status,
+        role: user.role,
+        user_id: user.id
+      };
 
       await logAttempt(ip, true, undefined, email);
 
-      const token = await generateToken(user.id, user.role, prof.id, prof.matricula);
-      const { user_id: _, ...safeProf } = prof;
-      return jsonResponse({ professor: safeProf, token });
+      const token = await generateToken(user.id, user.role, professorData.id, professorData.matricula);
+
+      return jsonResponse({
+        success: true,
+        token,
+        professor: professorData,
+      });
     }
 
     // ═══════════════════════════════════════════════════════
