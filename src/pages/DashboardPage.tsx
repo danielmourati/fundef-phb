@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { LogOut, User, AlertTriangle, Bell, Check, FileText, KeyRound } from 'lucide-react';
+import { LogOut, User, AlertTriangle, Bell, Check, FileText, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 
 const STEPS = ['Pendente', 'Em Análise', 'Validado'] as const;
@@ -58,6 +58,9 @@ const DashboardPage = () => {
   const [senhaNova, setSenhaNova] = useState('');
   const [senhaConfirm, setSenhaConfirm] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
+  const [showSenhaAtual, setShowSenhaAtual] = useState(false);
+  const [showSenhaNova, setShowSenhaNova] = useState(false);
+  const [showSenhaConfirm, setShowSenhaConfirm] = useState(false);
 
   const authHeaders = { Authorization: `Bearer ${token}` };
 
@@ -490,33 +493,63 @@ const DashboardPage = () => {
           <div className="space-y-4 mt-2">
             <div className="space-y-2">
               <Label htmlFor="senha-atual">Senha atual *</Label>
-              <Input
-                id="senha-atual"
-                type="password"
-                placeholder="Digite sua senha atual"
-                value={senhaAtual}
-                onChange={(e) => setSenhaAtual(e.target.value)}
-              />
+              <div className="relative">
+                <Input
+                  id="senha-atual"
+                  type={showSenhaAtual ? "text" : "password"}
+                  placeholder="Digite sua senha atual"
+                  value={senhaAtual}
+                  onChange={(e) => setSenhaAtual(e.target.value)}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowSenhaAtual(!showSenhaAtual)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showSenhaAtual ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="senha-nova">Nova senha *</Label>
-              <Input
-                id="senha-nova"
-                type="password"
-                placeholder="Mínimo 6 caracteres"
-                value={senhaNova}
-                onChange={(e) => setSenhaNova(e.target.value)}
-              />
+              <div className="relative">
+                <Input
+                  id="senha-nova"
+                  type={showSenhaNova ? "text" : "password"}
+                  placeholder="Mínimo 6 caracteres"
+                  value={senhaNova}
+                  onChange={(e) => setSenhaNova(e.target.value)}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowSenhaNova(!showSenhaNova)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showSenhaNova ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="senha-confirm">Confirmar nova senha *</Label>
-              <Input
-                id="senha-confirm"
-                type="password"
-                placeholder="Repita a nova senha"
-                value={senhaConfirm}
-                onChange={(e) => setSenhaConfirm(e.target.value)}
-              />
+              <div className="relative">
+                <Input
+                  id="senha-confirm"
+                  type={showSenhaConfirm ? "text" : "password"}
+                  placeholder="Repita a nova senha"
+                  value={senhaConfirm}
+                  onChange={(e) => setSenhaConfirm(e.target.value)}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowSenhaConfirm(!showSenhaConfirm)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showSenhaConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
           </div>
           <DialogFooter className="mt-4">

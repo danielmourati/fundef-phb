@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertCircle, MessageCircle } from 'lucide-react';
+import { AlertCircle, MessageCircle, Eye, EyeOff } from 'lucide-react';
 import loginImage from '@/assets/login-education.jpg';
 import logoSeduc from '@/assets/logo-seduc-azul.png';
 import {
@@ -34,10 +34,10 @@ const formatCpfInput = (value: string): string => {
   if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
   return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
 };
-
 const LoginPage = () => {
   const [cpf, setCpf] = useState('');
   const [senha, setSenha] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
@@ -131,7 +131,7 @@ const LoginPage = () => {
             <img
               src={logoSeduc}
               alt="SEDUC Parnaíba"
-              className="h-16 object-contain"
+              className="h-auto w-full max-w-[280px] object-contain"
             />
             <div className="text-center">
               <h1 className="text-2xl font-bold text-foreground">Bem-vindo(a) 👋</h1>
@@ -170,15 +170,24 @@ const LoginPage = () => {
               <Label htmlFor="senha" className="text-sm font-medium">
                 Senha <span className="text-destructive">*</span>
               </Label>
-              <Input
-                id="senha"
-                type="password"
-                placeholder="Data de nascimento (DDMMAAAA)"
-                value={senha}
-                onChange={(e) => setSenha(e.target.value)}
-                required
-                className="h-12 rounded-lg"
-              />
+              <div className="relative">
+                <Input
+                  id="senha"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Data de nascimento (DDMMAAAA)"
+                  value={senha}
+                  onChange={(e) => setSenha(e.target.value)}
+                  required
+                  className="h-12 rounded-lg pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
             </div>
 
             {error && (

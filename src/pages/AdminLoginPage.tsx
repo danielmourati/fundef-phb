@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertCircle, Shield } from 'lucide-react';
+import { AlertCircle, Shield, Eye, EyeOff } from 'lucide-react';
 import logoSeduc from '@/assets/logo-seduc-azul.png';
 
 const AdminLoginPage = () => {
@@ -12,6 +12,7 @@ const AdminLoginPage = () => {
   const [senha, setSenha] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { loginAdmin } = useAuth();
   const navigate = useNavigate();
 
@@ -49,7 +50,7 @@ const AdminLoginPage = () => {
             <img
               src={logoSeduc}
               alt="SEDUC Parnaíba"
-              className="h-14 object-contain"
+              className="h-auto w-full max-w-[280px] object-contain"
             />
             <div className="text-center space-y-2">
               <div className="inline-flex items-center gap-2 bg-primary/10 text-primary text-xs font-semibold px-3 py-1.5 rounded-full">
@@ -94,16 +95,25 @@ const AdminLoginPage = () => {
               <Label htmlFor="admin-senha" className="text-sm font-medium">
                 Senha <span className="text-destructive">*</span>
               </Label>
-              <Input
-                id="admin-senha"
-                type="password"
-                placeholder="Sua senha"
-                value={senha}
-                onChange={(e) => setSenha(e.target.value)}
-                required
-                className="h-12 rounded-lg"
-                autoComplete="current-password"
-              />
+              <div className="relative">
+                <Input
+                  id="admin-senha"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Sua senha"
+                  value={senha}
+                  onChange={(e) => setSenha(e.target.value)}
+                  required
+                  className="h-12 rounded-lg pr-10"
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
             </div>
 
             {error && (
