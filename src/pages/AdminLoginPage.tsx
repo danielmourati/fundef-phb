@@ -21,29 +21,18 @@ const AdminLoginPage = () => {
     setError('');
     setIsLoading(true);
 
-    // Chama edge function diretamente com tipo=admin para login por e-mail
-    try {
-      const { data, error: fnErr } = await supabase.functions.invoke('custom-login', {
-        body: { tipo: 'admin', email, senha },
-      });
-      if (fnErr || !data?.professor) {
-        setError(data?.error || 'E-mail ou senha incorretos.');
-        setIsLoading(false);
-        return;
+    const result = await login(email, senha);
+    setIsLoading(false);
+    if (result.success) {
+      const stored = localStorage.getItem('fundef_session');
+      const role = stored ? JSON.parse(stored).professor?.role : null;
+      if (role === 'admin') navigate('/admin');
+      else if (role === 'juridico') navigate('/juridico');
+      else {
+        setError('Esta tela é restrita para Admin e Jurídico.');
       }
-      // Reaproveita o login do contexto (que já valida e armazena sessão)
-      const result = await login(email, senha);
-      setIsLoading(false);
-      if (result.success) {
-        const stored = localStorage.getItem('fundef_session');
-        const role = stored ? JSON.parse(stored).professor?.role : null;
-        navigate(role === 'juridico' ? '/juridico' : '/admin');
-      } else {
-        setError(result.error || 'Erro ao fazer login.');
-      }
-    } catch {
-      setError('Erro de conexão.');
-      setIsLoading(false);
+    } else {
+      setError(result.error || 'E-mail ou senha incorretos.');
     }
   };
 
