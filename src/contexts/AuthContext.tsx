@@ -52,14 +52,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(false);
   }, []);
 
-  const login = async (matricula: string, senha: string) => {
+  const login = async (identificador: string, senha: string) => {
     try {
       const { data, error } = await supabase.functions.invoke('custom-login', {
-        body: { matricula, senha },
+        body: { identificador, senha },
       });
 
       if (error || !data?.professor) {
-        return { success: false, error: data?.error || 'Matrícula ou senha incorretos.' };
+        return { success: false, error: data?.error || 'CPF ou senha incorretos.' };
       }
 
       setProfessor(data.professor);
