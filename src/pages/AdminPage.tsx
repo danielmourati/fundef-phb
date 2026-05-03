@@ -736,12 +736,19 @@ const AdminPage = () => {
                 </SelectContent>
               </Select>
             </div>
-            {!editingProf && (
-              <div className="space-y-2">
-                <Label>Senha (deixe vazio para usar data de nascimento)</Label>
-                <Input type="password" value={formData.senha} onChange={e => setFormData({...formData, senha: e.target.value})} />
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label>
+                {editingProf
+                  ? 'Redefinir senha (deixe vazio para manter a atual)'
+                  : 'Senha (deixe vazio para usar a data de nascimento)'}
+              </Label>
+              <Input
+                type="password"
+                placeholder={editingProf ? 'Nova senha' : 'Senha inicial'}
+                value={formData.senha}
+                onChange={e => setFormData({ ...formData, senha: e.target.value })}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
