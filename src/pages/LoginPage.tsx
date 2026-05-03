@@ -61,9 +61,9 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row bg-background">
+    <div className="h-screen overflow-hidden flex flex-col lg:flex-row bg-background">
       {/* Left side - Image */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden h-full">
         <img
           src={loginImage}
           alt="Professores em sala de aula"
@@ -81,14 +81,14 @@ const LoginPage = () => {
       </div>
 
       {/* Right side - Form */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 lg:px-16">
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 lg:px-16 h-full overflow-y-auto">
         <div className="w-full max-w-md space-y-8">
           {/* Logo */}
-          <div className="flex flex-col items-center space-y-6">
+          <div className="flex flex-col items-center space-y-4">
             <img
               src={logoSeduc}
               alt="SEDUC Parnaíba"
-              className="h-16 object-contain"
+              className="h-12 object-contain"
             />
             <div className="text-center">
               <h1 className="text-2xl font-bold text-foreground">Bem-vindo(a) 👋</h1>

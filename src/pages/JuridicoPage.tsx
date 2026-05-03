@@ -180,9 +180,9 @@ const JuridicoPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex bg-muted/30">
+    <div className="h-screen overflow-hidden flex bg-muted/30">
       {/* Sidebar */}
-      <aside className="w-64 bg-card border-r border-border flex flex-col min-h-screen sticky top-0">
+      <aside className="w-64 bg-card border-r border-border flex flex-col h-full shrink-0">
         <div className="p-4 border-b border-border flex items-center gap-3">
           <img src={logoSeduc} alt="SEDUC Parnaíba" className="h-12 object-contain" />
         </div>
@@ -211,8 +211,8 @@ const JuridicoPage = () => {
       </aside>
 
       {/* Main */}
-      <div className="flex-1 flex flex-col min-h-screen">
-        <header className="bg-card border-b border-border px-8 py-4 flex items-center justify-between sticky top-0 z-10">
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
+        <header className="bg-card border-b border-border px-8 py-4 flex items-center justify-between shrink-0">
           <div>
             <h2 className="text-xl font-semibold text-foreground">Caixa de Entrada — Contestações</h2>
             <p className="text-xs text-muted-foreground">Corpo Jurídico • Gerencie as contestações dos professores</p>
@@ -244,7 +244,7 @@ const JuridicoPage = () => {
           </div>
         </header>
 
-        <main className="flex-1 p-8 space-y-6">
+        <main className="flex-1 p-8 space-y-6 overflow-y-auto">
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
             {[

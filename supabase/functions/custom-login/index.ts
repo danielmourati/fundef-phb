@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (fetchErr || !professor || !professor.senha_hash) {
+    if (fetchErr || !professor) {
       await supabase.from("login_attempts").insert({ ip_address: ip, matricula: rawId, success: false });
       return new Response(
         JSON.stringify({ error: "Credenciais incorretas." }),
@@ -101,11 +101,24 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Verify password with bcrypt via database function
-    const { data: matchResult } = await supabase.rpc("verify_password", {
-      plain_password: senha,
-      hashed_password: professor.senha_hash,
-    });
+    let matchResult = false;
+    if (professor.senha_hash) {
+      // Verify password with bcrypt via database function
+      const { data } = await supabase.rpc("verify_password", {
+        plain_password: senha,
+        hashed_password: professor.senha_hash,
+      });
+      matchResult = !!data;
+    } else if (professor.data_nascimento) {
+      // Initial login: format data_nascimento (YYYY-MM-DD) to DDMMAAAA
+      const dateStr = String(professor.data_nascimento);
+      const parts = dateStr.split("-");
+      if (parts.length === 3) {
+        const [year, month, day] = parts;
+        const formattedDate = `${day}${month}${year}`;
+        matchResult = (senha === formattedDate);
+      }
+    }
 
     if (!matchResult) {
       await supabase.from("login_attempts").insert({ ip_address: ip, matricula: rawId, success: false });

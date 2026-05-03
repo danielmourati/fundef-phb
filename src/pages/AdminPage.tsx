@@ -290,9 +290,9 @@ const AdminPage = () => {
   ];
 
   return (
-    <div className="min-h-screen flex bg-muted/30">
+    <div className="h-screen overflow-hidden flex bg-muted/30">
       {/* Sidebar */}
-      <aside className="w-64 bg-card border-r border-border flex flex-col min-h-screen sticky top-0">
+      <aside className="w-64 bg-card border-r border-border flex flex-col h-full shrink-0">
         <div className="p-4 border-b border-border flex items-center gap-3">
           <img src={logoSeduc} alt="SEDUC Parnaíba" className="h-12 object-contain" />
         </div>
@@ -335,9 +335,9 @@ const AdminPage = () => {
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-h-screen">
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
         {/* Top Bar */}
-        <header className="bg-card border-b border-border px-8 py-4 flex items-center justify-between sticky top-0 z-10">
+        <header className="bg-card border-b border-border px-8 py-4 flex items-center justify-between shrink-0">
           <div>
             <h2 className="text-xl font-semibold text-foreground">
               {navItems.find(n => n.key === activeTab)?.label}
@@ -361,7 +361,7 @@ const AdminPage = () => {
           </div>
         </header>
 
-        <main className="flex-1 p-8 space-y-6">
+        <main className="flex-1 p-8 space-y-6 overflow-y-auto">
           {/* Dashboard Tab */}
           {activeTab === 'dashboard' && (
             <>
