@@ -108,9 +108,9 @@ Deno.serve(async (req) => {
     });
 
     if (!matchResult) {
-      await supabase.from("login_attempts").insert({ ip_address: ip, matricula: identificador, success: false });
+      await supabase.from("login_attempts").insert({ ip_address: ip, matricula: rawId, success: false });
       return new Response(
-        JSON.stringify({ error: "CPF ou senha incorretos." }),
+        JSON.stringify({ error: "Credenciais incorretas." }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -124,7 +124,7 @@ Deno.serve(async (req) => {
     }
 
     // Log successful attempt
-    await supabase.from("login_attempts").insert({ ip_address: ip, matricula: identificador, success: true });
+    await supabase.from("login_attempts").insert({ ip_address: ip, matricula: rawId, success: true });
 
     // Generate a simple session token (HMAC-based)
     const sessionId = crypto.randomUUID();
