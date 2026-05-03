@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AlertCircle, ShieldCheck } from 'lucide-react';
 import logoSeduc from '@/assets/logo-seduc-azul.png';
-import { supabase } from '@/integrations/supabase/client';
+
 
 const AdminLoginPage = () => {
   const [email, setEmail] = useState('');
