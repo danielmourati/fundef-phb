@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
     }
 
     // Log successful attempt
-    await supabase.from("login_attempts").insert({ ip_address: ip, matricula, success: true });
+    await supabase.from("login_attempts").insert({ ip_address: ip, matricula: identificador, success: true });
 
     // Generate a simple session token (HMAC-based)
     const sessionId = crypto.randomUUID();
