@@ -529,13 +529,13 @@ const AdminPage = () => {
                       <TableBody>
                         {filteredProfs.map(p => (
                           <TableRow key={p.id} className={`${p.status === 'Inativo' ? 'opacity-50' : ''} group`}>
-                            <TableCell className="font-mono text-sm">{p.matricula}</TableCell>
-                            <TableCell className="text-sm">{p.nome}</TableCell>
-                            <TableCell className="font-mono text-sm">{p.cpf}</TableCell>
+                            <TableCell className="font-mono text-xs lg:text-sm py-3">{p.matricula}</TableCell>
+                            <TableCell className="text-xs lg:text-sm font-medium py-3">{p.nome}</TableCell>
+                            <TableCell className="font-mono text-xs lg:text-sm hidden lg:table-cell py-3">{p.cpf}</TableCell>
                             <TableCell className="hidden md:table-cell py-3">
                               <Badge variant="outline" className="text-[10px] lg:text-xs capitalize px-2 py-0">{p.role}</Badge>
                             </TableCell>
-                            <TableCell className="text-sm">{p.total_cotas || 0}</TableCell>
+                            <TableCell className="text-xs lg:text-sm hidden sm:table-cell py-3">{p.total_cotas || 0}</TableCell>
                             <TableCell>
                               <Badge className={`text-xs font-medium ${
                                 p.status === 'Validado' || p.status === 'Ativo' ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-100' :
