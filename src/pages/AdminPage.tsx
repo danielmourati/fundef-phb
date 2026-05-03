@@ -11,7 +11,8 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
-  LogOut, User, AlertTriangle, Bell, Check, Users, Search, Plus, Upload, Trash2, Settings, MessageSquare, Send, Save, LayoutDashboard, KeyRound, Eye, EyeOff, Download, Pencil, FileText, UserX, UserCheck
+  LogOut, Upload, Download, Users, AlertTriangle, Settings, Plus, Pencil, Trash2, Save,
+  LayoutDashboard, FileText, Search, Send, MessageSquare, UserX, UserCheck,
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -50,7 +51,7 @@ interface Message {
 }
 
 const emptyProfessor = {
-  nome: '', cpf: '', matricula: '', senha: '', data_nascimento: '', email: '',
+  nome: '', cpf: '', matricula: '', senha: '', data_nascimento: '',
   vinculo_inicio: '', vinculo_fim: '', total_cotas: 0, status: 'Pendente', role: 'professor',
 };
 
@@ -79,13 +80,8 @@ const AdminPage = () => {
   const [editingProf, setEditingProf] = useState<any>(null);
   const [formData, setFormData] = useState(emptyProfessor);
 
-  const [senhaAtual, setSenhaAtual] = useState('');
-  const [senhaNova, setSenhaNova] = useState('');
-  const [senhaConfirm, setSenhaConfirm] = useState('');
-  const [changingPassword, setChangingPassword] = useState(false);
-  const [showSenhaAtual, setShowSenhaAtual] = useState(false);
-  const [showSenhaNova, setShowSenhaNova] = useState(false);
-  const [showSenhaConfirm, setShowSenhaConfirm] = useState(false);
+  const [emailDestino, setEmailDestino] = useState('');
+  const [savingSettings, setSavingSettings] = useState(false);
 
   // Message form state
   const [msgTitle, setMsgTitle] = useState('');
@@ -129,6 +125,11 @@ const AdminPage = () => {
   };
 
   const fetchSettings = async () => {
+    const { data } = await apiCall('GET', 'settings');
+    if (data && Array.isArray(data)) {
+      const emailSetting = data.find((s: any) => s.key === 'email_destino');
+      if (emailSetting) setEmailDestino(emailSetting.value);
+    }
   };
 
   const handleLogout = () => { logout(); navigate('/'); };
@@ -142,7 +143,7 @@ const AdminPage = () => {
   const openEditDialog = (p: Professor) => {
     setEditingProf(p);
     setFormData({
-      nome: p.nome, cpf: p.cpf, matricula: p.matricula, senha: '', email: '',
+      nome: p.nome, cpf: p.cpf, matricula: p.matricula, senha: '',
       data_nascimento: p.data_nascimento || '', vinculo_inicio: p.vinculo_inicio || '',
       vinculo_fim: p.vinculo_fim || '', total_cotas: p.total_cotas || 0,
       status: p.status, role: p.role,
@@ -226,29 +227,12 @@ const AdminPage = () => {
     toast.success('Relatório exportado!');
   };
 
-  const handleChangePassword = async () => {
-    if (!senhaAtual || !senhaNova || !senhaConfirm) {
-      toast.error('Preencha todos os campos.');
-      return;
-    }
-    if (senhaNova.length < 6) {
-      toast.error('A nova senha deve ter pelo menos 6 caracteres.');
-      return;
-    }
-    if (senhaNova !== senhaConfirm) {
-      toast.error('A nova senha e a confirmação não coincidem.');
-      return;
-    }
-    setChangingPassword(true);
-    const { data, error } = await apiCall('POST', 'change_password', { senha_atual: senhaAtual, senha_nova: senhaNova });
-    setChangingPassword(false);
-    if (error || data?.error) toast.error(data?.error || 'Erro ao alterar senha.');
-    else {
-      toast.success('Senha alterada com sucesso!');
-      setSenhaAtual('');
-      setSenhaNova('');
-      setSenhaConfirm('');
-    }
+  const handleSaveSettings = async () => {
+    setSavingSettings(true);
+    const { data, error } = await apiCall('PUT', 'save_settings', { key: 'email_destino', value: emailDestino });
+    setSavingSettings(false);
+    if (error || data?.error) toast.error(data?.error || 'Erro ao salvar.');
+    else toast.success('Configurações salvas!');
   };
 
   const handleSendMessage = async () => {
@@ -351,7 +335,7 @@ const AdminPage = () => {
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden">
+      <div className="flex-1 flex flex-col min-h-screen">
         {/* Top Bar */}
         <header className="bg-card border-b border-border px-8 py-4 flex items-center justify-between sticky top-0 z-10">
           <div>
@@ -377,7 +361,7 @@ const AdminPage = () => {
           </div>
         </header>
 
-        <main className="flex-1 p-8 space-y-6 overflow-y-auto">
+        <main className="flex-1 p-8 space-y-6">
           {/* Dashboard Tab */}
           {activeTab === 'dashboard' && (
             <>
@@ -654,73 +638,22 @@ const AdminPage = () => {
             <Card>
               <CardContent className="p-6 space-y-6">
                 <div>
-                  <h3 className="font-semibold text-foreground mb-1">Configurações de Acesso</h3>
-                  <p className="text-xs text-muted-foreground">Altere a sua senha de administrador.</p>
+                  <h3 className="font-semibold text-foreground mb-1">Configurações do Sistema</h3>
+                  <p className="text-xs text-muted-foreground">Gerencie as configurações gerais do sistema.</p>
                 </div>
-                <div className="space-y-4 max-w-md">
-                  <div className="space-y-2">
-                    <Label htmlFor="senha-atual">Senha atual *</Label>
-                    <div className="relative">
-                      <Input
-                        id="senha-atual"
-                        type={showSenhaAtual ? "text" : "password"}
-                        placeholder="Digite sua senha atual"
-                        value={senhaAtual}
-                        onChange={(e) => setSenhaAtual(e.target.value)}
-                        className="pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowSenhaAtual(!showSenhaAtual)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      >
-                        {showSenhaAtual ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="senha-nova">Nova senha *</Label>
-                    <div className="relative">
-                      <Input
-                        id="senha-nova"
-                        type={showSenhaNova ? "text" : "password"}
-                        placeholder="Mínimo 6 caracteres"
-                        value={senhaNova}
-                        onChange={(e) => setSenhaNova(e.target.value)}
-                        className="pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowSenhaNova(!showSenhaNova)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      >
-                        {showSenhaNova ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="senha-confirm">Confirmar nova senha *</Label>
-                    <div className="relative">
-                      <Input
-                        id="senha-confirm"
-                        type={showSenhaConfirm ? "text" : "password"}
-                        placeholder="Repita a nova senha"
-                        value={senhaConfirm}
-                        onChange={(e) => setSenhaConfirm(e.target.value)}
-                        className="pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowSenhaConfirm(!showSenhaConfirm)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      >
-                        {showSenhaConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                  </div>
+                <div className="space-y-2 max-w-md">
+                  <Label htmlFor="email_destino">E-mail de destino das contestações</Label>
+                  <Input
+                    id="email_destino"
+                    type="email"
+                    placeholder="advogada@exemplo.com"
+                    value={emailDestino}
+                    onChange={(e) => setEmailDestino(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">As contestações serão notificadas para este e-mail.</p>
                 </div>
-                <Button onClick={handleChangePassword} disabled={changingPassword}>
-                  <Save className="w-4 h-4 mr-1.5" /> {changingPassword ? 'Salvando...' : 'Alterar Senha'}
+                <Button onClick={handleSaveSettings} disabled={savingSettings}>
+                  <Save className="w-4 h-4 mr-1.5" /> {savingSettings ? 'Salvando...' : 'Salvar Configurações'}
                 </Button>
               </CardContent>
             </Card>
@@ -803,24 +736,19 @@ const AdminPage = () => {
                 </SelectContent>
               </Select>
             </div>
-            {(formData.role === 'admin' || formData.role === 'juridico') && (
-              <div className="space-y-2">
-                <Label>E-mail de acesso (login admin)</Label>
-                <Input
-                  type="email"
-                  placeholder="admin@email.com"
-                  value={formData.email}
-                  onChange={e => setFormData({...formData, email: e.target.value})}
-                />
-                <p className="text-xs text-muted-foreground">Este e-mail será usado para login em /login/admin</p>
-              </div>
-            )}
-            {!editingProf && (
-              <div className="space-y-2">
-                <Label>Senha (deixe vazio para usar data de nascimento)</Label>
-                <Input type="password" value={formData.senha} onChange={e => setFormData({...formData, senha: e.target.value})} />
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label>
+                {editingProf
+                  ? 'Redefinir senha (deixe vazio para manter a atual)'
+                  : 'Senha (deixe vazio para usar a data de nascimento)'}
+              </Label>
+              <Input
+                type="password"
+                placeholder={editingProf ? 'Nova senha' : 'Senha inicial'}
+                value={formData.senha}
+                onChange={e => setFormData({ ...formData, senha: e.target.value })}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>

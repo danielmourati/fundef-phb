@@ -1,16 +1,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE",
-};
+import { corsHeaders } from "https://esm.sh/@supabase/supabase-js@2/cors";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-async function verifyToken(authHeader: string | null): Promise<{ sub: string; role: string; uid?: string } | null> {
+async function verifyToken(authHeader: string | null): Promise<{ sub: string; role: string } | null> {
   if (!authHeader?.startsWith("Bearer ")) return null;
   const token = authHeader.slice(7);
   const dotIdx = token.lastIndexOf(".");
@@ -29,7 +25,7 @@ async function verifyToken(authHeader: string | null): Promise<{ sub: string; ro
     if (!valid) return null;
     const payload = JSON.parse(payloadStr);
     if (payload.exp < Date.now()) return null;
-    return { sub: payload.sub, role: payload.role, uid: payload.uid };
+    return { sub: payload.sub, role: payload.role };
   } catch {
     return null;
   }
@@ -99,86 +95,6 @@ Deno.serve(async (req) => {
       }).select("protocolo").single();
       if (error) throw error;
       return jsonResponse({ success: true, protocolo: data?.protocolo });
-    }
-
-    // POST change_password
-    if (req.method === "POST" && action === "change_password") {
-      const body = await req.json();
-      const senhaAtual = String(body.senha_atual || "").trim();
-      const senhaNova = String(body.senha_nova || "").trim();
-
-      if (!senhaAtual || !senhaNova) {
-        return new Response(
-          JSON.stringify({ error: "Senha atual e nova senha são obrigatórias." }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      if (senhaNova.length < 6) {
-        return new Response(
-          JSON.stringify({ error: "A nova senha deve ter pelo menos 6 caracteres." }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      // Get user_id from professor
-      const { data: prof } = await supabase
-        .from("professors")
-        .select("user_id")
-        .eq("id", user.sub)
-        .single();
-
-      if (!prof?.user_id) {
-        return new Response(
-          JSON.stringify({ error: "Usuário não encontrado." }),
-          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      // Get current hash from users table
-      const { data: userData } = await supabase
-        .from("users")
-        .select("senha_hash")
-        .eq("id", prof.user_id)
-        .single();
-
-      if (!userData?.senha_hash) {
-        return new Response(
-          JSON.stringify({ error: "Erro ao verificar senha atual." }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      // Verify current password
-      const { data: matchResult } = await supabase.rpc("verify_password", {
-        plain_password: senhaAtual,
-        hashed_password: userData.senha_hash,
-      });
-
-      if (!matchResult) {
-        return new Response(
-          JSON.stringify({ error: "Senha atual incorreta." }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      // Hash new password and update
-      const { data: hashData } = await supabase.rpc("hash_password", { plain_password: senhaNova });
-
-      const { error: updateErr } = await supabase
-        .from("users")
-        .update({ senha_hash: hashData })
-        .eq("id", prof.user_id);
-
-      if (updateErr) throw updateErr;
-
-      // Also update senha_hash in professors for backward compat
-      await supabase
-        .from("professors")
-        .update({ senha_hash: hashData, senha: "***" })
-        .eq("user_id", prof.user_id);
-
-      return jsonResponse({ success: true });
     }
 
     // GET messages (broadcast + personal notifications for professor)

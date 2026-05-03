@@ -63,21 +63,27 @@ export type Database = {
       }
       login_attempts: {
         Row: {
+          cpf: string | null
           created_at: string
+          email: string | null
           id: string
           ip_address: string
           matricula: string | null
           success: boolean
         }
         Insert: {
+          cpf?: string | null
           created_at?: string
+          email?: string | null
           id?: string
           ip_address: string
           matricula?: string | null
           success?: boolean
         }
         Update: {
+          cpf?: string | null
           created_at?: string
+          email?: string | null
           id?: string
           ip_address?: string
           matricula?: string | null
@@ -176,6 +182,7 @@ export type Database = {
           status: string
           total_cotas: number | null
           updated_at: string
+          user_id: string | null
           vinculo_fim: string | null
           vinculo_inicio: string | null
         }
@@ -192,6 +199,7 @@ export type Database = {
           status?: string
           total_cotas?: number | null
           updated_at?: string
+          user_id?: string | null
           vinculo_fim?: string | null
           vinculo_inicio?: string | null
         }
@@ -208,10 +216,19 @@ export type Database = {
           status?: string
           total_cotas?: number | null
           updated_at?: string
+          user_id?: string | null
           vinculo_fim?: string | null
           vinculo_inicio?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "professors_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       system_settings: {
         Row: {
@@ -234,6 +251,39 @@ export type Database = {
           key?: string
           updated_at?: string
           value?: string
+        }
+        Relationships: []
+      }
+      users: {
+        Row: {
+          cpf: string | null
+          created_at: string
+          email: string | null
+          id: string
+          role: string
+          senha_hash: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          cpf?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          role?: string
+          senha_hash: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          cpf?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          role?: string
+          senha_hash?: string
+          status?: string
+          updated_at?: string
         }
         Relationships: []
       }

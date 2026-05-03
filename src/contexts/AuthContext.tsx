@@ -14,31 +14,11 @@ interface Professor {
   role: string;
 }
 
-interface MatriculaOption {
-  id: string;
-  nome: string;
-  cpf: string;
-  matricula: string;
-  data_nascimento: string | null;
-  vinculo_inicio: string | null;
-  vinculo_fim: string | null;
-  total_cotas: number | null;
-  status: string;
-  role: string;
-}
-
 interface AuthContextType {
   professor: Professor | null;
   token: string | null;
   loading: boolean;
-  login: (cpf: string, senha: string) => Promise<{
-    success: boolean;
-    error?: string;
-    multiple_matriculas?: boolean;
-    matriculas?: MatriculaOption[];
-  }>;
-  loginAdmin: (email: string, senha: string) => Promise<{ success: boolean; error?: string }>;
-  selectMatricula: (cpf: string, senha: string, matriculaId: string) => Promise<{ success: boolean; error?: string }>;
+  login: (identificador: string, senha: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
 }
 
@@ -72,68 +52,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(false);
   }, []);
 
-  // Login for professors (CPF + senha)
-  const login = async (cpf: string, senha: string) => {
+  const login = async (identificador: string, senha: string) => {
     try {
       const { data, error } = await supabase.functions.invoke('custom-login', {
-        body: { cpf, senha, mode: 'professor' },
+        body: { identificador, senha },
       });
 
-      if (error) {
-        return { success: false, error: 'Erro de conexão com o servidor.' };
-      }
-
-      // Multiple matrículas — return them for the UI to show selection
-      if (data?.multiple_matriculas) {
-        return {
-          success: false,
-          multiple_matriculas: true,
-          matriculas: data.matriculas,
-        };
-      }
-
-      if (!data?.professor) {
+      if (error || !data?.professor) {
         return { success: false, error: data?.error || 'CPF ou senha incorretos.' };
-      }
-
-      setProfessor(data.professor);
-      setToken(data.token);
-      localStorage.setItem('fundef_session', JSON.stringify({ professor: data.professor, token: data.token }));
-      return { success: true };
-    } catch {
-      return { success: false, error: 'Erro de conexão com o servidor.' };
-    }
-  };
-
-  // Login for admin/juridico (email + senha)
-  const loginAdmin = async (email: string, senha: string) => {
-    try {
-      const { data, error } = await supabase.functions.invoke('custom-login', {
-        body: { email, senha, mode: 'admin' },
-      });
-
-      if (error || !data?.professor) {
-        return { success: false, error: data?.error || 'E-mail ou senha incorretos.' };
-      }
-
-      setProfessor(data.professor);
-      setToken(data.token);
-      localStorage.setItem('fundef_session', JSON.stringify({ professor: data.professor, token: data.token }));
-      return { success: true };
-    } catch {
-      return { success: false, error: 'Erro de conexão com o servidor.' };
-    }
-  };
-
-  // Select a specific matrícula after multi-matrícula login
-  const selectMatricula = async (cpf: string, senha: string, matriculaId: string) => {
-    try {
-      const { data, error } = await supabase.functions.invoke('custom-login', {
-        body: { cpf, senha, mode: 'professor', matricula_id: matriculaId },
-      });
-
-      if (error || !data?.professor) {
-        return { success: false, error: data?.error || 'Erro ao selecionar matrícula.' };
       }
 
       setProfessor(data.professor);
@@ -152,7 +78,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ professor, token, loading, login, loginAdmin, selectMatricula, logout }}>
+    <AuthContext.Provider value={{ professor, token, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
