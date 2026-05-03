@@ -517,23 +517,23 @@ const AdminPage = () => {
                     <Table>
                       <TableHeader>
                         <TableRow className="hover:bg-transparent">
-                          <TableHead className="text-xs font-medium text-muted-foreground">Matrícula</TableHead>
-                          <TableHead className="text-xs font-medium text-muted-foreground">Nome</TableHead>
-                          <TableHead className="text-xs font-medium text-muted-foreground">CPF</TableHead>
-                          <TableHead className="text-xs font-medium text-muted-foreground">Perfil</TableHead>
-                          <TableHead className="text-xs font-medium text-muted-foreground">Cotas</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground w-[80px] lg:w-[120px]">Matrícula</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground min-w-[150px]">Nome</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground hidden lg:table-cell">CPF</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground hidden md:table-cell">Perfil</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground hidden sm:table-cell">Cotas</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground">Status</TableHead>
-                          <TableHead className="text-xs font-medium text-muted-foreground text-right">Ações</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground text-right sticky right-0 bg-card/95 backdrop-blur-sm z-10 border-l border-border px-4 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {filteredProfs.map(p => (
-                          <TableRow key={p.id} className={p.status === 'Inativo' ? 'opacity-50' : ''}>
+                          <TableRow key={p.id} className={`${p.status === 'Inativo' ? 'opacity-50' : ''} group`}>
                             <TableCell className="font-mono text-sm">{p.matricula}</TableCell>
                             <TableCell className="text-sm">{p.nome}</TableCell>
                             <TableCell className="font-mono text-sm">{p.cpf}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className="text-xs capitalize">{p.role}</Badge>
+                            <TableCell className="hidden md:table-cell py-3">
+                              <Badge variant="outline" className="text-[10px] lg:text-xs capitalize px-2 py-0">{p.role}</Badge>
                             </TableCell>
                             <TableCell className="text-sm">{p.total_cotas || 0}</TableCell>
                             <TableCell>
@@ -544,22 +544,24 @@ const AdminPage = () => {
                                 'bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-100'
                               } border`}>{p.status}</Badge>
                             </TableCell>
-                            <TableCell className="text-right space-x-1">
-                              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditDialog(p)} title="Editar">
-                                <Pencil className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className={`h-8 w-8 ${p.status === 'Inativo' ? 'text-green-600 hover:text-green-700' : 'text-orange-500 hover:text-orange-600'}`}
-                                onClick={() => handleToggleStatus(p)}
-                                title={p.status === 'Inativo' ? 'Ativar' : 'Inativar'}
-                              >
-                                {p.status === 'Inativo' ? <UserCheck className="w-4 h-4" /> : <UserX className="w-4 h-4" />}
-                              </Button>
-                              <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDeleteProf(p.id, p.nome)} title="Excluir">
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
+                            <TableCell className="text-right sticky right-0 bg-card/95 backdrop-blur-sm z-10 border-l border-border px-4 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)] group-hover:bg-accent/50 transition-colors">
+                              <div className="flex items-center justify-end gap-1">
+                                <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-background" onClick={() => openEditDialog(p)} title="Editar">
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className={`h-8 w-8 hover:bg-background ${p.status === 'Inativo' ? 'text-green-600 hover:text-green-700' : 'text-orange-500 hover:text-orange-600'}`}
+                                  onClick={() => handleToggleStatus(p)}
+                                  title={p.status === 'Inativo' ? 'Ativar' : 'Inativar'}
+                                >
+                                  {p.status === 'Inativo' ? <UserCheck className="w-3.5 h-3.5" /> : <UserX className="w-3.5 h-3.5" />}
+                                </Button>
+                                <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleDeleteProf(p.id, p.nome)} title="Excluir">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
