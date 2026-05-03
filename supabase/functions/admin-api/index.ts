@@ -149,6 +149,16 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: true });
     }
 
+    // DELETE all professors (Clear database)
+    if (req.method === "DELETE" && action === "delete_all_professors") {
+      // First delete all contestations as they depend on professors
+      await supabase.from("contestacoes").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      // Then delete all professors
+      const { error } = await supabase.from("professors").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      if (error) throw error;
+      return jsonResponse({ success: true });
+    }
+
     // POST CSV import
     if (req.method === "POST" && action === "import_csv") {
       const body = await req.json();

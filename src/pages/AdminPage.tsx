@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
   LogOut, Upload, Download, Users, AlertTriangle, Settings, Plus, Pencil, Trash2, Save,
-  LayoutDashboard, FileText, Search, Send, MessageSquare, UserX, UserCheck, Menu, Eye, EyeOff,
+  LayoutDashboard, FileText, Search, Send, MessageSquare, UserX, UserCheck, Menu, Eye, EyeOff, Trash,
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -179,6 +179,19 @@ const AdminPage = () => {
     });
     if (error || data?.error) { toast.error(data?.error || 'Erro ao excluir.'); return; }
     toast.success('Professor excluído!');
+    fetchData();
+  };
+
+  const handleClearDatabase = async () => {
+    if (!confirm('ATENÇÃO: Isso excluirá TODOS os professores e contestações do sistema. Esta ação não pode ser desfeita. Deseja continuar?')) return;
+    setLoading(true);
+    const { data, error } = await supabase.functions.invoke('admin-api?action=delete_all_professors', {
+      method: 'DELETE',
+      headers: authHeaders,
+    });
+    setLoading(false);
+    if (error || data?.error) { toast.error(data?.error || 'Erro ao limpar base.'); return; }
+    toast.success('Base de dados limpa com sucesso!');
     fetchData();
   };
 
@@ -491,6 +504,9 @@ const AdminPage = () => {
                     <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleCSVImport} />
                     <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={() => fileInputRef.current?.click()}>
                       <Upload className="w-4 h-4 mr-1.5" /> Importar
+                    </Button>
+                    <Button size="sm" variant="destructive" className="flex-1 sm:flex-none" onClick={handleClearDatabase}>
+                      <Trash className="w-4 h-4 mr-1.5" /> Limpar Base
                     </Button>
                     <Button size="sm" className="flex-1 sm:flex-none" onClick={openAddDialog}>
                       <Plus className="w-4 h-4 mr-1.5" /> Adicionar
