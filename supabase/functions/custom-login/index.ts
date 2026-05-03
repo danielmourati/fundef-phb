@@ -34,28 +34,39 @@ Deno.serve(async (req) => {
 
     // Parse and validate input
     const body = await req.json();
-    const matricula = String(body.matricula || "").trim();
+    // Aceita "identificador" (CPF preferencial) ou os campos legados "cpf"/"matricula"
+    const rawId = String(body.identificador || body.cpf || body.matricula || "").trim();
     const senha = String(body.senha || "").trim();
+    const identificador = rawId.replace(/\D/g, "") || rawId; // normaliza CPF removendo pontuação
 
-    if (!matricula || !senha || matricula.length > 50 || senha.length > 50) {
+    if (!identificador || !senha || identificador.length > 50 || senha.length > 50) {
       return new Response(
-        JSON.stringify({ error: "Matrícula e senha são obrigatórios." }),
+        JSON.stringify({ error: "CPF e senha são obrigatórios." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Find professor by matricula
-    const { data: professor, error: fetchErr } = await supabase
+    // Busca por CPF (forma padrão); fallback por matrícula para compatibilidade
+    let { data: professor, error: fetchErr } = await supabase
       .from("professors")
       .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, status, role, senha_hash")
-      .eq("matricula", matricula)
+      .eq("cpf", identificador)
       .maybeSingle();
 
+    if (!professor) {
+      const fb = await supabase
+        .from("professors")
+        .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, status, role, senha_hash")
+        .eq("matricula", identificador)
+        .maybeSingle();
+      professor = fb.data;
+      fetchErr = fb.error;
+    }
+
     if (fetchErr || !professor || !professor.senha_hash) {
-      // Log failed attempt
-      await supabase.from("login_attempts").insert({ ip_address: ip, matricula, success: false });
+      await supabase.from("login_attempts").insert({ ip_address: ip, matricula: identificador, success: false });
       return new Response(
-        JSON.stringify({ error: "Matrícula ou senha incorretos." }),
+        JSON.stringify({ error: "CPF ou senha incorretos." }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
