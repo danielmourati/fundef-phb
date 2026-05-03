@@ -78,9 +78,9 @@ Deno.serve(async (req) => {
     });
 
     if (!matchResult) {
-      await supabase.from("login_attempts").insert({ ip_address: ip, matricula, success: false });
+      await supabase.from("login_attempts").insert({ ip_address: ip, matricula: identificador, success: false });
       return new Response(
-        JSON.stringify({ error: "Matrícula ou senha incorretos." }),
+        JSON.stringify({ error: "CPF ou senha incorretos." }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
