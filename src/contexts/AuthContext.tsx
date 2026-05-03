@@ -18,7 +18,7 @@ interface AuthContextType {
   professor: Professor | null;
   token: string | null;
   loading: boolean;
-  login: (matricula: string, senha: string) => Promise<{ success: boolean; error?: string }>;
+  login: (identificador: string, senha: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
 }
 
