@@ -12,8 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
-  LogOut, Scale, Inbox, Search, FileText, Clock, CheckCircle, XCircle, Download,
+  LogOut, Scale, Inbox, Search, FileText, Clock, CheckCircle, XCircle, Download, Menu,
 } from 'lucide-react';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { toast } from 'sonner';
 import logoSeduc from '@/assets/logo-seduc.png';
 import jsPDF from 'jspdf';
@@ -181,8 +182,8 @@ const JuridicoPage = () => {
 
   return (
     <div className="h-screen overflow-hidden flex bg-muted/30">
-      {/* Sidebar */}
-      <aside className="w-64 bg-card border-r border-border flex flex-col h-full shrink-0">
+      {/* Desktop Sidebar */}
+      <aside className="hidden lg:flex w-64 bg-card border-r border-border flex-col h-full shrink-0">
         <div className="p-4 border-b border-border flex items-center gap-3">
           <img src={logoSeduc} alt="SEDUC Parnaíba" className="h-12 object-contain" />
         </div>
@@ -212,17 +213,51 @@ const JuridicoPage = () => {
 
       {/* Main */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
-        <header className="bg-card border-b border-border px-8 py-4 flex items-center justify-between shrink-0">
-          <div>
-            <h2 className="text-xl font-semibold text-foreground">Caixa de Entrada — Contestações</h2>
-            <p className="text-xs text-muted-foreground">Corpo Jurídico • Gerencie as contestações dos professores</p>
+        <header className="bg-card border-b border-border px-4 lg:px-8 py-4 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-4">
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="lg:hidden">
+                  <Menu className="w-5 h-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="p-0 w-64">
+                <div className="p-4 border-b border-border flex items-center gap-3">
+                  <img src={logoSeduc} alt="SEDUC Parnaíba" className="h-10 object-contain" />
+                </div>
+                <nav className="flex-1 p-3 space-y-1">
+                  <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium bg-primary text-primary-foreground shadow-sm">
+                    <Inbox className="w-4 h-4" />
+                    Caixa de Entrada
+                  </button>
+                </nav>
+                <div className="p-4 border-t border-border mt-auto">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Scale className="w-4 h-4 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{professor.nome}</p>
+                      <p className="text-xs text-muted-foreground">Corpo Jurídico</p>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={handleLogout} className="w-full justify-start text-muted-foreground hover:text-destructive">
+                    <LogOut className="w-4 h-4 mr-2" /> Sair
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
+            <div>
+              <h2 className="text-lg lg:text-xl font-semibold text-foreground">Caixa de Entrada — Contestações</h2>
+              <p className="text-[10px] lg:text-xs text-muted-foreground">Corpo Jurídico • Gerencie as contestações dos professores</p>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" onClick={handleExportPDF} className="h-9">
-              <Download className="w-4 h-4 mr-1.5" /> Exportar PDF
+          <div className="flex items-center gap-2 lg:gap-3">
+            <Button variant="outline" size="sm" onClick={handleExportPDF} className="h-9 hidden sm:flex">
+              <Download className="w-4 h-4 mr-1.5" /> PDF
             </Button>
             <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-36 h-9">
+              <SelectTrigger className="w-28 lg:w-36 h-9">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -235,8 +270,8 @@ const JuridicoPage = () => {
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Buscar protocolo, nome..."
-                className="pl-9 w-64 h-9"
+                placeholder="Buscar..."
+                className="pl-9 w-28 lg:w-64 h-9"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
               />
@@ -244,7 +279,7 @@ const JuridicoPage = () => {
           </div>
         </header>
 
-        <main className="flex-1 p-8 space-y-6 overflow-y-auto">
+        <main className="flex-1 p-4 lg:p-8 space-y-6 overflow-y-auto">
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
             {[

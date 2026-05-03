@@ -4,13 +4,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertCircle, ShieldCheck } from 'lucide-react';
+import { AlertCircle, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import logoSeduc from '@/assets/logo-seduc-azul.png';
 
 
 const AdminLoginPage = () => {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
@@ -66,15 +67,24 @@ const AdminLoginPage = () => {
           </div>
           <div className="space-y-2">
             <Label htmlFor="senha">Senha <span className="text-destructive">*</span></Label>
-            <Input
-              id="senha"
-              type="password"
-              placeholder="Sua senha"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-              required
-              className="h-12 rounded-lg"
-            />
+            <div className="relative">
+              <Input
+                id="senha"
+                type={showPassword ? "text" : "password"}
+                placeholder="Sua senha"
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                required
+                className="h-12 rounded-lg pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
           </div>
 
           {error && (

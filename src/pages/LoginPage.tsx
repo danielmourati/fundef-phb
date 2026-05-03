@@ -4,27 +4,17 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertCircle, MessageCircle } from 'lucide-react';
+import { AlertCircle, MessageCircle, Eye, EyeOff } from 'lucide-react';
 import loginImage from '@/assets/login-education.jpg';
 import logoSeduc from '@/assets/logo-seduc-azul.png';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
 
 const LoginPage = () => {
   const [cpf, setCpf] = useState('');
   const [senha, setSenha] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [reportOpen, setReportOpen] = useState(false);
-  const [reportMatricula, setReportMatricula] = useState('');
-  const [reportMessage, setReportMessage] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -51,13 +41,7 @@ const LoginPage = () => {
   };
 
   const handleReport = () => {
-    toast({
-      title: 'Relatório enviado',
-      description: 'Sua solicitação foi registrada. A equipe de suporte entrará em contato.',
-    });
-    setReportOpen(false);
-    setReportMatricula('');
-    setReportMessage('');
+    window.open('https://wa.me/5586994422827', '_blank');
   };
 
   return (
@@ -126,15 +110,24 @@ const LoginPage = () => {
               <Label htmlFor="senha" className="text-sm font-medium">
                 Senha <span className="text-destructive">*</span>
               </Label>
-              <Input
-                id="senha"
-                type="password"
-                placeholder="Data de nascimento (DDMMAAAA)"
-                value={senha}
-                onChange={(e) => setSenha(e.target.value)}
-                required
-                className="h-12 rounded-lg"
-              />
+              <div className="relative">
+                <Input
+                  id="senha"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Data de nascimento (DDMMAAAA)"
+                  value={senha}
+                  onChange={(e) => setSenha(e.target.value)}
+                  required
+                  className="h-12 rounded-lg pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
             </div>
 
             {error && (
@@ -157,7 +150,7 @@ const LoginPage = () => {
           <div className="text-center">
             <button
               type="button"
-              onClick={() => setReportOpen(true)}
+              onClick={handleReport}
               className="text-sm text-primary hover:underline inline-flex items-center gap-1.5 font-medium"
             >
               <MessageCircle className="w-4 h-4" />
@@ -175,41 +168,6 @@ const LoginPage = () => {
         </footer>
       </div>
 
-      {/* Report Dialog */}
-      <Dialog open={reportOpen} onOpenChange={setReportOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Reportar problema de acesso</DialogTitle>
-            <DialogDescription>
-              Preencha as informações abaixo para que a equipe de suporte possa ajudá-lo.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 mt-2">
-            <div className="space-y-2">
-              <Label htmlFor="report-matricula">Matrícula (se souber)</Label>
-              <Input
-                id="report-matricula"
-                placeholder="Sua matrícula"
-                value={reportMatricula}
-                onChange={(e) => setReportMatricula(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="report-msg">Descreva o problema</Label>
-              <Textarea
-                id="report-msg"
-                placeholder="Ex: Não consigo acessar, esqueci minha senha..."
-                value={reportMessage}
-                onChange={(e) => setReportMessage(e.target.value)}
-                rows={4}
-              />
-            </div>
-            <Button onClick={handleReport} className="w-full" disabled={!reportMessage.trim()}>
-              Enviar relatório
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

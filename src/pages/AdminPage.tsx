@@ -12,8 +12,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
   LogOut, Upload, Download, Users, AlertTriangle, Settings, Plus, Pencil, Trash2, Save,
-  LayoutDashboard, FileText, Search, Send, MessageSquare, UserX, UserCheck,
+  LayoutDashboard, FileText, Search, Send, MessageSquare, UserX, UserCheck, Menu,
 } from 'lucide-react';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
@@ -89,6 +90,7 @@ const AdminPage = () => {
   const [msgScheduled, setMsgScheduled] = useState('');
   const [sendingMsg, setSendingMsg] = useState(false);
   const [msgDialogOpen, setMsgDialogOpen] = useState(false);
+  const [showModalPassword, setShowModalPassword] = useState(false);
 
   const authHeaders = { Authorization: `Bearer ${token}` };
 
@@ -291,8 +293,8 @@ const AdminPage = () => {
 
   return (
     <div className="h-screen overflow-hidden flex bg-muted/30">
-      {/* Sidebar */}
-      <aside className="w-64 bg-card border-r border-border flex flex-col h-full shrink-0">
+      {/* Desktop Sidebar */}
+      <aside className="hidden lg:flex w-64 bg-card border-r border-border flex-col h-full shrink-0">
         <div className="p-4 border-b border-border flex items-center gap-3">
           <img src={logoSeduc} alt="SEDUC Parnaíba" className="h-12 object-contain" />
         </div>
@@ -337,14 +339,62 @@ const AdminPage = () => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         {/* Top Bar */}
-        <header className="bg-card border-b border-border px-8 py-4 flex items-center justify-between shrink-0">
-          <div>
-            <h2 className="text-xl font-semibold text-foreground">
-              {navItems.find(n => n.key === activeTab)?.label}
-            </h2>
-            <p className="text-xs text-muted-foreground">
-              Painel Administrativo • Última atualização: agora
-            </p>
+        <header className="bg-card border-b border-border px-4 lg:px-8 py-4 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-4">
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="lg:hidden">
+                  <Menu className="w-5 h-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="p-0 w-64">
+                <div className="p-4 border-b border-border flex items-center gap-3">
+                  <img src={logoSeduc} alt="SEDUC Parnaíba" className="h-10 object-contain" />
+                </div>
+                <nav className="flex-1 p-3 space-y-1">
+                  {navItems.map(item => {
+                    const Icon = item.icon;
+                    const isActive = activeTab === item.key;
+                    return (
+                      <button
+                        key={item.key}
+                        onClick={() => setActiveTab(item.key)}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                          isActive
+                            ? 'bg-primary text-primary-foreground shadow-sm'
+                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                        }`}
+                      >
+                        <Icon className="w-4 h-4" />
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </nav>
+                <div className="p-4 border-t border-border mt-auto">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Users className="w-4 h-4 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{professor.nome}</p>
+                      <p className="text-xs text-muted-foreground">Administrador</p>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={handleLogout} className="w-full justify-start text-muted-foreground hover:text-destructive">
+                    <LogOut className="w-4 h-4 mr-2" /> Sair
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
+            <div>
+              <h2 className="text-lg lg:text-xl font-semibold text-foreground">
+                {navItems.find(n => n.key === activeTab)?.label}
+              </h2>
+              <p className="text-[10px] lg:text-xs text-muted-foreground">
+                Painel Administrativo • Última atualização: agora
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             {(activeTab === 'professors' || activeTab === 'dashboard') && (
@@ -352,7 +402,7 @@ const AdminPage = () => {
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="Buscar..."
-                  className="pl-9 w-64 h-9"
+                  className="pl-9 w-32 lg:w-64 h-9"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                 />
@@ -361,7 +411,7 @@ const AdminPage = () => {
           </div>
         </header>
 
-        <main className="flex-1 p-8 space-y-6 overflow-y-auto">
+        <main className="flex-1 p-4 lg:p-8 space-y-6 overflow-y-auto">
           {/* Dashboard Tab */}
           {activeTab === 'dashboard' && (
             <>
@@ -435,14 +485,14 @@ const AdminPage = () => {
           {activeTab === 'professors' && (
             <Card>
               <CardContent className="p-0">
-                <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-6 py-4 border-b border-border gap-4">
                   <h3 className="font-semibold text-foreground">Professores ({nonAdminProfs.length})</h3>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                     <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleCSVImport} />
-                    <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}>
-                      <Upload className="w-4 h-4 mr-1.5" /> Importar CSV
+                    <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={() => fileInputRef.current?.click()}>
+                      <Upload className="w-4 h-4 mr-1.5" /> Importar
                     </Button>
-                    <Button size="sm" onClick={openAddDialog}>
+                    <Button size="sm" className="flex-1 sm:flex-none" onClick={openAddDialog}>
                       <Plus className="w-4 h-4 mr-1.5" /> Adicionar
                     </Button>
                   </div>
@@ -742,12 +792,22 @@ const AdminPage = () => {
                   ? 'Redefinir senha (deixe vazio para manter a atual)'
                   : 'Senha (deixe vazio para usar a data de nascimento)'}
               </Label>
-              <Input
-                type="password"
-                placeholder={editingProf ? 'Nova senha' : 'Senha inicial'}
-                value={formData.senha}
-                onChange={e => setFormData({ ...formData, senha: e.target.value })}
-              />
+              <div className="relative">
+                <Input
+                  type={showModalPassword ? "text" : "password"}
+                  placeholder={editingProf ? 'Nova senha' : 'Senha inicial'}
+                  value={formData.senha}
+                  onChange={e => setFormData({ ...formData, senha: e.target.value })}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowModalPassword(!showModalPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showModalPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
             </div>
           </div>
           <DialogFooter>
