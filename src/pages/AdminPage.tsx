@@ -185,10 +185,7 @@ const AdminPage = () => {
   const handleClearDatabase = async () => {
     if (!confirm('ATENÇÃO: Isso excluirá TODOS os professores e contestações do sistema. Esta ação não pode ser desfeita. Deseja continuar?')) return;
     setLoading(true);
-    const { data, error } = await supabase.functions.invoke('admin-api?action=delete_all_professors', {
-      method: 'DELETE',
-      headers: authHeaders,
-    });
+    const { data, error } = await apiCall('POST', 'delete_all_professors');
     setLoading(false);
     if (error || data?.error) { toast.error(data?.error || 'Erro ao limpar base.'); return; }
     toast.success('Base de dados limpa com sucesso!');

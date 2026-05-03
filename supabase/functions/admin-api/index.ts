@@ -149,8 +149,8 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: true });
     }
 
-    // DELETE all professors (Clear database)
-    if (req.method === "DELETE" && action === "delete_all_professors") {
+    // DELETE all professors (Clear database) - Allowing POST for compatibility
+    if ((req.method === "DELETE" || req.method === "POST") && action === "delete_all_professors") {
       // First delete all contestations as they depend on professors
       await supabase.from("contestacoes").delete().neq("id", "00000000-0000-0000-0000-000000000000");
       // Then delete all professors
