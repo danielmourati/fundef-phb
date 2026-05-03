@@ -34,39 +34,69 @@ Deno.serve(async (req) => {
 
     // Parse and validate input
     const body = await req.json();
-    // Aceita "identificador" (CPF preferencial) ou os campos legados "cpf"/"matricula"
-    const rawId = String(body.identificador || body.cpf || body.matricula || "").trim();
+    const tipo = String(body.tipo || "").trim().toLowerCase(); // "admin" ou vazio
+    const rawId = String(body.identificador || body.email || body.cpf || body.matricula || "").trim();
     const senha = String(body.senha || "").trim();
-    const identificador = rawId.replace(/\D/g, "") || rawId; // normaliza CPF removendo pontuação
 
-    if (!identificador || !senha || identificador.length > 50 || senha.length > 50) {
+    if (!rawId || !senha || rawId.length > 100 || senha.length > 100) {
       return new Response(
-        JSON.stringify({ error: "CPF e senha são obrigatórios." }),
+        JSON.stringify({ error: "Credenciais obrigatórias." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Busca por CPF (forma padrão); fallback por matrícula para compatibilidade
-    let { data: professor, error: fetchErr } = await supabase
-      .from("professors")
-      .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, status, role, senha_hash")
-      .eq("cpf", identificador)
-      .maybeSingle();
+    let professor: any = null;
+    let fetchErr: any = null;
 
-    if (!professor) {
-      const fb = await supabase
+    if (tipo === "admin" || rawId.includes("@")) {
+      // Login por e-mail (admin/jurídico) na tabela users
+      const email = rawId.toLowerCase();
+      const u = await supabase
+        .from("users")
+        .select("id, email, role, status, senha_hash")
+        .ilike("email", email)
+        .maybeSingle();
+      if (u.data) {
+        professor = {
+          id: u.data.id,
+          nome: u.data.role === "admin" ? "Administrador" : "Jurídico",
+          cpf: "",
+          matricula: u.data.email,
+          data_nascimento: null,
+          vinculo_inicio: null,
+          vinculo_fim: null,
+          total_cotas: 0,
+          status: u.data.status,
+          role: u.data.role,
+          senha_hash: u.data.senha_hash,
+        };
+      }
+      fetchErr = u.error;
+    } else {
+      // Login professor por CPF (com fallback matrícula)
+      const identificador = rawId.replace(/\D/g, "") || rawId;
+      const r = await supabase
         .from("professors")
         .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, status, role, senha_hash")
-        .eq("matricula", identificador)
+        .eq("cpf", identificador)
         .maybeSingle();
-      professor = fb.data;
-      fetchErr = fb.error;
+      professor = r.data;
+      fetchErr = r.error;
+      if (!professor) {
+        const fb = await supabase
+          .from("professors")
+          .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, status, role, senha_hash")
+          .eq("matricula", identificador)
+          .maybeSingle();
+        professor = fb.data;
+        fetchErr = fb.error;
+      }
     }
 
     if (fetchErr || !professor || !professor.senha_hash) {
-      await supabase.from("login_attempts").insert({ ip_address: ip, matricula: identificador, success: false });
+      await supabase.from("login_attempts").insert({ ip_address: ip, matricula: rawId, success: false });
       return new Response(
-        JSON.stringify({ error: "CPF ou senha incorretos." }),
+        JSON.stringify({ error: "Credenciais incorretas." }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
