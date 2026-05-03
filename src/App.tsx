@@ -7,6 +7,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Index from "./pages/Index.tsx";
 import LoginPage from "./pages/LoginPage.tsx";
+import AdminLoginPage from "./pages/AdminLoginPage.tsx";
 import DashboardPage from "./pages/DashboardPage.tsx";
 import AdminPage from "./pages/AdminPage.tsx";
 import JuridicoPage from "./pages/JuridicoPage.tsx";
