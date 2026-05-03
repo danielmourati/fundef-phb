@@ -109,16 +109,17 @@ const LoginPage = () => {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="matricula" className="text-sm font-medium">
-                Matrícula <span className="text-destructive">*</span>
+              <Label htmlFor="cpf" className="text-sm font-medium">
+                CPF <span className="text-destructive">*</span>
               </Label>
               <Input
-                id="matricula"
-                placeholder="Digite sua matrícula"
-                value={matricula}
-                onChange={(e) => setMatricula(e.target.value)}
+                id="cpf"
+                placeholder="Digite seu CPF (somente números)"
+                value={cpf}
+                onChange={(e) => setCpf(e.target.value)}
                 required
                 className="h-12 rounded-lg"
+                inputMode="numeric"
               />
             </div>
             <div className="space-y-2">
