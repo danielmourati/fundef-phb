@@ -33,7 +33,7 @@ const LoginPage = () => {
     setError('');
     setIsLoading(true);
 
-    const result = await login(matricula, senha);
+    const result = await login(cpf, senha);
     setIsLoading(false);
 
     if (result.success) {
