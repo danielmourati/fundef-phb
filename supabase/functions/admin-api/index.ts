@@ -209,11 +209,15 @@ Deno.serve(async (req) => {
         });
       }
 
-      const { error } = await supabase.from("messages").insert({
-        title, content, created_by: user.sub,
+      const { error: insertError } = await supabase.from("messages").insert({
+        title, content, created_by: null, // Broadcast message
         scheduled_at: scheduledAt, sent,
       });
-      if (error) throw error;
+      if (insertError) {
+        return new Response(JSON.stringify({ error: `Erro ao salvar mensagem: ${insertError.message}` }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       return jsonResponse({ success: true });
     }
 
