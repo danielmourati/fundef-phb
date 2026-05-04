@@ -1,58 +1,51 @@
+# Suporte a múltiplas matrículas por CPF
 
+## Decisões confirmadas
+- **UX**: seletor de matrículas no topo do painel (abas/dropdown). O card só atualiza ao trocar a matrícula ativa.
+- **Vínculo**: contestações e mensagens lidas continuam vinculadas à **matrícula** (linha em `professors`), não ao CPF.
+- **Modelo de dados**: mantemos 1 linha por matrícula em `professors` (mesmo CPF repetido). Sem migração de dados.
 
-## Análise da situação
+## Como vai funcionar para o professor
 
-O projeto **já está usando Supabase** (Lovable Cloud, que é Supabase nos bastidores). O banco atual tem:
-- Tabelas: `professors`, `contestacoes`, `messages`, `message_reads`, `login_attempts`, `system_settings`
-- Edge functions: `custom-login`, `admin-api`, `professor-api`
-- Funções SQL: `hash_password`, `verify_password`, `generate_protocolo`
-- Project ref atual: `opmpgzaejeoptrajhrbt`
+1. Login normal com **CPF + data de nascimento**.
+2. Após autenticar, o sistema busca **todas as matrículas** do CPF informado.
+3. Comportamento na tela:
+   - **1 matrícula** → comportamento atual, sem nenhum seletor.
+   - **2 ou mais matrículas** → aparece um **seletor de abas** logo abaixo do nome ("Bem-vindo(a)"), no formato:
+     ```text
+     [ Matrícula 1000171 ]  [ Matrícula 1000245 ]  [ Matrícula 1000388 ]
+     ```
+     A primeira fica selecionada por padrão. Ao clicar em outra, todo o card de dados (vínculo, cotas, status, situação do processo) é trocado.
+4. As abas **Mensagens** e **Contestações** seguem a matrícula ativa:
+   - "Mensagens" mostra os recados daquela matrícula (e o badge de não-lidas considera só ela).
+   - "Contestações" lista somente as daquela matrícula, e novas contestações nascem ligadas à matrícula ativa.
+5. Botão **Sair** continua único (encerra a sessão inteira).
 
-Então "migrar para o Supabase" provavelmente significa uma destas três coisas. Preciso confirmar com você qual é o objetivo antes de montar o plano técnico.
+## Mudanças técnicas
 
-## Cenários possíveis
+### Backend (`custom-login` edge function)
+- Quando o login for de professor, em vez de retornar **um** registro, retornar:
+  - dados base do usuário (`nome`, `cpf`, `role`)
+  - array `matriculas[]` com cada linha encontrada (`id`, `matricula`, `vinculo_inicio`, `vinculo_fim`, `total_cotas`, `status`)
+- O **token HMAC** continua amarrado ao CPF, mas o payload passa a conter a lista de `professor_ids` autorizados, para o `professor-api` validar que a matrícula consultada pertence ao CPF logado.
 
-**Cenário A — Migrar para um projeto Supabase próprio (fora do Lovable Cloud)**
-Você cria uma conta em supabase.com, cria um novo projeto, e movemos schema + dados para lá. O app passa a apontar para essa nova URL/chave. Vantagem: controle total via dashboard do Supabase. Desvantagem: perde a integração automática do Lovable Cloud.
+### Backend (`professor-api`)
+- Todas as rotas (`messages`, `mark_read`, `contestacoes`, `create_contestacao`) passam a aceitar um parâmetro `professor_id` (matrícula ativa) no body/query.
+- Validação: o `professor_id` recebido **precisa estar** no array de IDs do token. Caso contrário, 403.
+- Substituir os `eq("professor_id", user.sub)` pelo `professor_id` recebido.
 
-**Cenário B — Exportar dados do Lovable Cloud atual para outro Supabase existente**
-Você já tem um projeto Supabase e quer mover os dados deste app para lá.
+### Frontend
+- `AuthContext`: passa a guardar `professor` (dados base) + `matriculas[]` + `matriculaAtivaId`. Função `setMatriculaAtiva(id)`.
+- `DashboardPage`:
+  - Renderiza o seletor de abas só se `matriculas.length > 1`.
+  - Card de dados, badge de status e stepper passam a ler de `matriculaAtiva` (não mais de `professor` direto).
+  - Fetch de mensagens/contestações refeito sempre que `matriculaAtivaId` muda.
+- `LoginPage`: nenhuma mudança visual; só consome o novo formato de resposta.
 
-**Cenário C — Apenas exportar backup do banco atual**
-Gerar um dump SQL com schema + dados para você guardar/migrar manualmente.
+### Banco de dados
+- **Nenhuma migração necessária.** A estrutura atual (`professors` com CPF repetido por matrícula) já comporta o cenário.
+- Opcional/futuro: índice em `professors(cpf)` para acelerar a busca por múltiplas matrículas (a base é pequena, então não é urgente).
 
-## Informações que preciso de você
-
-1. **Qual cenário acima** (A, B ou C)?
-2. Se A ou B: você já tem **conta no supabase.com**? Se sim, preciso de:
-   - Project URL (ex: `https://xxxxx.supabase.co`)
-   - Anon/Publishable key
-   - Service role key (para rodar a migração — será guardada como secret)
-   - Senha do banco (ou string de conexão `postgresql://...`) para importar o dump
-3. Quer migrar **apenas o schema** (estrutura vazia) ou **schema + todos os dados atuais** (professores, contestações, mensagens, etc.)?
-4. Quer manter o **Lovable Cloud ativo em paralelo** durante a transição, ou cortar de vez?
-
-## Passo a passo geral (válido para Cenário A)
-
-1. **Criar projeto no Supabase.com** — você faz isso no painel deles e me envia as credenciais.
-2. **Exportar o schema atual** — eu gero um arquivo `.sql` com todas as tabelas, funções, triggers e sequences do banco atual.
-3. **Exportar os dados** — gero `COPY ... TO STDOUT` em CSV para cada tabela ou um `pg_dump` completo (entrego em `/mnt/documents/`).
-4. **Importar no novo Supabase** — aplico o schema e depois carrego os dados via `psql` usando a connection string que você fornecer.
-5. **Recriar extensões** — `pgcrypto` (usada por `hash_password`/`verify_password`) precisa estar habilitada no novo projeto.
-6. **Reimplantar edge functions** — `custom-login`, `admin-api`, `professor-api` precisam ser deployadas no novo projeto via CLI Supabase (eu te passo os comandos).
-7. **Configurar secrets no novo projeto** — `SUPABASE_SERVICE_ROLE_KEY` (gerado automaticamente), `LOVABLE_API_KEY` (se for manter recursos de IA — talvez não funcione fora do Lovable Cloud).
-8. **Atualizar `.env` do app** — trocar `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID` para apontar ao novo projeto.
-9. **Regenerar `src/integrations/supabase/types.ts`** com o novo project ref.
-10. **Testes** — login, CRUD de professores, contestações, exportação PDF, mensagens.
-
-## Atenção / riscos
-
-- O recurso **Lovable AI** (`LOVABLE_API_KEY`) só funciona dentro do Lovable Cloud. Hoje ele não está sendo usado nas edge functions atuais, então não deve haver impacto.
-- Senhas estão em **bcrypt** (`pgcrypto`) — funcionarão no novo projeto desde que `pgcrypto` esteja habilitado. Os usuários não precisarão redefinir senha.
-- Tabelas hoje **não têm RLS habilitado** (todo acesso é via edge function com service role). No novo projeto isso continua funcionando igual, mas é uma boa hora para ativar RLS se quiser.
-- Uma vez migrado, **não há como desfazer** o desligamento do Lovable Cloud sem recriar do zero.
-
-## Próximo passo
-
-Me responda com o cenário (A/B/C) e as credenciais (se aplicável). Com isso eu monto o plano de execução detalhado e os scripts de migração.
-
+## Fora de escopo
+- Tela do admin/jurídico: continua listando uma linha por matrícula (cada vínculo é tratado independentemente, como hoje).
+- Unificação de "perfil único" por CPF: não será feita agora, conforme decisão de manter o modelo atual.
