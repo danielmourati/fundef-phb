@@ -139,16 +139,7 @@ Deno.serve(async (req) => {
     // Log successful attempt
     await supabase.from("login_attempts").insert({ ip_address: ip, matricula: rawId, success: true });
 
-    // Generate a simple session token (HMAC-based)
-    const sessionId = crypto.randomUUID();
-    const tokenPayload = {
-      sub: professor.id,
-      role: professor.role,
-      mat: professor.matricula,
-      sid: sessionId,
-      exp: Date.now() + 8 * 60 * 60 * 1000, // 8 hours
-    };
-
+    // Helper para gerar token HMAC por matrícula (8h)
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
       "raw",
@@ -157,15 +148,36 @@ Deno.serve(async (req) => {
       false,
       ["sign"]
     );
-    const payloadStr = JSON.stringify(tokenPayload);
-    const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(payloadStr));
-    const sigHex = Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, "0")).join("");
-    const token = btoa(payloadStr) + "." + sigHex;
+    const sessionId = crypto.randomUUID();
+    const signToken = async (sub: string, role: string, mat: string) => {
+      const payload = { sub, role, mat, sid: sessionId, exp: Date.now() + 8 * 60 * 60 * 1000 };
+      const payloadStr = JSON.stringify(payload);
+      const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(payloadStr));
+      const sigHex = Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, "0")).join("");
+      return btoa(payloadStr) + "." + sigHex;
+    };
 
-    // Return professor data (without sensitive fields) + token
+    // Para professor: buscar TODAS as matrículas vinculadas ao mesmo CPF
+    let matriculas: Array<any> = [];
+    if (professor.role === "professor" && professor.cpf) {
+      const all = await supabase
+        .from("professors")
+        .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, status, role")
+        .eq("cpf", professor.cpf)
+        .order("matricula", { ascending: true });
+      const rows = all.data || [];
+      matriculas = await Promise.all(rows.map(async (r) => ({
+        ...r,
+        token: await signToken(r.id, r.role, r.matricula),
+      })));
+    }
+
+    const token = await signToken(professor.id, professor.role, professor.matricula);
+
+    // Return professor data (without sensitive fields) + token + matriculas
     const { senha_hash: _, ...safeProf } = professor;
     return new Response(
-      JSON.stringify({ professor: safeProf, token }),
+      JSON.stringify({ professor: safeProf, token, matriculas }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
