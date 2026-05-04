@@ -61,7 +61,7 @@ const DashboardPage = () => {
       fetchMessages();
       fetchContestacoes();
     }
-  }, [professor, token]);
+  }, [professor?.id, token]);
 
   if (!professor) return null;
   if (professor.role === 'admin' || professor.role === 'juridico') return null;
