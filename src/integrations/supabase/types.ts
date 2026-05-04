@@ -158,15 +158,7 @@ export type Database = {
           title?: string
           updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "messages_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "professors"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       professors: {
         Row: {
