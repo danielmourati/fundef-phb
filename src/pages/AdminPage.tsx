@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
   LogOut, Upload, Download, Users, AlertTriangle, Settings, Plus, Pencil, Trash2, Save,
-  LayoutDashboard, FileText, Search, Send, MessageSquare, UserX, UserCheck, Menu, Eye, EyeOff, Trash,
+  LayoutDashboard, FileText, Search, Send, MessageSquare, UserX, UserCheck, Menu, Eye, EyeOff, Trash, Loader2,
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -91,6 +91,8 @@ const AdminPage = () => {
   const [sendingMsg, setSendingMsg] = useState(false);
   const [msgDialogOpen, setMsgDialogOpen] = useState(false);
   const [showModalPassword, setShowModalPassword] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
 
   const authHeaders = { Authorization: `Bearer ${token}` };
 
@@ -203,20 +205,38 @@ const AdminPage = () => {
   const handleCSVImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const text = await file.text();
-    const lines = text.split('\n').filter(l => l.trim());
-    if (lines.length < 2) { toast.error('CSV vazio ou inválido.'); return; }
-    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-    const rows = lines.slice(1).map(line => {
-      const values = line.split(',').map(v => v.trim());
-      const obj: Record<string, string> = {};
-      headers.forEach((h, i) => { obj[h] = values[i] || ''; });
-      return obj;
-    });
-    const { data, error } = await apiCall('POST', 'import_csv', { rows });
-    if (error || data?.error) toast.error(data?.error || 'Erro na importação.');
-    else { toast.success(`${data?.count || rows.length} professor(es) importado(s)!`); fetchData(); }
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    setImporting(true);
+    setImportProgress({ current: 0, total: 0 });
+    try {
+      const text = await file.text();
+      const lines = text.split('\n').filter(l => l.trim());
+      if (lines.length < 2) { toast.error('CSV vazio ou inválido.'); return; }
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const rows = lines.slice(1).map(line => {
+        const values = line.split(',').map(v => v.trim());
+        const obj: Record<string, string> = {};
+        headers.forEach((h, i) => { obj[h] = values[i] || ''; });
+        return obj;
+      });
+      const CHUNK = 100;
+      setImportProgress({ current: 0, total: rows.length });
+      let imported = 0;
+      for (let i = 0; i < rows.length; i += CHUNK) {
+        const chunk = rows.slice(i, i + CHUNK);
+        const { data, error } = await apiCall('POST', 'import_csv', { rows: chunk });
+        if (error || data?.error) {
+          toast.error(data?.error || 'Erro na importação.');
+          return;
+        }
+        imported += data?.count || chunk.length;
+        setImportProgress({ current: imported, total: rows.length });
+      }
+      toast.success(`${imported} professor(es) importado(s)!`);
+      fetchData();
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const exportContestacoes = () => {
@@ -498,9 +518,16 @@ const AdminPage = () => {
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-6 py-4 border-b border-border gap-4">
                   <h3 className="font-semibold text-foreground">Professores ({nonAdminProfs.length})</h3>
                   <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-                    <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleCSVImport} />
-                    <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={() => fileInputRef.current?.click()}>
-                      <Upload className="w-4 h-4 mr-1.5" /> Importar
+                    <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleCSVImport} disabled={importing} />
+                    <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+                      {importing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                          {importProgress.total > 0 ? `Importando ${importProgress.current}/${importProgress.total}` : 'Importando...'}
+                        </>
+                      ) : (
+                        <><Upload className="w-4 h-4 mr-1.5" /> Importar</>
+                      )}
                     </Button>
                     <Button size="sm" variant="destructive" className="flex-1 sm:flex-none" onClick={handleClearDatabase}>
                       <Trash className="w-4 h-4 mr-1.5" /> Limpar Base
