@@ -79,6 +79,8 @@ Deno.serve(async (req) => {
         .from("professors")
         .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, status, role, senha_hash")
         .eq("cpf", identificador)
+        .order("matricula", { ascending: true })
+        .limit(1)
         .maybeSingle();
       professor = r.data;
       fetchErr = r.error;
@@ -87,6 +89,7 @@ Deno.serve(async (req) => {
           .from("professors")
           .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, status, role, senha_hash")
           .eq("matricula", identificador)
+          .limit(1)
           .maybeSingle();
         professor = fb.data;
         fetchErr = fb.error;
