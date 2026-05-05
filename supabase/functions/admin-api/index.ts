@@ -174,7 +174,7 @@ Deno.serve(async (req) => {
           vinculo_inicio: r.vinculo_inicio || null,
           vinculo_fim: r.vinculo_fim || null,
           total_cotas: parseInt(r.total_cotas) || 0,
-          status: r.status || "Pendente", role: "professor",
+          status: "Pendente", role: "professor",
         });
       }
       const { error } = await supabase.from("professors").insert(toInsert);
