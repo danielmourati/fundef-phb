@@ -73,23 +73,41 @@ Deno.serve(async (req) => {
       }
       fetchErr = u.error;
     } else {
-      // Login professor por CPF (com fallback matrícula)
+      // Login professor por CPF (com fallback matrícula). Pode haver múltiplas linhas
       const identificador = rawId.replace(/\D/g, "") || rawId;
       const r = await supabase
         .from("professors")
         .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, status, role, senha_hash")
         .eq("cpf", identificador)
-        .maybeSingle();
-      professor = r.data;
+        .order("matricula", { ascending: true });
+      let candidates = r.data || [];
       fetchErr = r.error;
-      if (!professor) {
+      if (candidates.length === 0) {
         const fb = await supabase
           .from("professors")
           .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, status, role, senha_hash")
-          .eq("matricula", identificador)
-          .maybeSingle();
-        professor = fb.data;
+          .eq("matricula", identificador);
+        candidates = fb.data || [];
         fetchErr = fb.error;
+      }
+
+      // Encontrar a primeira linha cuja senha bata
+      for (const c of candidates) {
+        let ok = false;
+        if (c.senha_hash) {
+          const { data } = await supabase.rpc("verify_password", {
+            plain_password: senha,
+            hashed_password: c.senha_hash,
+          });
+          ok = !!data;
+        } else if (c.data_nascimento) {
+          const parts = String(c.data_nascimento).split("-");
+          if (parts.length === 3) {
+            const [y, m, d] = parts;
+            ok = senha === `${d}${m}${y}`;
+          }
+        }
+        if (ok) { professor = c; break; }
       }
     }
 
@@ -101,31 +119,23 @@ Deno.serve(async (req) => {
       );
     }
 
-    let matchResult = false;
-    if (professor.senha_hash) {
-      // Verify password with bcrypt via database function
-      const { data } = await supabase.rpc("verify_password", {
-        plain_password: senha,
-        hashed_password: professor.senha_hash,
-      });
-      matchResult = !!data;
-    } else if (professor.data_nascimento) {
-      // Initial login: format data_nascimento (YYYY-MM-DD) to DDMMAAAA
-      const dateStr = String(professor.data_nascimento);
-      const parts = dateStr.split("-");
-      if (parts.length === 3) {
-        const [year, month, day] = parts;
-        const formattedDate = `${day}${month}${year}`;
-        matchResult = (senha === formattedDate);
+    // Para admin/juridico ainda precisamos validar senha (não passou no loop acima)
+    if (professor.role === "admin" || professor.role === "juridico") {
+      let matchResult = false;
+      if (professor.senha_hash) {
+        const { data } = await supabase.rpc("verify_password", {
+          plain_password: senha,
+          hashed_password: professor.senha_hash,
+        });
+        matchResult = !!data;
       }
-    }
-
-    if (!matchResult) {
-      await supabase.from("login_attempts").insert({ ip_address: ip, matricula: rawId, success: false });
-      return new Response(
-        JSON.stringify({ error: "Credenciais incorretas." }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      if (!matchResult) {
+        await supabase.from("login_attempts").insert({ ip_address: ip, matricula: rawId, success: false });
+        return new Response(
+          JSON.stringify({ error: "Credenciais incorretas." }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // Block inactive users
