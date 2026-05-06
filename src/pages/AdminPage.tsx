@@ -470,7 +470,6 @@ const AdminPage = () => {
                           <TableHead className="text-xs font-medium text-muted-foreground">Nome</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground">CPF</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground">Cotas</TableHead>
-                          <TableHead className="text-xs font-medium text-muted-foreground">Status</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -480,13 +479,6 @@ const AdminPage = () => {
                             <TableCell className="text-sm">{p.nome}</TableCell>
                             <TableCell className="font-mono text-sm">{p.cpf}</TableCell>
                             <TableCell className="text-sm">{p.total_cotas || 0}</TableCell>
-                            <TableCell>
-                              <Badge className={`text-xs font-medium ${
-                                p.status === 'Validado' ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-100' :
-                                p.status === 'Em Análise' ? 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100' :
-                                'bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-100'
-                              } border`}>{p.status}</Badge>
-                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
