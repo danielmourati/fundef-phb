@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
       const email = rawId.toLowerCase();
       const u = await supabase
         .from("users")
-        .select("id, email, role, status, senha_hash")
+        .select("id, email, role, senha_hash")
         .ilike("email", email)
         .maybeSingle();
       if (u.data) {
@@ -66,7 +66,6 @@ Deno.serve(async (req) => {
           vinculo_inicio: null,
           vinculo_fim: null,
           total_cotas: 0,
-          status: u.data.status,
           role: u.data.role,
           senha_hash: u.data.senha_hash,
         };
@@ -77,7 +76,7 @@ Deno.serve(async (req) => {
       const identificador = rawId.replace(/\D/g, "") || rawId;
       const r = await supabase
         .from("professors")
-        .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, status, role, senha_hash")
+        .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, role, senha_hash")
         .eq("cpf", identificador)
         .order("matricula", { ascending: true });
       let candidates = r.data || [];
@@ -85,7 +84,7 @@ Deno.serve(async (req) => {
       if (candidates.length === 0) {
         const fb = await supabase
           .from("professors")
-          .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, status, role, senha_hash")
+          .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, role, senha_hash")
           .eq("matricula", identificador);
         candidates = fb.data || [];
         fetchErr = fb.error;
@@ -138,13 +137,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Block inactive users
-    if (professor.status === "Inativo") {
-      return new Response(
-        JSON.stringify({ error: "Sua conta está inativa. Entre em contato com a administração." }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // (status field removed — no inactive blocking by status)
 
     // Log successful attempt
     await supabase.from("login_attempts").insert({ ip_address: ip, matricula: rawId, success: true });
@@ -172,7 +165,7 @@ Deno.serve(async (req) => {
     if (professor.role === "professor" && professor.cpf) {
       const all = await supabase
         .from("professors")
-        .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, status, role")
+        .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, role")
         .eq("cpf", professor.cpf)
         .order("matricula", { ascending: true });
       const rows = all.data || [];

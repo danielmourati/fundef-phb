@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
   LogOut, Upload, Download, Users, AlertTriangle, Settings, Plus, Pencil, Trash2, Save,
-  LayoutDashboard, FileText, Search, Send, MessageSquare, UserX, UserCheck, Menu, Eye, EyeOff, Trash, Loader2,
+  LayoutDashboard, FileText, Search, Send, MessageSquare, Menu, Eye, EyeOff, Trash, Loader2,
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -28,7 +28,6 @@ interface Professor {
   vinculo_inicio: string | null;
   vinculo_fim: string | null;
   total_cotas: number | null;
-  status: string;
   role: string;
 }
 
@@ -53,7 +52,7 @@ interface Message {
 
 const emptyProfessor = {
   nome: '', cpf: '', matricula: '', senha: '', data_nascimento: '',
-  vinculo_inicio: '', vinculo_fim: '', total_cotas: 0, status: 'Pendente', role: 'professor',
+  vinculo_inicio: '', vinculo_fim: '', total_cotas: 0, role: 'professor',
 };
 
 type ActiveTab = 'dashboard' | 'professors' | 'contestacoes' | 'messages' | 'settings';
@@ -150,7 +149,7 @@ const AdminPage = () => {
       nome: p.nome, cpf: p.cpf, matricula: p.matricula, senha: '',
       data_nascimento: p.data_nascimento || '', vinculo_inicio: p.vinculo_inicio || '',
       vinculo_fim: p.vinculo_fim || '', total_cotas: p.total_cotas || 0,
-      status: p.status, role: p.role,
+      role: p.role,
     });
     setDialogOpen(true);
   };
@@ -191,14 +190,6 @@ const AdminPage = () => {
     setLoading(false);
     if (error || data?.error) { toast.error(data?.error || 'Erro ao limpar base.'); return; }
     toast.success('Base de dados limpa com sucesso!');
-    fetchData();
-  };
-
-  const handleToggleStatus = async (p: Professor) => {
-    const newStatus = p.status === 'Inativo' ? 'Ativo' : 'Inativo';
-    const { data, error } = await apiCall('PUT', 'update_professor', { id: p.id, status: newStatus, nome: p.nome, cpf: p.cpf, matricula: p.matricula, role: p.role });
-    if (error || data?.error) { toast.error(data?.error || 'Erro ao alterar status.'); return; }
-    toast.success(`Usuário ${newStatus === 'Inativo' ? 'inativado' : 'ativado'}!`);
     fetchData();
   };
 
@@ -310,15 +301,10 @@ const AdminPage = () => {
     p.matricula.includes(searchQuery) ||
     p.cpf.includes(searchQuery)
   );
-  const validados = nonAdminProfs.filter(p => p.status === 'Validado').length;
-  const pendentes = nonAdminProfs.filter(p => p.status === 'Pendente').length;
-  const emAnalise = nonAdminProfs.filter(p => p.status === 'Em Análise').length;
-
   const statCards = [
     { label: 'Total Professores', value: nonAdminProfs.length, icon: Users, color: 'bg-primary/10 text-primary' },
-    { label: 'Validados', value: validados, icon: FileText, color: 'bg-green-50 text-green-600' },
-    { label: 'Pendentes', value: pendentes, icon: AlertTriangle, color: 'bg-yellow-50 text-yellow-600' },
     { label: 'Contestações', value: contestacoes.length, icon: AlertTriangle, color: 'bg-red-50 text-red-600' },
+    { label: 'Mensagens', value: messages.length, icon: MessageSquare, color: 'bg-blue-50 text-blue-600' },
   ];
 
   return (
@@ -484,7 +470,6 @@ const AdminPage = () => {
                           <TableHead className="text-xs font-medium text-muted-foreground">Nome</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground">CPF</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground">Cotas</TableHead>
-                          <TableHead className="text-xs font-medium text-muted-foreground">Status</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -494,13 +479,6 @@ const AdminPage = () => {
                             <TableCell className="text-sm">{p.nome}</TableCell>
                             <TableCell className="font-mono text-sm">{p.cpf}</TableCell>
                             <TableCell className="text-sm">{p.total_cotas || 0}</TableCell>
-                            <TableCell>
-                              <Badge className={`text-xs font-medium ${
-                                p.status === 'Validado' ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-100' :
-                                p.status === 'Em Análise' ? 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100' :
-                                'bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-100'
-                              } border`}>{p.status}</Badge>
-                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -549,13 +527,12 @@ const AdminPage = () => {
                           <TableHead className="text-xs font-medium text-muted-foreground hidden lg:table-cell">CPF</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground hidden md:table-cell">Perfil</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground hidden sm:table-cell">Cotas</TableHead>
-                          <TableHead className="text-xs font-medium text-muted-foreground">Status</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground text-right sticky right-0 bg-card/95 backdrop-blur-sm z-10 border-l border-border px-4 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {filteredProfs.map(p => (
-                          <TableRow key={p.id} className={`${p.status === 'Inativo' ? 'opacity-50' : ''} group`}>
+                          <TableRow key={p.id} className="group">
                             <TableCell className="font-mono text-xs lg:text-sm py-3">{p.matricula}</TableCell>
                             <TableCell className="text-xs lg:text-sm font-medium py-3">{p.nome}</TableCell>
                             <TableCell className="font-mono text-xs lg:text-sm hidden lg:table-cell py-3">{p.cpf}</TableCell>
@@ -563,27 +540,10 @@ const AdminPage = () => {
                               <Badge variant="outline" className="text-[10px] lg:text-xs capitalize px-2 py-0">{p.role}</Badge>
                             </TableCell>
                             <TableCell className="text-xs lg:text-sm hidden sm:table-cell py-3">{p.total_cotas || 0}</TableCell>
-                            <TableCell>
-                              <Badge className={`text-xs font-medium ${
-                                p.status === 'Validado' || p.status === 'Ativo' ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-100' :
-                                p.status === 'Inativo' ? 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-100' :
-                                p.status === 'Em Análise' ? 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100' :
-                                'bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-100'
-                              } border`}>{p.status}</Badge>
-                            </TableCell>
                             <TableCell className="text-right sticky right-0 bg-card/95 backdrop-blur-sm z-10 border-l border-border px-4 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)] group-hover:bg-accent/50 transition-colors">
                               <div className="flex items-center justify-end gap-1">
                                 <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-background" onClick={() => openEditDialog(p)} title="Editar">
                                   <Pencil className="w-3.5 h-3.5" />
-                                </Button>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className={`h-8 w-8 hover:bg-background ${p.status === 'Inativo' ? 'text-green-600 hover:text-green-700' : 'text-orange-500 hover:text-orange-600'}`}
-                                  onClick={() => handleToggleStatus(p)}
-                                  title={p.status === 'Inativo' ? 'Ativar' : 'Inativar'}
-                                >
-                                  {p.status === 'Inativo' ? <UserCheck className="w-3.5 h-3.5" /> : <UserX className="w-3.5 h-3.5" />}
                                 </Button>
                                 <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleDeleteProf(p.id, p.nome)} title="Excluir">
                                   <Trash2 className="w-3.5 h-3.5" />
@@ -812,21 +772,6 @@ const AdminPage = () => {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select value={formData.status} onValueChange={v => setFormData({...formData, status: v})}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Pendente">Pendente</SelectItem>
-                  <SelectItem value="Ativo">Ativo</SelectItem>
-                  <SelectItem value="Validado">Validado</SelectItem>
-                  <SelectItem value="Em Análise">Em Análise</SelectItem>
-                  <SelectItem value="Inativo">Inativo</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
             <div className="space-y-2">
               <Label>

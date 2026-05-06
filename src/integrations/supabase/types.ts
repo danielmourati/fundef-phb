@@ -171,7 +171,6 @@ export type Database = {
           role: string
           senha: string
           senha_hash: string | null
-          status: string
           total_cotas: number | null
           updated_at: string
           user_id: string | null
@@ -188,7 +187,6 @@ export type Database = {
           role?: string
           senha: string
           senha_hash?: string | null
-          status?: string
           total_cotas?: number | null
           updated_at?: string
           user_id?: string | null
@@ -205,7 +203,6 @@ export type Database = {
           role?: string
           senha?: string
           senha_hash?: string | null
-          status?: string
           total_cotas?: number | null
           updated_at?: string
           user_id?: string | null

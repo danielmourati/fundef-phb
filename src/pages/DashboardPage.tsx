@@ -13,13 +13,6 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '
 import { LogOut, User, AlertTriangle, Bell, Check, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 
-const STEPS = ['Pendente', 'Em Análise', 'Validado'] as const;
-
-const stepColors: Record<string, { active: string; dot: string }> = {
-  'Pendente': { active: 'text-yellow-600', dot: 'bg-yellow-500' },
-  'Em Análise': { active: 'text-blue-600', dot: 'bg-blue-500' },
-  'Validado': { active: 'text-green-600', dot: 'bg-green-500' },
-};
 
 interface Message {
   id: string;
@@ -96,7 +89,6 @@ const DashboardPage = () => {
     navigate('/');
   };
 
-  const currentStepIndex = STEPS.indexOf(professor.status as typeof STEPS[number]);
   const formatCpf = (cpf: string) => cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
   const unreadCount = messages.filter(m => !m.read).length;
 
@@ -230,18 +222,9 @@ const DashboardPage = () => {
           <>
             <Card className="overflow-hidden">
               <CardContent className="p-0">
-                <div className="flex items-center justify-between px-5 pt-5 pb-3">
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Matrícula</p>
-                    <p className="text-2xl font-bold tracking-tight">{professor.matricula}</p>
-                  </div>
-                  <Badge className={`${
-                    professor.status === 'Validado' ? 'bg-green-100 text-green-700 border-green-200' :
-                    professor.status === 'Em Análise' ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                    'bg-yellow-100 text-yellow-700 border-yellow-200'
-                  } border text-xs font-semibold`}>
-                    {professor.status}
-                  </Badge>
+                <div className="px-5 pt-5 pb-3">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Matrícula</p>
+                  <p className="text-2xl font-bold tracking-tight">{professor.matricula}</p>
                 </div>
 
                 <div className="border-t mx-5" />
@@ -262,40 +245,6 @@ const DashboardPage = () => {
                   <div>
                     <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Total de Cotas</p>
                     <p className="font-medium text-sm">{professor.total_cotas ?? '—'} meses</p>
-                  </div>
-                </div>
-
-                <div className="border-t mx-5" />
-
-                <div className="px-5 py-4">
-                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-3">Situação do Processo</p>
-                  <div className="flex items-center">
-                    {STEPS.map((step, i) => {
-                      const isActive = i <= currentStepIndex;
-                      const isCurrent = i === currentStepIndex;
-                      const colors = stepColors[step];
-                      return (
-                        <div key={step} className="flex items-center flex-1 last:flex-none">
-                          <div className="flex flex-col items-center gap-1.5 min-w-[60px]">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${
-                              isCurrent
-                                ? `${colors.dot} text-white border-transparent shadow-md`
-                                : isActive
-                                  ? `${colors.dot} text-white border-transparent opacity-70`
-                                  : 'bg-muted border-border text-muted-foreground'
-                            }`}>
-                              {i + 1}
-                            </div>
-                            <span className={`text-[11px] font-medium ${isCurrent ? colors.active : isActive ? 'text-foreground/70' : 'text-muted-foreground'}`}>
-                              {step}
-                            </span>
-                          </div>
-                          {i < STEPS.length - 1 && (
-                            <div className={`flex-1 h-0.5 mx-1 mt-[-18px] rounded ${isActive && i < currentStepIndex ? 'bg-primary/40' : 'bg-border'}`} />
-                          )}
-                        </div>
-                      );
-                    })}
                   </div>
                 </div>
               </CardContent>

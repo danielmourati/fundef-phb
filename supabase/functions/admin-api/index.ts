@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     if (req.method === "GET" && action === "professors") {
       const { data, error } = await supabase
         .from("professors")
-        .select("id, matricula, nome, cpf, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, status, role")
+        .select("id, matricula, nome, cpf, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, role")
         .order("nome");
       if (error) throw error;
       return jsonResponse(data);
@@ -110,7 +110,6 @@ Deno.serve(async (req) => {
         vinculo_inicio: body.vinculo_inicio || null,
         vinculo_fim: body.vinculo_fim || null,
         total_cotas: Number(body.total_cotas) || 0,
-        status: body.status || "Pendente",
         role: body.role || "professor",
       };
       const { error } = await supabase.from("professors").insert(payload);
@@ -127,7 +126,6 @@ Deno.serve(async (req) => {
         vinculo_inicio: body.vinculo_inicio || null,
         vinculo_fim: body.vinculo_fim || null,
         total_cotas: Number(body.total_cotas) || 0,
-        status: body.status || "Pendente",
         role: body.role || "professor",
       };
       if (body.senha && body.senha !== "***") {
@@ -174,7 +172,7 @@ Deno.serve(async (req) => {
           vinculo_inicio: r.vinculo_inicio || null,
           vinculo_fim: r.vinculo_fim || null,
           total_cotas: parseInt(r.total_cotas) || 0,
-          status: r.status || "Pendente", role: "professor",
+          role: "professor",
         });
       }
       const { error } = await supabase.from("professors").insert(toInsert);

@@ -10,7 +10,6 @@ interface Professor {
   vinculo_inicio: string | null;
   vinculo_fim: string | null;
   total_cotas: number | null;
-  status: string;
   role: string;
 }
 
@@ -85,7 +84,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           id: first.id, nome: first.nome, cpf: first.cpf, matricula: first.matricula,
           data_nascimento: first.data_nascimento, vinculo_inicio: first.vinculo_inicio,
           vinculo_fim: first.vinculo_fim, total_cotas: first.total_cotas,
-          status: first.status, role: first.role,
+          role: first.role,
         };
         tk = first.token;
       }
@@ -107,7 +106,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       id: found.id, nome: found.nome, cpf: found.cpf, matricula: found.matricula,
       data_nascimento: found.data_nascimento, vinculo_inicio: found.vinculo_inicio,
       vinculo_fim: found.vinculo_fim, total_cotas: found.total_cotas,
-      status: found.status, role: found.role,
+      role: found.role,
     };
     setProfessor(prof);
     setToken(found.token);
