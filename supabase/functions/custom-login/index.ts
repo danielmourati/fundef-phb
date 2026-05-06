@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
       const email = rawId.toLowerCase();
       const u = await supabase
         .from("users")
-        .select("id, email, role, status, senha_hash")
+        .select("id, email, role, senha_hash")
         .ilike("email", email)
         .maybeSingle();
       if (u.data) {
@@ -66,7 +66,6 @@ Deno.serve(async (req) => {
           vinculo_inicio: null,
           vinculo_fim: null,
           total_cotas: 0,
-          status: u.data.status,
           role: u.data.role,
           senha_hash: u.data.senha_hash,
         };
