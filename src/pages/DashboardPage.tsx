@@ -89,7 +89,6 @@ const DashboardPage = () => {
     navigate('/');
   };
 
-  const currentStepIndex = STEPS.indexOf(professor.status as typeof STEPS[number]);
   const formatCpf = (cpf: string) => cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
   const unreadCount = messages.filter(m => !m.read).length;
 
