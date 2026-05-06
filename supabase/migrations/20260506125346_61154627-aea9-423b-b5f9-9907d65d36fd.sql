@@ -1,0 +1,1 @@
+ALTER TABLE public.professors DROP COLUMN IF EXISTS status;
