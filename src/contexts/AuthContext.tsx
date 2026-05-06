@@ -10,7 +10,6 @@ interface Professor {
   vinculo_inicio: string | null;
   vinculo_fim: string | null;
   total_cotas: number | null;
-  status: string;
   role: string;
 }
 
