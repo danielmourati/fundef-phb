@@ -137,13 +137,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Block inactive users
-    if (professor.status === "Inativo") {
-      return new Response(
-        JSON.stringify({ error: "Sua conta está inativa. Entre em contato com a administração." }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // (status field removed — no inactive blocking by status)
 
     // Log successful attempt
     await supabase.from("login_attempts").insert({ ip_address: ip, matricula: rawId, success: true });
