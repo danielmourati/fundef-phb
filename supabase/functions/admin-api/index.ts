@@ -110,7 +110,6 @@ Deno.serve(async (req) => {
         vinculo_inicio: body.vinculo_inicio || null,
         vinculo_fim: body.vinculo_fim || null,
         total_cotas: Number(body.total_cotas) || 0,
-        status: body.status || "Pendente",
         role: body.role || "professor",
       };
       const { error } = await supabase.from("professors").insert(payload);
