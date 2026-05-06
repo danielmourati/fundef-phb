@@ -301,15 +301,10 @@ const AdminPage = () => {
     p.matricula.includes(searchQuery) ||
     p.cpf.includes(searchQuery)
   );
-  const validados = nonAdminProfs.filter(p => p.status === 'Validado').length;
-  const pendentes = nonAdminProfs.filter(p => p.status === 'Pendente').length;
-  const emAnalise = nonAdminProfs.filter(p => p.status === 'Em Análise').length;
-
   const statCards = [
     { label: 'Total Professores', value: nonAdminProfs.length, icon: Users, color: 'bg-primary/10 text-primary' },
-    { label: 'Validados', value: validados, icon: FileText, color: 'bg-green-50 text-green-600' },
-    { label: 'Pendentes', value: pendentes, icon: AlertTriangle, color: 'bg-yellow-50 text-yellow-600' },
     { label: 'Contestações', value: contestacoes.length, icon: AlertTriangle, color: 'bg-red-50 text-red-600' },
+    { label: 'Mensagens', value: messages.length, icon: MessageSquare, color: 'bg-blue-50 text-blue-600' },
   ];
 
   return (
