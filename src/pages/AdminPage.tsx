@@ -193,14 +193,6 @@ const AdminPage = () => {
     fetchData();
   };
 
-  const handleToggleStatus = async (p: Professor) => {
-    const newStatus = p.status === 'Inativo' ? 'Ativo' : 'Inativo';
-    const { data, error } = await apiCall('PUT', 'update_professor', { id: p.id, status: newStatus, nome: p.nome, cpf: p.cpf, matricula: p.matricula, role: p.role });
-    if (error || data?.error) { toast.error(data?.error || 'Erro ao alterar status.'); return; }
-    toast.success(`Usuário ${newStatus === 'Inativo' ? 'inativado' : 'ativado'}!`);
-    fetchData();
-  };
-
   const handleCSVImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
