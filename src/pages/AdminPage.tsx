@@ -149,7 +149,7 @@ const AdminPage = () => {
       nome: p.nome, cpf: p.cpf, matricula: p.matricula, senha: '',
       data_nascimento: p.data_nascimento || '', vinculo_inicio: p.vinculo_inicio || '',
       vinculo_fim: p.vinculo_fim || '', total_cotas: p.total_cotas || 0,
-      status: p.status, role: p.role,
+      role: p.role,
     });
     setDialogOpen(true);
   };
