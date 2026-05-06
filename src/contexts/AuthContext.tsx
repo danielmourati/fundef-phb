@@ -106,7 +106,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       id: found.id, nome: found.nome, cpf: found.cpf, matricula: found.matricula,
       data_nascimento: found.data_nascimento, vinculo_inicio: found.vinculo_inicio,
       vinculo_fim: found.vinculo_fim, total_cotas: found.total_cotas,
-      status: found.status, role: found.role,
+      role: found.role,
     };
     setProfessor(prof);
     setToken(found.token);
