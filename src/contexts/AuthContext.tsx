@@ -84,7 +84,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           id: first.id, nome: first.nome, cpf: first.cpf, matricula: first.matricula,
           data_nascimento: first.data_nascimento, vinculo_inicio: first.vinculo_inicio,
           vinculo_fim: first.vinculo_fim, total_cotas: first.total_cotas,
-          status: first.status, role: first.role,
+          role: first.role,
         };
         tk = first.token;
       }
