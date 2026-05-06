@@ -774,21 +774,6 @@ const AdminPage = () => {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Status</Label>
-              <Select value={formData.status} onValueChange={v => setFormData({...formData, status: v})}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Pendente">Pendente</SelectItem>
-                  <SelectItem value="Ativo">Ativo</SelectItem>
-                  <SelectItem value="Validado">Validado</SelectItem>
-                  <SelectItem value="Em Análise">Em Análise</SelectItem>
-                  <SelectItem value="Inativo">Inativo</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
               <Label>
                 {editingProf
                   ? 'Redefinir senha (deixe vazio para manter a atual)'
