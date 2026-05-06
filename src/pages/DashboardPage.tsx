@@ -13,13 +13,6 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '
 import { LogOut, User, AlertTriangle, Bell, Check, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 
-const STEPS = ['Pendente', 'Em Análise', 'Validado'] as const;
-
-const stepColors: Record<string, { active: string; dot: string }> = {
-  'Pendente': { active: 'text-yellow-600', dot: 'bg-yellow-500' },
-  'Em Análise': { active: 'text-blue-600', dot: 'bg-blue-500' },
-  'Validado': { active: 'text-green-600', dot: 'bg-green-500' },
-};
 
 interface Message {
   id: string;
