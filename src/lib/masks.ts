@@ -47,3 +47,17 @@ export const isValidDate = (value: string): boolean => {
   if (y < 1900 || y > 2100) return false;
   return true;
 };
+
+export const maskMonthYear = (value: string) => {
+  const digits = value.replace(/\D/g, '').slice(0, 6);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+};
+
+export const isValidMonthYear = (value: string): boolean => {
+  if (!value) return true;
+  const m = value.match(/^(\d{2})\/(\d{4})$/);
+  if (!m) return false;
+  const mo = parseInt(m[1]), y = parseInt(m[2]);
+  return mo >= 1 && mo <= 12 && y >= 1900 && y <= 2100;
+};
