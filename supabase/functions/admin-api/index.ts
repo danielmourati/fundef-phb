@@ -175,7 +175,9 @@ Deno.serve(async (req) => {
           role: "professor",
         });
       }
-      const { error } = await supabase.from("professors").insert(toInsert);
+      const { error } = await supabase
+        .from("professors")
+        .upsert(toInsert, { onConflict: "matricula" });
       if (error) throw error;
       return jsonResponse({ success: true, count: toInsert.length });
     }
