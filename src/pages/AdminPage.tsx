@@ -18,7 +18,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { maskCPF, unmaskCPF, isValidCPF, maskDate, isValidDate } from '@/lib/masks';
+import { maskCPF, unmaskCPF, isValidCPF, maskDate, isValidDate, maskPhone } from '@/lib/masks';
 
 interface Professor {
   id: string;
@@ -258,7 +258,7 @@ const AdminPage = () => {
       ['Matrícula', 'Nome', 'Motivo', 'Descrição', 'WhatsApp', 'Status', 'Data'].join(','),
       ...contestacoes.map(c => [
         c.professors?.matricula || '', `"${c.professors?.nome || ''}"`,
-        `"${c.motivo}"`, `"${c.descricao}"`, c.whatsapp || '', c.status,
+        `"${c.motivo}"`, `"${c.descricao}"`, c.whatsapp ? maskPhone(c.whatsapp) : '', c.status,
         new Date(c.created_at).toLocaleDateString('pt-BR'),
       ].join(',')),
     ].join('\n');
@@ -617,7 +617,7 @@ const AdminPage = () => {
                             <TableCell className="text-sm">{c.professors?.nome}</TableCell>
                             <TableCell className="text-sm">{c.motivo}</TableCell>
                             <TableCell className="max-w-[200px] truncate text-sm">{c.descricao}</TableCell>
-                            <TableCell className="text-sm">{c.whatsapp || '—'}</TableCell>
+                            <TableCell className="text-sm">{c.whatsapp ? maskPhone(c.whatsapp) : '—'}</TableCell>
                             <TableCell><Badge variant="secondary" className="text-xs">{c.status}</Badge></TableCell>
                             <TableCell className="text-sm">{new Date(c.created_at).toLocaleDateString('pt-BR')}</TableCell>
                           </TableRow>
