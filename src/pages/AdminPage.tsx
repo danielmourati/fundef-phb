@@ -147,9 +147,11 @@ const AdminPage = () => {
   const openEditDialog = (p: Professor) => {
     setEditingProf(p);
     setFormData({
-      nome: p.nome, cpf: p.cpf, matricula: p.matricula, senha: '',
-      data_nascimento: p.data_nascimento || '', vinculo_inicio: p.vinculo_inicio || '',
-      vinculo_fim: p.vinculo_fim || '', total_cotas: p.total_cotas || 0,
+      nome: p.nome, cpf: maskCPF(p.cpf || ''), matricula: p.matricula, senha: '',
+      data_nascimento: maskDate(p.data_nascimento || ''),
+      vinculo_inicio: maskDate(p.vinculo_inicio || ''),
+      vinculo_fim: maskDate(p.vinculo_fim || ''),
+      total_cotas: p.total_cotas || 0,
       role: p.role,
     });
     setDialogOpen(true);
