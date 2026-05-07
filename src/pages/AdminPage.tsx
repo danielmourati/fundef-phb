@@ -752,7 +752,13 @@ const AdminPage = () => {
               </div>
               <div className="space-y-2">
                 <Label>CPF *</Label>
-                <Input value={formData.cpf} onChange={e => setFormData({...formData, cpf: e.target.value})} placeholder="00000000000" />
+                <Input
+                  value={formData.cpf}
+                  onChange={e => setFormData({...formData, cpf: maskCPF(e.target.value)})}
+                  placeholder="000.000.000-00"
+                  inputMode="numeric"
+                  maxLength={14}
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -762,17 +768,35 @@ const AdminPage = () => {
               </div>
               <div className="space-y-2">
                 <Label>Data Nascimento</Label>
-                <Input value={formData.data_nascimento} onChange={e => setFormData({...formData, data_nascimento: e.target.value})} placeholder="01011980" />
+                <Input
+                  value={formData.data_nascimento}
+                  onChange={e => setFormData({...formData, data_nascimento: maskDate(e.target.value)})}
+                  placeholder="DD/MM/AAAA"
+                  inputMode="numeric"
+                  maxLength={10}
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Vínculo Início</Label>
-                <Input value={formData.vinculo_inicio} onChange={e => setFormData({...formData, vinculo_inicio: e.target.value})} placeholder="01/2001" />
+                <Input
+                  value={formData.vinculo_inicio}
+                  onChange={e => setFormData({...formData, vinculo_inicio: maskDate(e.target.value)})}
+                  placeholder="DD/MM/AAAA"
+                  inputMode="numeric"
+                  maxLength={10}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Vínculo Fim</Label>
-                <Input value={formData.vinculo_fim} onChange={e => setFormData({...formData, vinculo_fim: e.target.value})} placeholder="12/2003" />
+                <Input
+                  value={formData.vinculo_fim}
+                  onChange={e => setFormData({...formData, vinculo_fim: maskDate(e.target.value)})}
+                  placeholder="DD/MM/AAAA"
+                  inputMode="numeric"
+                  maxLength={10}
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
