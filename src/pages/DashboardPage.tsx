@@ -90,6 +90,14 @@ const DashboardPage = () => {
   };
 
   const formatCpf = (cpf: string) => cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  const formatDate = (value: string | null | undefined) => {
+    if (!value) return '—';
+    const iso = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+    const digits = value.replace(/\D/g, '');
+    if (digits.length === 8) return `${digits.slice(0,2)}/${digits.slice(2,4)}/${digits.slice(4)}`;
+    return value;
+  };
   const unreadCount = messages.filter(m => !m.read).length;
 
   const handleContestacao = async (e: React.FormEvent) => {
@@ -232,11 +240,11 @@ const DashboardPage = () => {
                 <div className="grid grid-cols-2 gap-x-6 gap-y-4 px-5 py-4">
                   <div>
                     <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Vínculo Início</p>
-                    <p className="font-medium text-sm">{professor.vinculo_inicio || '—'}</p>
+                    <p className="font-medium text-sm">{formatDate(professor.vinculo_inicio)}</p>
                   </div>
                   <div>
                     <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Vínculo Fim</p>
-                    <p className="font-medium text-sm">{professor.vinculo_fim || '—'}</p>
+                    <p className="font-medium text-sm">{formatDate(professor.vinculo_fim)}</p>
                   </div>
                   <div>
                     <p className="text-[11px] text-muted-foreground uppercase tracking-wider">CPF</p>
