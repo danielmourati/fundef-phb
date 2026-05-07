@@ -178,12 +178,13 @@ const AdminPage = () => {
       toast.error('Vínculo Fim inválido (use DD/MM/AAAA).');
       return;
     }
+    const payload = { ...formData, cpf: unmaskCPF(formData.cpf) };
     if (editingProf) {
-      const { data, error } = await apiCall('PUT', 'update_professor', { ...formData, id: editingProf.id });
+      const { data, error } = await apiCall('PUT', 'update_professor', { ...payload, id: editingProf.id });
       if (error || data?.error) { toast.error(data?.error || 'Erro ao atualizar.'); return; }
       toast.success('Professor atualizado!');
     } else {
-      const { data, error } = await apiCall('POST', 'create_professor', formData);
+      const { data, error } = await apiCall('POST', 'create_professor', payload);
       if (error || data?.error) { toast.error(data?.error || 'Erro ao adicionar.'); return; }
       toast.success('Professor adicionado!');
     }
