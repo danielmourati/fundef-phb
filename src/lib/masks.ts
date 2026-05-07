@@ -1,0 +1,49 @@
+// Máscaras e validações de input
+
+export const maskCPF = (value: string) => {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  return digits
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})\.(\d{3})(\d)/, '$1.$2.$3')
+    .replace(/\.(\d{3})(\d)/, '.$1-$2');
+};
+
+export const unmaskCPF = (value: string) => value.replace(/\D/g, '');
+
+export const isValidCPF = (value: string): boolean => {
+  const cpf = unmaskCPF(value);
+  if (cpf.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(cpf)) return false;
+
+  const calc = (factor: number) => {
+    let total = 0;
+    for (let i = 0; i < factor - 1; i++) {
+      total += parseInt(cpf[i]) * (factor - i);
+    }
+    const rest = (total * 10) % 11;
+    return rest === 10 ? 0 : rest;
+  };
+
+  return calc(10) === parseInt(cpf[9]) && calc(11) === parseInt(cpf[10]);
+};
+
+// Máscara DD/MM/YYYY
+export const maskDate = (value: string) => {
+  const digits = value.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+};
+
+export const isValidDate = (value: string): boolean => {
+  if (!value) return true; // opcional
+  const m = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return false;
+  const [, dd, mm, yyyy] = m;
+  const d = parseInt(dd), mo = parseInt(mm), y = parseInt(yyyy);
+  if (mo < 1 || mo > 12) return false;
+  const dim = new Date(y, mo, 0).getDate();
+  if (d < 1 || d > dim) return false;
+  if (y < 1900 || y > 2100) return false;
+  return true;
+};
