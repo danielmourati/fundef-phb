@@ -160,6 +160,22 @@ const AdminPage = () => {
       toast.error('Nome, Matrícula e CPF são obrigatórios.');
       return;
     }
+    if (!isValidCPF(formData.cpf)) {
+      toast.error('CPF inválido.');
+      return;
+    }
+    if (!isValidDate(formData.data_nascimento)) {
+      toast.error('Data de nascimento inválida (use DD/MM/AAAA).');
+      return;
+    }
+    if (!isValidDate(formData.vinculo_inicio)) {
+      toast.error('Vínculo Início inválido (use DD/MM/AAAA).');
+      return;
+    }
+    if (!isValidDate(formData.vinculo_fim)) {
+      toast.error('Vínculo Fim inválido (use DD/MM/AAAA).');
+      return;
+    }
     if (editingProf) {
       const { data, error } = await apiCall('PUT', 'update_professor', { ...formData, id: editingProf.id });
       if (error || data?.error) { toast.error(data?.error || 'Erro ao atualizar.'); return; }
