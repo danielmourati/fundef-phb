@@ -18,6 +18,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import { maskCPF, unmaskCPF, isValidCPF, maskDate, isValidDate } from '@/lib/masks';
 
 interface Professor {
   id: string;
@@ -146,9 +147,11 @@ const AdminPage = () => {
   const openEditDialog = (p: Professor) => {
     setEditingProf(p);
     setFormData({
-      nome: p.nome, cpf: p.cpf, matricula: p.matricula, senha: '',
-      data_nascimento: p.data_nascimento || '', vinculo_inicio: p.vinculo_inicio || '',
-      vinculo_fim: p.vinculo_fim || '', total_cotas: p.total_cotas || 0,
+      nome: p.nome, cpf: maskCPF(p.cpf || ''), matricula: p.matricula, senha: '',
+      data_nascimento: maskDate(p.data_nascimento || ''),
+      vinculo_inicio: maskDate(p.vinculo_inicio || ''),
+      vinculo_fim: maskDate(p.vinculo_fim || ''),
+      total_cotas: p.total_cotas || 0,
       role: p.role,
     });
     setDialogOpen(true);
@@ -159,12 +162,29 @@ const AdminPage = () => {
       toast.error('Nome, Matrícula e CPF são obrigatórios.');
       return;
     }
+    if (!isValidCPF(formData.cpf)) {
+      toast.error('CPF inválido.');
+      return;
+    }
+    if (!isValidDate(formData.data_nascimento)) {
+      toast.error('Data de nascimento inválida (use DD/MM/AAAA).');
+      return;
+    }
+    if (!isValidDate(formData.vinculo_inicio)) {
+      toast.error('Vínculo Início inválido (use DD/MM/AAAA).');
+      return;
+    }
+    if (!isValidDate(formData.vinculo_fim)) {
+      toast.error('Vínculo Fim inválido (use DD/MM/AAAA).');
+      return;
+    }
+    const payload = { ...formData, cpf: unmaskCPF(formData.cpf) };
     if (editingProf) {
-      const { data, error } = await apiCall('PUT', 'update_professor', { ...formData, id: editingProf.id });
+      const { data, error } = await apiCall('PUT', 'update_professor', { ...payload, id: editingProf.id });
       if (error || data?.error) { toast.error(data?.error || 'Erro ao atualizar.'); return; }
       toast.success('Professor atualizado!');
     } else {
-      const { data, error } = await apiCall('POST', 'create_professor', formData);
+      const { data, error } = await apiCall('POST', 'create_professor', payload);
       if (error || data?.error) { toast.error(data?.error || 'Erro ao adicionar.'); return; }
       toast.success('Professor adicionado!');
     }
@@ -733,7 +753,13 @@ const AdminPage = () => {
               </div>
               <div className="space-y-2">
                 <Label>CPF *</Label>
-                <Input value={formData.cpf} onChange={e => setFormData({...formData, cpf: e.target.value})} placeholder="00000000000" />
+                <Input
+                  value={formData.cpf}
+                  onChange={e => setFormData({...formData, cpf: maskCPF(e.target.value)})}
+                  placeholder="000.000.000-00"
+                  inputMode="numeric"
+                  maxLength={14}
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -743,17 +769,35 @@ const AdminPage = () => {
               </div>
               <div className="space-y-2">
                 <Label>Data Nascimento</Label>
-                <Input value={formData.data_nascimento} onChange={e => setFormData({...formData, data_nascimento: e.target.value})} placeholder="01011980" />
+                <Input
+                  value={formData.data_nascimento}
+                  onChange={e => setFormData({...formData, data_nascimento: maskDate(e.target.value)})}
+                  placeholder="DD/MM/AAAA"
+                  inputMode="numeric"
+                  maxLength={10}
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Vínculo Início</Label>
-                <Input value={formData.vinculo_inicio} onChange={e => setFormData({...formData, vinculo_inicio: e.target.value})} placeholder="01/2001" />
+                <Input
+                  value={formData.vinculo_inicio}
+                  onChange={e => setFormData({...formData, vinculo_inicio: maskDate(e.target.value)})}
+                  placeholder="DD/MM/AAAA"
+                  inputMode="numeric"
+                  maxLength={10}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Vínculo Fim</Label>
-                <Input value={formData.vinculo_fim} onChange={e => setFormData({...formData, vinculo_fim: e.target.value})} placeholder="12/2003" />
+                <Input
+                  value={formData.vinculo_fim}
+                  onChange={e => setFormData({...formData, vinculo_fim: maskDate(e.target.value)})}
+                  placeholder="DD/MM/AAAA"
+                  inputMode="numeric"
+                  maxLength={10}
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
