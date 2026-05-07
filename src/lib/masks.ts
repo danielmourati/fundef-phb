@@ -27,8 +27,12 @@ export const isValidCPF = (value: string): boolean => {
   return calc(10) === parseInt(cpf[9]) && calc(11) === parseInt(cpf[10]);
 };
 
-// Máscara DD/MM/YYYY
+// Máscara DD/MM/YYYY (aceita ISO YYYY-MM-DD como entrada)
 export const maskDate = (value: string) => {
+  if (!value) return '';
+  // Normaliza ISO (YYYY-MM-DD) para DD/MM/YYYY
+  const iso = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
   const digits = value.replace(/\D/g, '').slice(0, 8);
   if (digits.length <= 2) return digits;
   if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
