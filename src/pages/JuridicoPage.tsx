@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import logoSeduc from '@/assets/logo-seduc.png';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { maskPhone } from '@/lib/masks';
 
 interface Contestacao {
   id: string;
