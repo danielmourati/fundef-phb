@@ -136,7 +136,7 @@ const JuridicoPage = () => {
       c.professor?.nome || '—',
       c.professor?.cpf || '—',
       c.motivo,
-      c.whatsapp || '—',
+      c.whatsapp ? maskPhone(c.whatsapp) : '—',
       c.status,
       c.resposta || '—',
       new Date(c.created_at).toLocaleDateString('pt-BR'),
@@ -334,7 +334,7 @@ const JuridicoPage = () => {
                             <TableCell className="font-mono text-sm">{c.professor?.matricula}</TableCell>
                             <TableCell className="text-sm">{c.professor?.nome}</TableCell>
                             <TableCell className="text-sm max-w-[150px] truncate">{c.motivo}</TableCell>
-                            <TableCell className="text-sm">{c.whatsapp || '—'}</TableCell>
+                            <TableCell className="text-sm">{c.whatsapp ? maskPhone(c.whatsapp) : '—'}</TableCell>
                             <TableCell>
                               <Badge className={`text-xs font-medium border ${cfg.color}`}>{c.status}</Badge>
                             </TableCell>
@@ -379,7 +379,7 @@ const JuridicoPage = () => {
                 </div>
                 <div>
                   <p className="text-muted-foreground text-xs">WhatsApp</p>
-                  <p>{selectedContest.whatsapp || '—'}</p>
+                  <p>{selectedContest.whatsapp ? maskPhone(selectedContest.whatsapp) : '—'}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground text-xs">Data</p>
