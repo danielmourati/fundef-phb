@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { LogOut, User, AlertTriangle, Bell, Check, FileText } from 'lucide-react';
 import { toast } from 'sonner';
+import { maskPhone } from '@/lib/masks';
 
 
 interface Message {
@@ -396,7 +397,9 @@ const DashboardPage = () => {
                 id="whatsapp"
                 placeholder="(86) 99999-9999"
                 value={whatsapp}
-                onChange={(e) => setWhatsapp(e.target.value)}
+                onChange={(e) => setWhatsapp(maskPhone(e.target.value))}
+                inputMode="numeric"
+                maxLength={15}
                 required
               />
             </div>
