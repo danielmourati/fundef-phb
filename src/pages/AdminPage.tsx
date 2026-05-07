@@ -202,9 +202,11 @@ const AdminPage = () => {
       const text = await file.text();
       const lines = text.split('\n').filter(l => l.trim());
       if (lines.length < 2) { toast.error('CSV vazio ou inválido.'); return; }
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      // Detecta delimitador (`;` ou `,`) a partir da linha de cabeçalho
+      const delimiter = lines[0].includes(';') ? ';' : ',';
+      const headers = lines[0].split(delimiter).map(h => h.trim().toLowerCase().replace(/^\ufeff/, ''));
       const rows = lines.slice(1).map(line => {
-        const values = line.split(',').map(v => v.trim());
+        const values = line.split(delimiter).map(v => v.trim());
         const obj: Record<string, string> = {};
         headers.forEach((h, i) => { obj[h] = values[i] || ''; });
         return obj;
