@@ -397,7 +397,9 @@ const DashboardPage = () => {
                 id="whatsapp"
                 placeholder="(86) 99999-9999"
                 value={whatsapp}
-                onChange={(e) => setWhatsapp(e.target.value)}
+                onChange={(e) => setWhatsapp(maskPhone(e.target.value))}
+                inputMode="numeric"
+                maxLength={15}
                 required
               />
             </div>
