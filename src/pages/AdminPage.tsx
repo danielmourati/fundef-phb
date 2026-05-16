@@ -98,8 +98,9 @@ const AdminPage = () => {
   const [dupDialog, setDupDialog] = useState<{
     open: boolean;
     groups: Array<Record<string, string>[]>;
-    resolve?: (action: 'keep' | 'dedupe' | 'cancel') => void;
+    resolve?: (result: { action: 'keep' | 'dedupe' | 'cancel'; keepIndices?: number[] }) => void;
   }>({ open: false, groups: [] });
+  const [keepIndices, setKeepIndices] = useState<number[]>([]);
 
   const authHeaders = { Authorization: `Bearer ${token}` };
 
