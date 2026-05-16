@@ -1147,6 +1147,66 @@ const AdminPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de validação do CSV */}
+      <Dialog open={validationDialog.open} onOpenChange={(open) => !open && setValidationDialog({ open: false, errors: [], missingHeaders: [] })}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">
+              CSV inválido — importação bloqueada
+            </DialogTitle>
+          </DialogHeader>
+          {validationDialog.missingHeaders.length > 0 && (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+              <p className="font-semibold text-destructive mb-1">Colunas obrigatórias ausentes:</p>
+              <p className="text-foreground">{validationDialog.missingHeaders.join(', ')}</p>
+              <p className="text-xs text-muted-foreground mt-2">
+                O cabeçalho do CSV deve conter, no mínimo: <strong>nome, matricula, cpf</strong>.
+              </p>
+            </div>
+          )}
+          {validationDialog.errors.length > 0 && (
+            <>
+              <p className="text-sm text-muted-foreground">
+                Foram encontrados <strong>{validationDialog.errors.length}</strong> erro(s) nos dados.
+                Corrija o arquivo e tente novamente.
+              </p>
+              <div className="overflow-auto flex-1 border rounded-md">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted sticky top-0">
+                    <tr>
+                      <th className="px-2 py-1 text-left w-16">Linha</th>
+                      <th className="px-2 py-1 text-left">Campo</th>
+                      <th className="px-2 py-1 text-left">Valor</th>
+                      <th className="px-2 py-1 text-left">Erro</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {validationDialog.errors.slice(0, 200).map((err, i) => (
+                      <tr key={i} className="border-t">
+                        <td className="px-2 py-1 font-mono text-muted-foreground">{err.line}</td>
+                        <td className="px-2 py-1 font-mono">{err.field}</td>
+                        <td className="px-2 py-1 font-mono text-muted-foreground">{err.value || '—'}</td>
+                        <td className="px-2 py-1 text-destructive">{err.message}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {validationDialog.errors.length > 200 && (
+                  <p className="text-xs text-muted-foreground p-2 text-center">
+                    Exibindo os primeiros 200 erros de {validationDialog.errors.length}.
+                  </p>
+                )}
+              </div>
+            </>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setValidationDialog({ open: false, errors: [], missingHeaders: [] })}>
+              Entendi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
