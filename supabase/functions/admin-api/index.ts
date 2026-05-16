@@ -154,18 +154,39 @@ Deno.serve(async (req) => {
     if (req.method === "POST" && action === "import_csv") {
       const body = await req.json();
       const rows = body.rows as Array<Record<string, string>>;
+      // Normaliza qualquer formato de data para DD/MM/AAAA
+      const normalizeDateBR = (v: string | null | undefined): string | null => {
+        if (!v) return null;
+        const s = String(v).trim();
+        if (!s) return null;
+        // ISO YYYY-MM-DD
+        const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+        // DD/MM/YYYY ou DD-MM-YYYY
+        const br = s.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
+        if (br) return `${br[1]}/${br[2]}/${br[3]}`;
+        // DDMMYYYY
+        const digits = s.replace(/\D/g, "");
+        if (digits.length === 8) return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+        return s;
+      };
       const toInsert = [];
       for (const r of rows) {
-        const senha = r.data_nascimento?.replace(/\D/g, "") || r.senha || "";
+        const dataNasc = normalizeDateBR(r.data_nascimento);
+        const vinIni = normalizeDateBR(r.vinculo_inicio);
+        const vinFim = normalizeDateBR(r.vinculo_fim);
+        // Senha = data de nascimento em formato DDMMYYYY (apenas dígitos)
+        const senha = (dataNasc?.replace(/\D/g, "") || r.senha || "");
         const { data: hashData } = await supabase.rpc("hash_password", { plain_password: senha });
         toInsert.push({
           nome: r.nome || "", cpf: r.cpf || "", matricula: r.matricula || "",
           senha: "***", senha_hash: hashData,
-          data_nascimento: r.data_nascimento || null,
-          vinculo_inicio: r.vinculo_inicio || null,
-          vinculo_fim: r.vinculo_fim || null,
+          data_nascimento: dataNasc,
+          vinculo_inicio: vinIni,
+          vinculo_fim: vinFim,
           total_cotas: parseInt(r.total_cotas) || 0,
           role: "professor",
+          status: (r.status || "ATIVO").toUpperCase(),
         });
       }
       const { error } = await supabase
