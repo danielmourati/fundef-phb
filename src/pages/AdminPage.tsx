@@ -106,6 +106,15 @@ const AdminPage = () => {
     errors: Array<{ line: number; field: string; message: string; value?: string }>;
     missingHeaders: string[];
   }>({ open: false, errors: [], missingHeaders: [] });
+  const [summaryDialog, setSummaryDialog] = useState<{
+    open: boolean;
+    totalLines: number;
+    emptyDiscarded: number;
+    duplicateGroups: number;
+    keptBySelection: number;
+    dedupedRemoved: number;
+    imported: number;
+  }>({ open: false, totalLines: 0, emptyDiscarded: 0, duplicateGroups: 0, keptBySelection: 0, dedupedRemoved: 0, imported: 0 });
 
   const authHeaders = { Authorization: `Bearer ${token}` };
 
@@ -272,16 +281,17 @@ const AdminPage = () => {
       };
       const rawHeaders = lines[0].split(delimiter).map(normHeader);
       const headers = rawHeaders.map(h => HEADER_ALIASES[h] || h);
-      const rows = lines.slice(1).map(line => {
+      const rawDataLines = lines.length - 1;
+      const allRows = lines.slice(1).map(line => {
         const values = line.split(delimiter).map(v => v.trim());
         const obj: Record<string, string> = {};
         headers.forEach((h, i) => { obj[h] = values[i] || ''; });
-        // Normaliza CPF (mantém apenas dígitos)
         if (obj.cpf) obj.cpf = obj.cpf.replace(/\D/g, '');
-        // Normaliza total_cotas
         if (obj.total_cotas) obj.total_cotas = obj.total_cotas.replace(/\D/g, '') || '0';
         return obj;
-      }).filter(obj => Object.values(obj).some(v => v && v.trim() !== ''));
+      });
+      const rows = allRows.filter(obj => Object.values(obj).some(v => v && v.trim() !== ''));
+      const emptyDiscarded = allRows.length - rows.length;
 
       // ===== Validação do CSV =====
       const REQUIRED_HEADERS = ['nome', 'matricula', 'cpf'];
@@ -352,6 +362,8 @@ const AdminPage = () => {
       const dupGroups = Array.from(bySig.values()).filter(g => g.length > 1);
 
       let finalRows = rows;
+      let keptBySelection = 0;
+      let dedupedRemoved = 0;
       if (dupGroups.length > 0) {
         setKeepIndices(dupGroups.map(() => 0));
         const result = await new Promise<{ action: 'keep' | 'dedupe' | 'cancel'; keepIndices?: number[] }>((resolve) => {
@@ -364,7 +376,6 @@ const AdminPage = () => {
         }
         if (result.action === 'dedupe') {
           const raw = result.keepIndices || [];
-          // Para cada grupo, garante um índice válido (default = 0 = primeira linha)
           const keepIdx = dupGroups.map((g, gi) => {
             const v = raw[gi];
             return typeof v === 'number' && v >= 0 && v < g.length ? v : 0;
@@ -376,6 +387,8 @@ const AdminPage = () => {
             });
           });
           finalRows = rows.filter(r => !toRemove.has(r));
+          keptBySelection = dupGroups.length;
+          dedupedRemoved = toRemove.size;
         }
       }
 
@@ -392,7 +405,15 @@ const AdminPage = () => {
         imported += data?.count || chunk.length;
         setImportProgress({ current: imported, total: finalRows.length });
       }
-      toast.success(`${imported} professor(es) importado(s)!`);
+      setSummaryDialog({
+        open: true,
+        totalLines: rawDataLines,
+        emptyDiscarded,
+        duplicateGroups: dupGroups.length,
+        keptBySelection,
+        dedupedRemoved,
+        imported,
+      });
       fetchData();
     } finally {
       setImporting(false);
@@ -1209,6 +1230,44 @@ const AdminPage = () => {
             <Button onClick={() => setValidationDialog({ open: false, errors: [], missingHeaders: [] })}>
               Entendi
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de resumo da importação */}
+      <Dialog open={summaryDialog.open} onOpenChange={(open) => !open && setSummaryDialog(s => ({ ...s, open: false }))}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Importação concluída</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between border-b pb-2">
+              <span className="text-muted-foreground">Total de linhas no CSV</span>
+              <span className="font-semibold">{summaryDialog.totalLines}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Linhas vazias descartadas</span>
+              <span className="font-semibold">{summaryDialog.emptyDiscarded}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Grupos de duplicatas detectados</span>
+              <span className="font-semibold">{summaryDialog.duplicateGroups}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Mantidas por seleção (1 por grupo)</span>
+              <span className="font-semibold">{summaryDialog.keptBySelection}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Duplicatas removidas</span>
+              <span className="font-semibold">{summaryDialog.dedupedRemoved}</span>
+            </div>
+            <div className="flex justify-between border-t pt-2 mt-2">
+              <span className="font-semibold text-primary">Registros importados</span>
+              <span className="font-bold text-primary text-lg">{summaryDialog.imported}</span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setSummaryDialog(s => ({ ...s, open: false }))}>Fechar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
