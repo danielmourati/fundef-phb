@@ -18,7 +18,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { maskCPF, unmaskCPF, isValidCPF, maskDate, isValidDate, maskPhone } from '@/lib/masks';
+import { maskCPF, unmaskCPF, isValidCPF, maskDate, isValidDate, maskPhone, STATUS_OPTIONS, statusBadgeClass, statusRowClass, normalizeStatus } from '@/lib/masks';
 
 interface Professor {
   id: string;
@@ -30,6 +30,7 @@ interface Professor {
   vinculo_fim: string | null;
   total_cotas: number | null;
   role: string;
+  status: string | null;
 }
 
 interface Contestacao {
@@ -54,6 +55,7 @@ interface Message {
 const emptyProfessor = {
   nome: '', cpf: '', matricula: '', senha: '', data_nascimento: '',
   vinculo_inicio: '', vinculo_fim: '', total_cotas: 0, role: 'professor',
+  status: 'ATIVO',
 };
 
 type ActiveTab = 'dashboard' | 'professors' | 'contestacoes' | 'messages' | 'settings';
@@ -153,6 +155,7 @@ const AdminPage = () => {
       vinculo_fim: maskDate(p.vinculo_fim || ''),
       total_cotas: p.total_cotas || 0,
       role: p.role,
+      status: normalizeStatus(p.status),
     });
     setDialogOpen(true);
   };
@@ -171,11 +174,11 @@ const AdminPage = () => {
       return;
     }
     if (!isValidDate(formData.vinculo_inicio)) {
-      toast.error('Vínculo Início inválido (use DD/MM/AAAA).');
+      toast.error('Data de Admissão inválida (use DD/MM/AAAA).');
       return;
     }
     if (!isValidDate(formData.vinculo_fim)) {
-      toast.error('Vínculo Fim inválido (use DD/MM/AAAA).');
+      toast.error('Data da Aposentadoria inválida (use DD/MM/AAAA).');
       return;
     }
     const payload = { ...formData, cpf: unmaskCPF(formData.cpf) };
@@ -544,24 +547,30 @@ const AdminPage = () => {
                     <Table>
                       <TableHeader>
                         <TableRow className="hover:bg-transparent">
-                          <TableHead className="text-xs font-medium text-muted-foreground w-[80px] lg:w-[120px]">Matrícula</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground min-w-[150px]">Nome</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground w-[80px] lg:w-[120px]">Mat</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground hidden lg:table-cell">CPF</TableHead>
-                          <TableHead className="text-xs font-medium text-muted-foreground hidden md:table-cell">Perfil</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground hidden md:table-cell whitespace-nowrap">Data de Admissão</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground hidden md:table-cell whitespace-nowrap">Data da Aposentadoria</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground hidden sm:table-cell">Cotas</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground whitespace-nowrap">Status do Servidor</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground text-right sticky right-0 bg-card/95 backdrop-blur-sm z-10 border-l border-border px-4 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {filteredProfs.map(p => (
-                          <TableRow key={p.id} className="group">
-                            <TableCell className="font-mono text-xs lg:text-sm py-3">{p.matricula}</TableCell>
+                          <TableRow key={p.id} className={`group ${statusRowClass(p.status)}`}>
                             <TableCell className="text-xs lg:text-sm font-medium py-3">{p.nome}</TableCell>
+                            <TableCell className="font-mono text-xs lg:text-sm py-3">{p.matricula}</TableCell>
                             <TableCell className="font-mono text-xs lg:text-sm hidden lg:table-cell py-3">{p.cpf}</TableCell>
-                            <TableCell className="hidden md:table-cell py-3">
-                              <Badge variant="outline" className="text-[10px] lg:text-xs capitalize px-2 py-0">{p.role}</Badge>
-                            </TableCell>
+                            <TableCell className="text-xs lg:text-sm hidden md:table-cell py-3 whitespace-nowrap">{maskDate(p.vinculo_inicio || '') || '—'}</TableCell>
+                            <TableCell className="text-xs lg:text-sm hidden md:table-cell py-3 whitespace-nowrap">{maskDate(p.vinculo_fim || '') || '—'}</TableCell>
                             <TableCell className="text-xs lg:text-sm hidden sm:table-cell py-3">{p.total_cotas || 0}</TableCell>
+                            <TableCell className="py-3">
+                              <Badge variant="outline" className={`text-[10px] lg:text-xs px-2 py-0 border ${statusBadgeClass(p.status)}`}>
+                                {normalizeStatus(p.status)}
+                              </Badge>
+                            </TableCell>
                             <TableCell className="text-right sticky right-0 bg-card/95 backdrop-blur-sm z-10 border-l border-border px-4 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)] group-hover:bg-accent/50 transition-colors">
                               <div className="flex items-center justify-end gap-1">
                                 <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-background" onClick={() => openEditDialog(p)} title="Editar">
@@ -780,7 +789,7 @@ const AdminPage = () => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Vínculo Início</Label>
+                <Label>Data de Admissão</Label>
                 <Input
                   value={formData.vinculo_inicio}
                   onChange={e => setFormData({...formData, vinculo_inicio: maskDate(e.target.value)})}
@@ -790,7 +799,7 @@ const AdminPage = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Vínculo Fim</Label>
+                <Label>Data da Aposentadoria</Label>
                 <Input
                   value={formData.vinculo_fim}
                   onChange={e => setFormData({...formData, vinculo_fim: maskDate(e.target.value)})}
@@ -806,18 +815,31 @@ const AdminPage = () => {
                 <Input type="number" value={formData.total_cotas} onChange={e => setFormData({...formData, total_cotas: parseInt(e.target.value) || 0})} />
               </div>
               <div className="space-y-2">
-                <Label>Perfil (Role)</Label>
-                <Select value={formData.role} onValueChange={v => setFormData({...formData, role: v})}>
+                <Label>Status do Servidor</Label>
+                <Select value={formData.status} onValueChange={v => setFormData({...formData, status: v})}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="professor">Professor</SelectItem>
-                    <SelectItem value="admin">Administrador</SelectItem>
-                    <SelectItem value="juridico">Jurídico</SelectItem>
+                    {STATUS_OPTIONS.map(s => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Perfil (Role)</Label>
+              <Select value={formData.role} onValueChange={v => setFormData({...formData, role: v})}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="professor">Professor</SelectItem>
+                  <SelectItem value="admin">Administrador</SelectItem>
+                  <SelectItem value="juridico">Jurídico</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>

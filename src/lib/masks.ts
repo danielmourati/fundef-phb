@@ -75,3 +75,38 @@ export const isValidMonthYear = (value: string): boolean => {
   const mo = parseInt(m[1]), y = parseInt(m[2]);
   return mo >= 1 && mo <= 12 && y >= 1900 && y <= 2100;
 };
+
+// Status do servidor
+export type ServidorStatus = 'ATIVO' | 'APOSENTADO' | 'EXONERADO' | 'EXONERADA' | 'FALECIDO' | 'FALECIDA';
+
+export const STATUS_OPTIONS: ServidorStatus[] = [
+  'ATIVO', 'APOSENTADO', 'EXONERADO', 'EXONERADA', 'FALECIDO', 'FALECIDA',
+];
+
+export const normalizeStatus = (s: string | null | undefined): string => {
+  if (!s) return 'ATIVO';
+  return String(s).trim().toUpperCase();
+};
+
+// Classes Tailwind para badge/coluna por status
+export const statusBadgeClass = (s: string | null | undefined): string => {
+  const v = normalizeStatus(s);
+  if (v === 'EXONERADO' || v === 'EXONERADA') {
+    return 'bg-orange-100 text-orange-700 border-orange-300';
+  }
+  if (v === 'FALECIDO' || v === 'FALECIDA') {
+    return 'bg-red-100 text-red-700 border-red-300';
+  }
+  if (v === 'APOSENTADO' || v === 'APOSENTADA') {
+    return 'bg-blue-100 text-blue-700 border-blue-300';
+  }
+  return 'bg-green-100 text-green-700 border-green-300';
+};
+
+// Destaque sutil para a linha inteira da tabela quando status crítico
+export const statusRowClass = (s: string | null | undefined): string => {
+  const v = normalizeStatus(s);
+  if (v === 'EXONERADO' || v === 'EXONERADA') return 'bg-orange-50/60';
+  if (v === 'FALECIDO' || v === 'FALECIDA') return 'bg-red-50/60';
+  return '';
+};

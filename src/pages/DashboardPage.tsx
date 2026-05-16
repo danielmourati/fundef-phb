@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { LogOut, User, AlertTriangle, Bell, Check, FileText } from 'lucide-react';
 import { toast } from 'sonner';
-import { maskPhone } from '@/lib/masks';
+import { maskPhone, statusBadgeClass, normalizeStatus } from '@/lib/masks';
 
 
 interface Message {
@@ -231,20 +231,25 @@ const DashboardPage = () => {
           <>
             <Card className="overflow-hidden">
               <CardContent className="p-0">
-                <div className="px-5 pt-5 pb-3">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Matrícula</p>
-                  <p className="text-2xl font-bold tracking-tight">{professor.matricula}</p>
+                <div className="px-5 pt-5 pb-3 flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Matrícula</p>
+                    <p className="text-2xl font-bold tracking-tight">{professor.matricula}</p>
+                  </div>
+                  <Badge variant="outline" className={`text-[11px] border ${statusBadgeClass(professor.status)}`}>
+                    {normalizeStatus(professor.status)}
+                  </Badge>
                 </div>
 
                 <div className="border-t mx-5" />
 
                 <div className="grid grid-cols-2 gap-x-6 gap-y-4 px-5 py-4">
                   <div>
-                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Vínculo Início</p>
+                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Data de Admissão</p>
                     <p className="font-medium text-sm">{formatDate(professor.vinculo_inicio)}</p>
                   </div>
                   <div>
-                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Vínculo Fim</p>
+                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Data da Aposentadoria</p>
                     <p className="font-medium text-sm">{formatDate(professor.vinculo_fim)}</p>
                   </div>
                   <div>
