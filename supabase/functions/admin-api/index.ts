@@ -171,21 +171,20 @@ Deno.serve(async (req) => {
         return s;
       };
       const byMat = new Map<string, Record<string, unknown>>();
-      const skipped: string[] = [];
+      const semMatricula: Record<string, unknown>[] = [];
       for (const r of rows) {
         const matricula = String(r.matricula || "").trim();
-        if (!matricula) { skipped.push("(sem matrícula)"); continue; }
         const dataNasc = normalizeDateBR(r.data_nascimento);
         const vinIni = normalizeDateBR(r.vinculo_inicio);
         const vinFim = normalizeDateBR(r.vinculo_fim);
+        const cpf = String(r.cpf || "").trim();
         // Senha = data de nascimento em formato DDMMYYYY (apenas dígitos)
-        const senha = (dataNasc?.replace(/\D/g, "") || r.senha || matricula);
+        const senha = (dataNasc?.replace(/\D/g, "") || r.senha || matricula || cpf.replace(/\D/g, ""));
         const { data: hashData } = await supabase.rpc("hash_password", { plain_password: senha });
-        // Dedup dentro do chunk: a última ocorrência prevalece
-        byMat.set(matricula, {
+        const record = {
           nome: String(r.nome || "").trim(),
-          cpf: String(r.cpf || "").trim(),
-          matricula,
+          cpf,
+          matricula: matricula || null,
           senha: "***", senha_hash: hashData,
           data_nascimento: dataNasc,
           vinculo_inicio: vinIni,
@@ -193,21 +192,40 @@ Deno.serve(async (req) => {
           total_cotas: parseInt(r.total_cotas) || 0,
           role: "professor",
           status: (r.status || "ATIVO").toString().toUpperCase().trim(),
-        });
+        };
+        if (matricula) {
+          // Dedup dentro do chunk: a última ocorrência prevalece
+          byMat.set(matricula, record);
+        } else {
+          // Sem matrícula: insere sempre como novo vínculo (sem upsert)
+          semMatricula.push(record);
+        }
       }
-      const toInsert = Array.from(byMat.values());
-      if (toInsert.length === 0) {
-        return jsonResponse({ success: true, count: 0, skipped: skipped.length });
+      const toUpsert = Array.from(byMat.values());
+      let total = 0;
+      if (toUpsert.length > 0) {
+        const { error } = await supabase
+          .from("professors")
+          .upsert(toUpsert, { onConflict: "matricula" });
+        if (error) {
+          return new Response(JSON.stringify({ error: `Erro ao importar: ${error.message}` }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        total += toUpsert.length;
       }
-      const { error } = await supabase
-        .from("professors")
-        .upsert(toInsert, { onConflict: "matricula" });
-      if (error) {
-        return new Response(JSON.stringify({ error: `Erro ao importar: ${error.message}` }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+      if (semMatricula.length > 0) {
+        const { error } = await supabase
+          .from("professors")
+          .insert(semMatricula);
+        if (error) {
+          return new Response(JSON.stringify({ error: `Erro ao importar (sem matrícula): ${error.message}` }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        total += semMatricula.length;
       }
-      return jsonResponse({ success: true, count: toInsert.length, skipped: skipped.length });
+      return jsonResponse({ success: true, count: total, sem_matricula: semMatricula.length });
     }
 
     // PUT settings
