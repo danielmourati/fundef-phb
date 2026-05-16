@@ -170,7 +170,7 @@ Deno.serve(async (req) => {
         if (digits.length === 8) return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
         return s;
       };
-      const byMat = new Map<string, Record<string, unknown>>();
+      const byKey = new Map<string, Record<string, unknown>>();
       const semMatricula: Record<string, unknown>[] = [];
       for (const r of rows) {
         const matricula = String(r.matricula || "").trim();
