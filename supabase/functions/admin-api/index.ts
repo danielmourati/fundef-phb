@@ -150,12 +150,20 @@ Deno.serve(async (req) => {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      // Busca o admin atual e valida a senha
-      const { data: adminRow } = await supabase
-        .from("professors")
+      // Busca o admin atual (na tabela users) e valida a senha
+      let { data: adminRow } = await supabase
+        .from("users")
         .select("id, role, senha_hash")
         .eq("id", user.sub)
         .maybeSingle();
+      if (!adminRow) {
+        const { data: profAdmin } = await supabase
+          .from("professors")
+          .select("id, role, senha_hash")
+          .eq("id", user.sub)
+          .maybeSingle();
+        adminRow = profAdmin;
+      }
       if (!adminRow || adminRow.role !== "admin" || !adminRow.senha_hash) {
         return new Response(JSON.stringify({ error: "Administrador não encontrado." }), {
           status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
