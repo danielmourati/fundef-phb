@@ -201,12 +201,12 @@ Deno.serve(async (req) => {
           semMatricula.push(record);
         }
       }
-      const toUpsert = Array.from(byMat.values());
+      const toUpsert = Array.from(byKey.values());
       let total = 0;
       if (toUpsert.length > 0) {
         const { error } = await supabase
           .from("professors")
-          .upsert(toUpsert, { onConflict: "matricula" });
+          .upsert(toUpsert, { onConflict: "matricula,cpf" });
         if (error) {
           return new Response(JSON.stringify({ error: `Erro ao importar: ${error.message}` }), {
             status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
