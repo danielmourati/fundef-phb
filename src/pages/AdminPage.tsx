@@ -275,12 +275,16 @@ const AdminPage = () => {
         if (obj.total_cotas) obj.total_cotas = obj.total_cotas.replace(/\D/g, '') || '0';
         return obj;
       });
-      // Detecta linhas 100% idênticas em TODAS as colunas
-      const sigOf = (r: Record<string, string>) =>
-        Object.keys(r).sort().map(k => `${k}=${(r[k] ?? '').trim().toUpperCase()}`).join('|');
+      // Detecta duplicatas pela mesma chave usada no servidor (matricula+cpf).
+      // Linhas que compartilham essa chave seriam mescladas silenciosamente no upsert
+      // — então alertamos o usuário mesmo quando os demais campos divergem.
       const bySig = new Map<string, Record<string, string>[]>();
       for (const r of rows) {
-        const s = sigOf(r);
+        const mat = (r.matricula || '').trim().toUpperCase();
+        const cpf = (r.cpf || '').trim();
+        // Sem matrícula não há conflito de upsert (cada linha vira novo registro)
+        if (!mat) continue;
+        const s = `${mat}|${cpf}`;
         if (!bySig.has(s)) bySig.set(s, []);
         bySig.get(s)!.push(r);
       }
