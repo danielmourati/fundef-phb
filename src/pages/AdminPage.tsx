@@ -363,7 +363,12 @@ const AdminPage = () => {
           return;
         }
         if (result.action === 'dedupe') {
-          const keepIdx = result.keepIndices || dupGroups.map(() => 0);
+          const raw = result.keepIndices || [];
+          // Para cada grupo, garante um índice válido (default = 0 = primeira linha)
+          const keepIdx = dupGroups.map((g, gi) => {
+            const v = raw[gi];
+            return typeof v === 'number' && v >= 0 && v < g.length ? v : 0;
+          });
           const toRemove = new Set<Record<string, string>>();
           dupGroups.forEach((g, gi) => {
             g.forEach((row, ri) => {
