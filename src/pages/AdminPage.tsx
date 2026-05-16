@@ -944,6 +944,41 @@ const AdminPage = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Confirmação para limpar base (exige senha do admin) */}
+      <Dialog open={clearDialogOpen} onOpenChange={(o) => { if (!clearing) setClearDialogOpen(o); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">⚠️ Limpar base de dados</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p>
+              Esta ação irá <strong>excluir TODOS os professores e contestações</strong> do
+              sistema. Contas de administrador e jurídico serão preservadas.
+            </p>
+            <p className="text-destructive font-medium">Esta ação não pode ser desfeita.</p>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Confirme com sua senha de administrador</label>
+              <Input
+                type="password"
+                value={clearPassword}
+                onChange={(e) => setClearPassword(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleClearDatabase(); }}
+                placeholder="Digite sua senha"
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setClearDialogOpen(false)} disabled={clearing}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleClearDatabase} disabled={clearing || !clearPassword}>
+              {clearing ? 'Limpando...' : 'Confirmar e limpar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Modal de linhas duplicadas */}
       <Dialog
         open={dupDialog.open}
