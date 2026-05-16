@@ -211,12 +211,23 @@ const AdminPage = () => {
     fetchData();
   };
 
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
+  const [clearPassword, setClearPassword] = useState('');
+  const [clearing, setClearing] = useState(false);
+
+  const openClearDialog = () => {
+    setClearPassword('');
+    setClearDialogOpen(true);
+  };
+
   const handleClearDatabase = async () => {
-    if (!confirm('ATENÇÃO: Isso excluirá TODOS os professores e contestações do sistema. Esta ação não pode ser desfeita. Deseja continuar?')) return;
-    setLoading(true);
-    const { data, error } = await apiCall('POST', 'delete_all_professors');
-    setLoading(false);
+    if (!clearPassword) { toast.error('Informe sua senha de administrador.'); return; }
+    setClearing(true);
+    const { data, error } = await apiCall('POST', 'delete_all_professors', { password: clearPassword });
+    setClearing(false);
     if (error || data?.error) { toast.error(data?.error || 'Erro ao limpar base.'); return; }
+    setClearDialogOpen(false);
+    setClearPassword('');
     toast.success('Base de dados limpa com sucesso!');
     fetchData();
   };
