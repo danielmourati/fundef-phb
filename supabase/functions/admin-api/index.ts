@@ -170,30 +170,44 @@ Deno.serve(async (req) => {
         if (digits.length === 8) return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
         return s;
       };
-      const toInsert = [];
+      const byMat = new Map<string, Record<string, unknown>>();
+      const skipped: string[] = [];
       for (const r of rows) {
+        const matricula = String(r.matricula || "").trim();
+        if (!matricula) { skipped.push("(sem matrícula)"); continue; }
         const dataNasc = normalizeDateBR(r.data_nascimento);
         const vinIni = normalizeDateBR(r.vinculo_inicio);
         const vinFim = normalizeDateBR(r.vinculo_fim);
         // Senha = data de nascimento em formato DDMMYYYY (apenas dígitos)
-        const senha = (dataNasc?.replace(/\D/g, "") || r.senha || "");
+        const senha = (dataNasc?.replace(/\D/g, "") || r.senha || matricula);
         const { data: hashData } = await supabase.rpc("hash_password", { plain_password: senha });
-        toInsert.push({
-          nome: r.nome || "", cpf: r.cpf || "", matricula: r.matricula || "",
+        // Dedup dentro do chunk: a última ocorrência prevalece
+        byMat.set(matricula, {
+          nome: String(r.nome || "").trim(),
+          cpf: String(r.cpf || "").trim(),
+          matricula,
           senha: "***", senha_hash: hashData,
           data_nascimento: dataNasc,
           vinculo_inicio: vinIni,
           vinculo_fim: vinFim,
           total_cotas: parseInt(r.total_cotas) || 0,
           role: "professor",
-          status: (r.status || "ATIVO").toUpperCase(),
+          status: (r.status || "ATIVO").toString().toUpperCase().trim(),
         });
+      }
+      const toInsert = Array.from(byMat.values());
+      if (toInsert.length === 0) {
+        return jsonResponse({ success: true, count: 0, skipped: skipped.length });
       }
       const { error } = await supabase
         .from("professors")
         .upsert(toInsert, { onConflict: "matricula" });
-      if (error) throw error;
-      return jsonResponse({ success: true, count: toInsert.length });
+      if (error) {
+        return new Response(JSON.stringify({ error: `Erro ao importar: ${error.message}` }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return jsonResponse({ success: true, count: toInsert.length, skipped: skipped.length });
     }
 
     // PUT settings
