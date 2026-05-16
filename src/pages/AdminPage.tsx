@@ -362,6 +362,8 @@ const AdminPage = () => {
       const dupGroups = Array.from(bySig.values()).filter(g => g.length > 1);
 
       let finalRows = rows;
+      let keptBySelection = 0;
+      let dedupedRemoved = 0;
       if (dupGroups.length > 0) {
         setKeepIndices(dupGroups.map(() => 0));
         const result = await new Promise<{ action: 'keep' | 'dedupe' | 'cancel'; keepIndices?: number[] }>((resolve) => {
@@ -374,7 +376,6 @@ const AdminPage = () => {
         }
         if (result.action === 'dedupe') {
           const raw = result.keepIndices || [];
-          // Para cada grupo, garante um índice válido (default = 0 = primeira linha)
           const keepIdx = dupGroups.map((g, gi) => {
             const v = raw[gi];
             return typeof v === 'number' && v >= 0 && v < g.length ? v : 0;
@@ -386,6 +387,8 @@ const AdminPage = () => {
             });
           });
           finalRows = rows.filter(r => !toRemove.has(r));
+          keptBySelection = dupGroups.length;
+          dedupedRemoved = toRemove.size;
         }
       }
 
@@ -402,7 +405,15 @@ const AdminPage = () => {
         imported += data?.count || chunk.length;
         setImportProgress({ current: imported, total: finalRows.length });
       }
-      toast.success(`${imported} professor(es) importado(s)!`);
+      setSummaryDialog({
+        open: true,
+        totalLines: rawDataLines,
+        emptyDiscarded,
+        duplicateGroups: dupGroups.length,
+        keptBySelection,
+        dedupedRemoved,
+        imported,
+      });
       fetchData();
     } finally {
       setImporting(false);
