@@ -1015,9 +1015,21 @@ const AdminPage = () => {
               <thead className="bg-muted sticky top-0">
                 <tr>
                   <th className="px-2 py-1 text-left">#</th>
-                  {dupDialog.groups[0] && Object.keys(dupDialog.groups[0][0]).map(k => (
-                    <th key={k} className="px-2 py-1 text-left whitespace-nowrap">{k}</th>
-                  ))}
+                  {dupDialog.groups[0] && Object.keys(dupDialog.groups[0][0]).map(k => {
+                    const headerLabels: Record<string, string> = {
+                      nome: 'Nome',
+                      matricula: 'Mat',
+                      cpf: 'CPF',
+                      vinculo_inicio: 'Data de Admissão',
+                      vinculo_fim: 'Data da Aposentadoria',
+                      total_cotas: 'Cotas',
+                      status: 'Status do Servidor',
+                      data_nascimento: 'Data de Nascimento',
+                    };
+                    return (
+                      <th key={k} className="px-2 py-1 text-left whitespace-nowrap">{headerLabels[k] || k}</th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
