@@ -227,11 +227,36 @@ const AdminPage = () => {
       if (lines.length < 2) { toast.error('CSV vazio ou inválido.'); return; }
       // Detecta delimitador (`;` ou `,`) a partir da linha de cabeçalho
       const delimiter = lines[0].includes(';') ? ';' : ',';
-      const headers = lines[0].split(delimiter).map(h => h.trim().toLowerCase().replace(/^\ufeff/, ''));
+      // Normaliza cabeçalho: remove BOM, acentos, espaços extras e mapeia aliases
+      const stripAccents = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const normHeader = (h: string) => stripAccents(h.trim().toLowerCase().replace(/^\ufeff+/, '')).replace(/\s+/g, ' ');
+      const HEADER_ALIASES: Record<string, string> = {
+        'nome': 'nome',
+        'mat': 'matricula', 'matricula': 'matricula', 'matrícula': 'matricula',
+        'cpf': 'cpf',
+        'data nascimento': 'data_nascimento', 'data de nascimento': 'data_nascimento',
+        'nascimento': 'data_nascimento', 'data_nascimento': 'data_nascimento',
+        'data da admissao': 'vinculo_inicio', 'data de admissao': 'vinculo_inicio',
+        'admissao': 'vinculo_inicio', 'vinculo inicio': 'vinculo_inicio',
+        'vinculo_inicio': 'vinculo_inicio',
+        'data da aposentadoria': 'vinculo_fim', 'data de aposentadoria': 'vinculo_fim',
+        'aposentadoria': 'vinculo_fim', 'vinculo fim': 'vinculo_fim',
+        'vinculo_fim': 'vinculo_fim',
+        'cotas': 'total_cotas', 'total de cotas': 'total_cotas', 'total cotas': 'total_cotas',
+        'total_cotas': 'total_cotas',
+        'status': 'status', 'status do servidor': 'status', 'situacao': 'status',
+        'senha': 'senha',
+      };
+      const rawHeaders = lines[0].split(delimiter).map(normHeader);
+      const headers = rawHeaders.map(h => HEADER_ALIASES[h] || h);
       const rows = lines.slice(1).map(line => {
         const values = line.split(delimiter).map(v => v.trim());
         const obj: Record<string, string> = {};
         headers.forEach((h, i) => { obj[h] = values[i] || ''; });
+        // Normaliza CPF (mantém apenas dígitos)
+        if (obj.cpf) obj.cpf = obj.cpf.replace(/\D/g, '');
+        // Normaliza total_cotas
+        if (obj.total_cotas) obj.total_cotas = obj.total_cotas.replace(/\D/g, '') || '0';
         return obj;
       });
       const CHUNK = 100;
