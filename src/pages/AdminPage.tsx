@@ -214,6 +214,7 @@ const AdminPage = () => {
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [clearPassword, setClearPassword] = useState('');
   const [clearing, setClearing] = useState(false);
+  const [showClearPassword, setShowClearPassword] = useState(false);
 
   const openClearDialog = () => {
     setClearPassword('');
@@ -962,14 +963,26 @@ const AdminPage = () => {
             <p className="text-destructive font-medium">Esta ação não pode ser desfeita.</p>
             <div className="space-y-1">
               <label className="text-sm font-medium">Confirme com sua senha de administrador</label>
-              <Input
-                type="password"
-                value={clearPassword}
-                onChange={(e) => setClearPassword(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleClearDatabase(); }}
-                placeholder="Digite sua senha"
-                autoFocus
-              />
+              <div className="relative">
+                <Input
+                  type={showClearPassword ? 'text' : 'password'}
+                  value={clearPassword}
+                  onChange={(e) => setClearPassword(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleClearDatabase(); }}
+                  placeholder="Digite sua senha"
+                  autoFocus
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowClearPassword((v) => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
+                  aria-label={showClearPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                  tabIndex={-1}
+                >
+                  {showClearPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
           </div>
           <DialogFooter className="gap-2">
