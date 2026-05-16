@@ -101,6 +101,11 @@ const AdminPage = () => {
     resolve?: (result: { action: 'keep' | 'dedupe' | 'cancel'; keepIndices?: number[] }) => void;
   }>({ open: false, groups: [] });
   const [keepIndices, setKeepIndices] = useState<number[]>([]);
+  const [validationDialog, setValidationDialog] = useState<{
+    open: boolean;
+    errors: Array<{ line: number; field: string; message: string; value?: string }>;
+    missingHeaders: string[];
+  }>({ open: false, errors: [], missingHeaders: [] });
 
   const authHeaders = { Authorization: `Bearer ${token}` };
 
