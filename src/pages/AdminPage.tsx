@@ -294,20 +294,23 @@ const AdminPage = () => {
 
       let finalRows = rows;
       if (dupGroups.length > 0) {
-        const action = await new Promise<'keep' | 'dedupe' | 'cancel'>((resolve) => {
+        setKeepIndices(dupGroups.map(() => 0));
+        const result = await new Promise<{ action: 'keep' | 'dedupe' | 'cancel'; keepIndices?: number[] }>((resolve) => {
           setDupDialog({ open: true, groups: dupGroups, resolve });
         });
         setDupDialog({ open: false, groups: [] });
-        if (action === 'cancel') {
+        if (result.action === 'cancel') {
           toast.info('Importação cancelada.');
           return;
         }
-        if (action === 'dedupe') {
-          // Para cada grupo, mantém somente a primeira ocorrência
+        if (result.action === 'dedupe') {
+          const keepIdx = result.keepIndices || dupGroups.map(() => 0);
           const toRemove = new Set<Record<string, string>>();
-          for (const g of dupGroups) {
-            for (let i = 1; i < g.length; i++) toRemove.add(g[i]);
-          }
+          dupGroups.forEach((g, gi) => {
+            g.forEach((row, ri) => {
+              if (ri !== keepIdx[gi]) toRemove.add(row);
+            });
+          });
           finalRows = rows.filter(r => !toRemove.has(r));
         }
       }
