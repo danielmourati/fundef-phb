@@ -264,8 +264,39 @@ const AdminPage = () => {
         if (obj.total_cotas) obj.total_cotas = obj.total_cotas.replace(/\D/g, '') || '0';
         return obj;
       });
+      // Detecta linhas 100% idênticas em TODAS as colunas
+      const sigOf = (r: Record<string, string>) =>
+        Object.keys(r).sort().map(k => `${k}=${(r[k] ?? '').trim().toUpperCase()}`).join('|');
+      const bySig = new Map<string, Record<string, string>[]>();
+      for (const r of rows) {
+        const s = sigOf(r);
+        if (!bySig.has(s)) bySig.set(s, []);
+        bySig.get(s)!.push(r);
+      }
+      const dupGroups = Array.from(bySig.values()).filter(g => g.length > 1);
+
+      let finalRows = rows;
+      if (dupGroups.length > 0) {
+        const action = await new Promise<'keep' | 'dedupe' | 'cancel'>((resolve) => {
+          setDupDialog({ open: true, groups: dupGroups, resolve });
+        });
+        setDupDialog({ open: false, groups: [] });
+        if (action === 'cancel') {
+          toast.info('Importação cancelada.');
+          return;
+        }
+        if (action === 'dedupe') {
+          // Para cada grupo, mantém somente a primeira ocorrência
+          const toRemove = new Set<Record<string, string>>();
+          for (const g of dupGroups) {
+            for (let i = 1; i < g.length; i++) toRemove.add(g[i]);
+          }
+          finalRows = rows.filter(r => !toRemove.has(r));
+        }
+      }
+
       const CHUNK = 100;
-      setImportProgress({ current: 0, total: rows.length });
+      setImportProgress({ current: 0, total: finalRows.length });
       let imported = 0;
       for (let i = 0; i < rows.length; i += CHUNK) {
         const chunk = rows.slice(i, i + CHUNK);
