@@ -281,16 +281,17 @@ const AdminPage = () => {
       };
       const rawHeaders = lines[0].split(delimiter).map(normHeader);
       const headers = rawHeaders.map(h => HEADER_ALIASES[h] || h);
-      const rows = lines.slice(1).map(line => {
+      const rawDataLines = lines.length - 1;
+      const allRows = lines.slice(1).map(line => {
         const values = line.split(delimiter).map(v => v.trim());
         const obj: Record<string, string> = {};
         headers.forEach((h, i) => { obj[h] = values[i] || ''; });
-        // Normaliza CPF (mantém apenas dígitos)
         if (obj.cpf) obj.cpf = obj.cpf.replace(/\D/g, '');
-        // Normaliza total_cotas
         if (obj.total_cotas) obj.total_cotas = obj.total_cotas.replace(/\D/g, '') || '0';
         return obj;
-      }).filter(obj => Object.values(obj).some(v => v && v.trim() !== ''));
+      });
+      const rows = allRows.filter(obj => Object.values(obj).some(v => v && v.trim() !== ''));
+      const emptyDiscarded = allRows.length - rows.length;
 
       // ===== Validação do CSV =====
       const REQUIRED_HEADERS = ['nome', 'matricula', 'cpf'];
