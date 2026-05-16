@@ -214,6 +214,7 @@ const AdminPage = () => {
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [clearPassword, setClearPassword] = useState('');
   const [clearing, setClearing] = useState(false);
+  const [showClearPassword, setShowClearPassword] = useState(false);
 
   const openClearDialog = () => {
     setClearPassword('');
