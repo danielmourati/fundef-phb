@@ -488,9 +488,9 @@ const AdminPage = () => {
   const nonAdminProfs = professors;
   const filteredProfs = nonAdminProfs.filter(p =>
     !searchQuery ||
-    p.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.matricula.includes(searchQuery) ||
-    p.cpf.includes(searchQuery)
+    (p.nome || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (p.matricula || '').includes(searchQuery) ||
+    (p.cpf || '').includes(searchQuery)
   );
   const statCards = [
     { label: 'Total Professores', value: nonAdminProfs.length, icon: Users, color: 'bg-primary/10 text-primary' },
