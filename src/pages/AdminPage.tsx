@@ -688,6 +688,29 @@ const AdminPage = () => {
                   <h3 className="font-semibold text-foreground">Professores ({nonAdminProfs.length})</h3>
                   <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                     <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleCSVImport} disabled={importing} />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 sm:flex-none"
+                      onClick={() => {
+                        const headers = ['nome', 'matricula', 'cpf', 'data_nascimento', 'vinculo_inicio', 'vinculo_fim', 'total_cotas', 'status'];
+                        const example = [
+                          ['JOSE DA SILVA', '12345', '12345678909', '15/03/1980', '01/04/2005', '', '132', 'ATIVO'],
+                          ['MARIA OLIVEIRA', '12346', '98765432100', '22/07/1975', '10/02/2000', '15/06/2024', '132', 'APOSENTADO'],
+                        ];
+                        const csv = [headers.join(';'), ...example.map(r => r.join(';'))].join('\n');
+                        const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'modelo-importacao-professores.csv';
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      }}
+                      title="Baixar modelo CSV"
+                    >
+                      <Download className="w-4 h-4 mr-1.5" /> Modelo CSV
+                    </Button>
                     <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={() => fileInputRef.current?.click()} disabled={importing}>
                       {importing ? (
                         <>
