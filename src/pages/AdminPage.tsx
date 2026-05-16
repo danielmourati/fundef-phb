@@ -604,7 +604,7 @@ const AdminPage = () => {
                         <><Upload className="w-4 h-4 mr-1.5" /> Importar</>
                       )}
                     </Button>
-                    <Button size="sm" variant="destructive" className="flex-1 sm:flex-none" onClick={handleClearDatabase}>
+                    <Button size="sm" variant="destructive" className="flex-1 sm:flex-none" onClick={openClearDialog}>
                       <Trash className="w-4 h-4 mr-1.5" /> Limpar Base
                     </Button>
                     <Button size="sm" className="flex-1 sm:flex-none" onClick={openAddDialog}>
