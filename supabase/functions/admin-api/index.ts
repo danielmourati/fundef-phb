@@ -140,12 +140,43 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: true });
     }
 
-    // DELETE all professors (Clear database) - Allowing POST for compatibility
+    // DELETE all professors (Clear database) - requires admin password confirmation
     if ((req.method === "DELETE" || req.method === "POST") && action === "delete_all_professors") {
+      let body: { password?: string } = {};
+      try { body = await req.json(); } catch { /* allow empty */ }
+      const password = String(body.password || "");
+      if (!password) {
+        return new Response(JSON.stringify({ error: "Senha de administrador obrigatória." }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      // Busca o admin atual e valida a senha
+      const { data: adminRow } = await supabase
+        .from("professors")
+        .select("id, role, senha_hash")
+        .eq("id", user.sub)
+        .maybeSingle();
+      if (!adminRow || adminRow.role !== "admin" || !adminRow.senha_hash) {
+        return new Response(JSON.stringify({ error: "Administrador não encontrado." }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { data: pwOk } = await supabase.rpc("verify_password", {
+        plain_password: password,
+        hashed_password: adminRow.senha_hash,
+      });
+      if (!pwOk) {
+        return new Response(JSON.stringify({ error: "Senha incorreta." }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       // First delete all contestations as they depend on professors
       await supabase.from("contestacoes").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-      // Then delete all professors
-      const { error } = await supabase.from("professors").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      // Then delete all professors (preserve admin/juridico accounts)
+      const { error } = await supabase
+        .from("professors")
+        .delete()
+        .not("role", "in", "(admin,juridico)");
       if (error) throw error;
       return jsonResponse({ success: true });
     }
