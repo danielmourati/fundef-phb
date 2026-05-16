@@ -932,6 +932,69 @@ const AdminPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de linhas duplicadas */}
+      <Dialog
+        open={dupDialog.open}
+        onOpenChange={(open) => {
+          if (!open && dupDialog.resolve) dupDialog.resolve('cancel');
+        }}
+      >
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>
+              Linhas duplicadas detectadas ({dupDialog.groups.length} grupo
+              {dupDialog.groups.length !== 1 ? 's' : ''})
+            </DialogTitle>
+          </DialogHeader>
+          <div className="overflow-auto flex-1 border rounded-md">
+            <table className="w-full text-xs">
+              <thead className="bg-muted sticky top-0">
+                <tr>
+                  <th className="px-2 py-1 text-left">#</th>
+                  {dupDialog.groups[0] && Object.keys(dupDialog.groups[0][0]).map(k => (
+                    <th key={k} className="px-2 py-1 text-left whitespace-nowrap">{k}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {dupDialog.groups.map((group, gi) => (
+                  <React.Fragment key={gi}>
+                    <tr className="bg-amber-50">
+                      <td colSpan={Object.keys(group[0]).length + 1} className="px-2 py-1 font-semibold text-amber-800">
+                        Grupo {gi + 1} — {group.length} ocorrências idênticas
+                      </td>
+                    </tr>
+                    {group.map((row, ri) => (
+                      <tr key={`${gi}-${ri}`} className="border-t">
+                        <td className="px-2 py-1 text-muted-foreground">{ri + 1}</td>
+                        {Object.keys(group[0]).map(k => (
+                          <td key={k} className="px-2 py-1 whitespace-nowrap">{row[k]}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Foram encontradas linhas com <strong>todos os campos idênticos</strong>. Deseja manter
+            todas as cópias ou remover as duplicatas (mantendo apenas 1 de cada grupo)?
+          </p>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => dupDialog.resolve?.('cancel')}>
+              Cancelar importação
+            </Button>
+            <Button variant="secondary" onClick={() => dupDialog.resolve?.('keep')}>
+              Manter todas as cópias
+            </Button>
+            <Button onClick={() => dupDialog.resolve?.('dedupe')}>
+              Remover duplicatas (manter 1)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
