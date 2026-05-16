@@ -170,7 +170,7 @@ Deno.serve(async (req) => {
         if (digits.length === 8) return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
         return s;
       };
-      const byMat = new Map<string, Record<string, unknown>>();
+      const byKey = new Map<string, Record<string, unknown>>();
       const semMatricula: Record<string, unknown>[] = [];
       for (const r of rows) {
         const matricula = String(r.matricula || "").trim();
@@ -194,19 +194,19 @@ Deno.serve(async (req) => {
           status: (r.status || "ATIVO").toString().toUpperCase().trim(),
         };
         if (matricula) {
-          // Dedup dentro do chunk: a última ocorrência prevalece
-          byMat.set(matricula, record);
+          // Dedup por (matricula + cpf): mesma matrícula com CPFs diferentes são pessoas distintas
+          byKey.set(`${matricula}|${cpf}`, record);
         } else {
           // Sem matrícula: insere sempre como novo vínculo (sem upsert)
           semMatricula.push(record);
         }
       }
-      const toUpsert = Array.from(byMat.values());
+      const toUpsert = Array.from(byKey.values());
       let total = 0;
       if (toUpsert.length > 0) {
         const { error } = await supabase
           .from("professors")
-          .upsert(toUpsert, { onConflict: "matricula" });
+          .upsert(toUpsert, { onConflict: "matricula,cpf" });
         if (error) {
           return new Response(JSON.stringify({ error: `Erro ao importar: ${error.message}` }), {
             status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
