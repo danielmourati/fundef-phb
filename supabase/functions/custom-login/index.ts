@@ -165,7 +165,7 @@ Deno.serve(async (req) => {
     if (professor.role === "professor" && professor.cpf) {
       const all = await supabase
         .from("professors")
-        .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, role")
+        .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, role, status")
         .eq("cpf", professor.cpf)
         .order("matricula", { ascending: true });
       const rows = all.data || [];
