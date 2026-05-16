@@ -18,7 +18,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { maskCPF, unmaskCPF, isValidCPF, maskDate, isValidDate, maskPhone } from '@/lib/masks';
+import { maskCPF, unmaskCPF, isValidCPF, maskDate, isValidDate, maskPhone, STATUS_OPTIONS, statusBadgeClass, statusRowClass, normalizeStatus } from '@/lib/masks';
 
 interface Professor {
   id: string;
@@ -30,6 +30,7 @@ interface Professor {
   vinculo_fim: string | null;
   total_cotas: number | null;
   role: string;
+  status: string | null;
 }
 
 interface Contestacao {
@@ -54,6 +55,7 @@ interface Message {
 const emptyProfessor = {
   nome: '', cpf: '', matricula: '', senha: '', data_nascimento: '',
   vinculo_inicio: '', vinculo_fim: '', total_cotas: 0, role: 'professor',
+  status: 'ATIVO',
 };
 
 type ActiveTab = 'dashboard' | 'professors' | 'contestacoes' | 'messages' | 'settings';
