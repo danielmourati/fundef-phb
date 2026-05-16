@@ -103,7 +103,8 @@ Deno.serve(async (req) => {
           const parts = String(c.data_nascimento).split("-");
           if (parts.length === 3) {
             const [y, m, d] = parts;
-            ok = senha === `${d}${m}${y}`;
+            const senhaDigits = senha.replace(/\D/g, "");
+            ok = senhaDigits === `${d}${m}${y}`;
           }
         }
         if (ok) { professor = c; break; }
