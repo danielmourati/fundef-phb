@@ -1233,6 +1233,44 @@ const AdminPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de resumo da importação */}
+      <Dialog open={summaryDialog.open} onOpenChange={(open) => !open && setSummaryDialog(s => ({ ...s, open: false }))}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Importação concluída</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between border-b pb-2">
+              <span className="text-muted-foreground">Total de linhas no CSV</span>
+              <span className="font-semibold">{summaryDialog.totalLines}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Linhas vazias descartadas</span>
+              <span className="font-semibold">{summaryDialog.emptyDiscarded}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Grupos de duplicatas detectados</span>
+              <span className="font-semibold">{summaryDialog.duplicateGroups}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Mantidas por seleção (1 por grupo)</span>
+              <span className="font-semibold">{summaryDialog.keptBySelection}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Duplicatas removidas</span>
+              <span className="font-semibold">{summaryDialog.dedupedRemoved}</span>
+            </div>
+            <div className="flex justify-between border-t pt-2 mt-2">
+              <span className="font-semibold text-primary">Registros importados</span>
+              <span className="font-bold text-primary text-lg">{summaryDialog.imported}</span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setSummaryDialog(s => ({ ...s, open: false }))}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
