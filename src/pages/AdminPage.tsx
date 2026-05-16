@@ -106,6 +106,15 @@ const AdminPage = () => {
     errors: Array<{ line: number; field: string; message: string; value?: string }>;
     missingHeaders: string[];
   }>({ open: false, errors: [], missingHeaders: [] });
+  const [summaryDialog, setSummaryDialog] = useState<{
+    open: boolean;
+    totalLines: number;
+    emptyDiscarded: number;
+    duplicateGroups: number;
+    keptBySelection: number;
+    dedupedRemoved: number;
+    imported: number;
+  }>({ open: false, totalLines: 0, emptyDiscarded: 0, duplicateGroups: 0, keptBySelection: 0, dedupedRemoved: 0, imported: 0 });
 
   const authHeaders = { Authorization: `Bearer ${token}` };
 
