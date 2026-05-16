@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import logoSeduc from '@/assets/logo-seduc.png';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -95,6 +95,11 @@ const AdminPage = () => {
   const [showModalPassword, setShowModalPassword] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
+  const [dupDialog, setDupDialog] = useState<{
+    open: boolean;
+    groups: Array<Record<string, string>[]>;
+    resolve?: (action: 'keep' | 'dedupe' | 'cancel') => void;
+  }>({ open: false, groups: [] });
 
   const authHeaders = { Authorization: `Bearer ${token}` };
 
@@ -259,18 +264,49 @@ const AdminPage = () => {
         if (obj.total_cotas) obj.total_cotas = obj.total_cotas.replace(/\D/g, '') || '0';
         return obj;
       });
+      // Detecta linhas 100% idênticas em TODAS as colunas
+      const sigOf = (r: Record<string, string>) =>
+        Object.keys(r).sort().map(k => `${k}=${(r[k] ?? '').trim().toUpperCase()}`).join('|');
+      const bySig = new Map<string, Record<string, string>[]>();
+      for (const r of rows) {
+        const s = sigOf(r);
+        if (!bySig.has(s)) bySig.set(s, []);
+        bySig.get(s)!.push(r);
+      }
+      const dupGroups = Array.from(bySig.values()).filter(g => g.length > 1);
+
+      let finalRows = rows;
+      if (dupGroups.length > 0) {
+        const action = await new Promise<'keep' | 'dedupe' | 'cancel'>((resolve) => {
+          setDupDialog({ open: true, groups: dupGroups, resolve });
+        });
+        setDupDialog({ open: false, groups: [] });
+        if (action === 'cancel') {
+          toast.info('Importação cancelada.');
+          return;
+        }
+        if (action === 'dedupe') {
+          // Para cada grupo, mantém somente a primeira ocorrência
+          const toRemove = new Set<Record<string, string>>();
+          for (const g of dupGroups) {
+            for (let i = 1; i < g.length; i++) toRemove.add(g[i]);
+          }
+          finalRows = rows.filter(r => !toRemove.has(r));
+        }
+      }
+
       const CHUNK = 100;
-      setImportProgress({ current: 0, total: rows.length });
+      setImportProgress({ current: 0, total: finalRows.length });
       let imported = 0;
-      for (let i = 0; i < rows.length; i += CHUNK) {
-        const chunk = rows.slice(i, i + CHUNK);
+      for (let i = 0; i < finalRows.length; i += CHUNK) {
+        const chunk = finalRows.slice(i, i + CHUNK);
         const { data, error } = await apiCall('POST', 'import_csv', { rows: chunk });
         if (error || data?.error) {
           toast.error(data?.error || 'Erro na importação.');
           return;
         }
         imported += data?.count || chunk.length;
-        setImportProgress({ current: imported, total: rows.length });
+        setImportProgress({ current: imported, total: finalRows.length });
       }
       toast.success(`${imported} professor(es) importado(s)!`);
       fetchData();
@@ -893,6 +929,69 @@ const AdminPage = () => {
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
             <Button onClick={handleSaveProf}>{editingProf ? 'Salvar' : 'Adicionar'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de linhas duplicadas */}
+      <Dialog
+        open={dupDialog.open}
+        onOpenChange={(open) => {
+          if (!open && dupDialog.resolve) dupDialog.resolve('cancel');
+        }}
+      >
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>
+              Linhas duplicadas detectadas ({dupDialog.groups.length} grupo
+              {dupDialog.groups.length !== 1 ? 's' : ''})
+            </DialogTitle>
+          </DialogHeader>
+          <div className="overflow-auto flex-1 border rounded-md">
+            <table className="w-full text-xs">
+              <thead className="bg-muted sticky top-0">
+                <tr>
+                  <th className="px-2 py-1 text-left">#</th>
+                  {dupDialog.groups[0] && Object.keys(dupDialog.groups[0][0]).map(k => (
+                    <th key={k} className="px-2 py-1 text-left whitespace-nowrap">{k}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {dupDialog.groups.map((group, gi) => (
+                  <React.Fragment key={gi}>
+                    <tr className="bg-amber-50">
+                      <td colSpan={Object.keys(group[0]).length + 1} className="px-2 py-1 font-semibold text-amber-800">
+                        Grupo {gi + 1} — {group.length} ocorrências idênticas
+                      </td>
+                    </tr>
+                    {group.map((row, ri) => (
+                      <tr key={`${gi}-${ri}`} className="border-t">
+                        <td className="px-2 py-1 text-muted-foreground">{ri + 1}</td>
+                        {Object.keys(group[0]).map(k => (
+                          <td key={k} className="px-2 py-1 whitespace-nowrap">{row[k]}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Foram encontradas linhas com <strong>todos os campos idênticos</strong>. Deseja manter
+            todas as cópias ou remover as duplicatas (mantendo apenas 1 de cada grupo)?
+          </p>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => dupDialog.resolve?.('cancel')}>
+              Cancelar importação
+            </Button>
+            <Button variant="secondary" onClick={() => dupDialog.resolve?.('keep')}>
+              Manter todas as cópias
+            </Button>
+            <Button onClick={() => dupDialog.resolve?.('dedupe')}>
+              Remover duplicatas (manter 1)
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
