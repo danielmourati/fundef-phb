@@ -95,6 +95,11 @@ const AdminPage = () => {
   const [showModalPassword, setShowModalPassword] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
+  const [dupDialog, setDupDialog] = useState<{
+    open: boolean;
+    groups: Array<Record<string, string>[]>;
+    resolve?: (action: 'keep' | 'dedupe' | 'cancel') => void;
+  }>({ open: false, groups: [] });
 
   const authHeaders = { Authorization: `Bearer ${token}` };
 
