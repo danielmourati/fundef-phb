@@ -101,6 +101,11 @@ const AdminPage = () => {
     resolve?: (result: { action: 'keep' | 'dedupe' | 'cancel'; keepIndices?: number[] }) => void;
   }>({ open: false, groups: [] });
   const [keepIndices, setKeepIndices] = useState<number[]>([]);
+  const [validationDialog, setValidationDialog] = useState<{
+    open: boolean;
+    errors: Array<{ line: number; field: string; message: string; value?: string }>;
+    missingHeaders: string[];
+  }>({ open: false, errors: [], missingHeaders: [] });
 
   const authHeaders = { Authorization: `Bearer ${token}` };
 
@@ -277,6 +282,60 @@ const AdminPage = () => {
         if (obj.total_cotas) obj.total_cotas = obj.total_cotas.replace(/\D/g, '') || '0';
         return obj;
       }).filter(obj => Object.values(obj).some(v => v && v.trim() !== ''));
+
+      // ===== Validação do CSV =====
+      const REQUIRED_HEADERS = ['nome', 'matricula', 'cpf'];
+      const missingHeaders = REQUIRED_HEADERS.filter(h => !headers.includes(h));
+      const errors: Array<{ line: number; field: string; message: string; value?: string }> = [];
+
+      // Aceita DD/MM/AAAA, AAAA-MM-DD ou DD-MM-AAAA
+      const isValidCSVDate = (v: string): boolean => {
+        if (!v) return true;
+        const s = v.trim();
+        let d: number, mo: number, y: number;
+        let m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+        if (m) { d = +m[1]; mo = +m[2]; y = +m[3]; }
+        else if ((m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/))) { y = +m[1]; mo = +m[2]; d = +m[3]; }
+        else if ((m = s.match(/^(\d{2})-(\d{2})-(\d{4})$/))) { d = +m[1]; mo = +m[2]; y = +m[3]; }
+        else return false;
+        if (mo < 1 || mo > 12 || d < 1 || d > new Date(y, mo, 0).getDate()) return false;
+        return y >= 1900 && y <= 2100;
+      };
+      const VALID_STATUS = new Set(['ATIVO', 'APOSENTADO', 'EXONERADO', 'EXONERADA', 'FALECIDO', 'FALECIDA']);
+
+      if (missingHeaders.length === 0) {
+        rows.forEach((r, idx) => {
+          const lineNum = idx + 2; // +1 cabeçalho, +1 base 1
+          if (!r.nome?.trim()) errors.push({ line: lineNum, field: 'nome', message: 'Nome é obrigatório' });
+          if (!r.matricula?.trim()) errors.push({ line: lineNum, field: 'matricula', message: 'Matrícula é obrigatória' });
+          if (!r.cpf?.trim()) {
+            errors.push({ line: lineNum, field: 'cpf', message: 'CPF é obrigatório' });
+          } else if (!isValidCPF(r.cpf)) {
+            errors.push({ line: lineNum, field: 'cpf', message: 'CPF inválido', value: r.cpf });
+          }
+          if (r.data_nascimento && !isValidCSVDate(r.data_nascimento)) {
+            errors.push({ line: lineNum, field: 'data_nascimento', message: 'Data inválida (use DD/MM/AAAA ou AAAA-MM-DD)', value: r.data_nascimento });
+          }
+          if (r.vinculo_inicio && !isValidCSVDate(r.vinculo_inicio)) {
+            errors.push({ line: lineNum, field: 'vinculo_inicio', message: 'Data de admissão inválida', value: r.vinculo_inicio });
+          }
+          if (r.vinculo_fim && !isValidCSVDate(r.vinculo_fim)) {
+            errors.push({ line: lineNum, field: 'vinculo_fim', message: 'Data de aposentadoria inválida', value: r.vinculo_fim });
+          }
+          if (r.total_cotas && !/^\d+$/.test(r.total_cotas)) {
+            errors.push({ line: lineNum, field: 'total_cotas', message: 'Cotas devem ser numéricas', value: r.total_cotas });
+          }
+          if (r.status && !VALID_STATUS.has(r.status.trim().toUpperCase())) {
+            errors.push({ line: lineNum, field: 'status', message: `Status inválido (use: ${[...VALID_STATUS].join(', ')})`, value: r.status });
+          }
+        });
+      }
+
+      if (missingHeaders.length > 0 || errors.length > 0) {
+        setValidationDialog({ open: true, errors, missingHeaders });
+        return;
+      }
+
       // Detecta duplicatas pela mesma chave usada no servidor (matricula+cpf).
       // Linhas que compartilham essa chave seriam mescladas silenciosamente no upsert
       // — então alertamos o usuário mesmo quando os demais campos divergem.
@@ -1084,6 +1143,66 @@ const AdminPage = () => {
             </Button>
             <Button onClick={() => dupDialog.resolve?.({ action: 'dedupe', keepIndices })}>
               Importar com seleção
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de validação do CSV */}
+      <Dialog open={validationDialog.open} onOpenChange={(open) => !open && setValidationDialog({ open: false, errors: [], missingHeaders: [] })}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">
+              CSV inválido — importação bloqueada
+            </DialogTitle>
+          </DialogHeader>
+          {validationDialog.missingHeaders.length > 0 && (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+              <p className="font-semibold text-destructive mb-1">Colunas obrigatórias ausentes:</p>
+              <p className="text-foreground">{validationDialog.missingHeaders.join(', ')}</p>
+              <p className="text-xs text-muted-foreground mt-2">
+                O cabeçalho do CSV deve conter, no mínimo: <strong>nome, matricula, cpf</strong>.
+              </p>
+            </div>
+          )}
+          {validationDialog.errors.length > 0 && (
+            <>
+              <p className="text-sm text-muted-foreground">
+                Foram encontrados <strong>{validationDialog.errors.length}</strong> erro(s) nos dados.
+                Corrija o arquivo e tente novamente.
+              </p>
+              <div className="overflow-auto flex-1 border rounded-md">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted sticky top-0">
+                    <tr>
+                      <th className="px-2 py-1 text-left w-16">Linha</th>
+                      <th className="px-2 py-1 text-left">Campo</th>
+                      <th className="px-2 py-1 text-left">Valor</th>
+                      <th className="px-2 py-1 text-left">Erro</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {validationDialog.errors.slice(0, 200).map((err, i) => (
+                      <tr key={i} className="border-t">
+                        <td className="px-2 py-1 font-mono text-muted-foreground">{err.line}</td>
+                        <td className="px-2 py-1 font-mono">{err.field}</td>
+                        <td className="px-2 py-1 font-mono text-muted-foreground">{err.value || '—'}</td>
+                        <td className="px-2 py-1 text-destructive">{err.message}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {validationDialog.errors.length > 200 && (
+                  <p className="text-xs text-muted-foreground p-2 text-center">
+                    Exibindo os primeiros 200 erros de {validationDialog.errors.length}.
+                  </p>
+                )}
+              </div>
+            </>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setValidationDialog({ open: false, errors: [], missingHeaders: [] })}>
+              Entendi
             </Button>
           </DialogFooter>
         </DialogContent>
