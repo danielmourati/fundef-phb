@@ -298,15 +298,15 @@ const AdminPage = () => {
       const CHUNK = 100;
       setImportProgress({ current: 0, total: finalRows.length });
       let imported = 0;
-      for (let i = 0; i < rows.length; i += CHUNK) {
-        const chunk = rows.slice(i, i + CHUNK);
+      for (let i = 0; i < finalRows.length; i += CHUNK) {
+        const chunk = finalRows.slice(i, i + CHUNK);
         const { data, error } = await apiCall('POST', 'import_csv', { rows: chunk });
         if (error || data?.error) {
           toast.error(data?.error || 'Erro na importação.');
           return;
         }
         imported += data?.count || chunk.length;
-        setImportProgress({ current: imported, total: rows.length });
+        setImportProgress({ current: imported, total: finalRows.length });
       }
       toast.success(`${imported} professor(es) importado(s)!`);
       fetchData();
