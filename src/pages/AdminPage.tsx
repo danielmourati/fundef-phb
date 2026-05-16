@@ -1004,7 +1004,7 @@ const AdminPage = () => {
       <Dialog
         open={dupDialog.open}
         onOpenChange={(open) => {
-          if (!open && dupDialog.resolve) dupDialog.resolve('cancel');
+          if (!open && dupDialog.resolve) dupDialog.resolve({ action: 'cancel' });
         }}
       >
         <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
@@ -1018,6 +1018,7 @@ const AdminPage = () => {
             <table className="w-full text-xs">
               <thead className="bg-muted sticky top-0">
                 <tr>
+                  <th className="px-2 py-1 text-left">Manter</th>
                   <th className="px-2 py-1 text-left">#</th>
                   {dupDialog.groups[0] && Object.keys(dupDialog.groups[0][0]).map(k => {
                     const headerLabels: Record<string, string> = {
@@ -1040,12 +1041,25 @@ const AdminPage = () => {
                 {dupDialog.groups.map((group, gi) => (
                   <React.Fragment key={gi}>
                     <tr className="bg-amber-50">
-                      <td colSpan={Object.keys(group[0]).length + 1} className="px-2 py-1 font-semibold text-amber-800">
-                        Grupo {gi + 1} — {group.length} ocorrências idênticas
+                      <td colSpan={Object.keys(group[0]).length + 2} className="px-2 py-1 font-semibold text-amber-800">
+                        Grupo {gi + 1} — {group.length} ocorrências (selecione qual manter)
                       </td>
                     </tr>
                     {group.map((row, ri) => (
-                      <tr key={`${gi}-${ri}`} className="border-t">
+                      <tr key={`${gi}-${ri}`} className="border-t hover:bg-muted/30">
+                        <td className="px-2 py-1 text-center">
+                          <input
+                            type="radio"
+                            name={`keep-group-${gi}`}
+                            checked={keepIndices[gi] === ri}
+                            onChange={() => setKeepIndices(prev => {
+                              const next = [...prev];
+                              next[gi] = ri;
+                              return next;
+                            })}
+                            className="cursor-pointer"
+                          />
+                        </td>
                         <td className="px-2 py-1 text-muted-foreground">{ri + 1}</td>
                         {Object.keys(group[0]).map(k => (
                           <td key={k} className="px-2 py-1 whitespace-nowrap">{row[k]}</td>
@@ -1058,18 +1072,18 @@ const AdminPage = () => {
             </table>
           </div>
           <p className="text-sm text-muted-foreground">
-            Foram encontradas linhas com <strong>todos os campos idênticos</strong>. Deseja manter
-            todas as cópias ou remover as duplicatas (mantendo apenas 1 de cada grupo)?
+            Foram encontradas linhas com a mesma <strong>matrícula + CPF</strong>. Selecione qual linha
+            manter em cada grupo, ou mantenha todas as cópias.
           </p>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => dupDialog.resolve?.('cancel')}>
+            <Button variant="outline" onClick={() => dupDialog.resolve?.({ action: 'cancel' })}>
               Cancelar importação
             </Button>
-            <Button variant="secondary" onClick={() => dupDialog.resolve?.('keep')}>
+            <Button variant="secondary" onClick={() => dupDialog.resolve?.({ action: 'keep' })}>
               Manter todas as cópias
             </Button>
-            <Button onClick={() => dupDialog.resolve?.('dedupe')}>
-              Remover duplicatas (manter 1)
+            <Button onClick={() => dupDialog.resolve?.({ action: 'dedupe', keepIndices })}>
+              Importar com seleção
             </Button>
           </DialogFooter>
         </DialogContent>
