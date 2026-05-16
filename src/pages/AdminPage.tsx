@@ -547,24 +547,30 @@ const AdminPage = () => {
                     <Table>
                       <TableHeader>
                         <TableRow className="hover:bg-transparent">
-                          <TableHead className="text-xs font-medium text-muted-foreground w-[80px] lg:w-[120px]">Matrícula</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground min-w-[150px]">Nome</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground w-[80px] lg:w-[120px]">Mat</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground hidden lg:table-cell">CPF</TableHead>
-                          <TableHead className="text-xs font-medium text-muted-foreground hidden md:table-cell">Perfil</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground hidden md:table-cell whitespace-nowrap">Data de Admissão</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground hidden md:table-cell whitespace-nowrap">Data da Aposentadoria</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground hidden sm:table-cell">Cotas</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground whitespace-nowrap">Status do Servidor</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground text-right sticky right-0 bg-card/95 backdrop-blur-sm z-10 border-l border-border px-4 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {filteredProfs.map(p => (
-                          <TableRow key={p.id} className="group">
-                            <TableCell className="font-mono text-xs lg:text-sm py-3">{p.matricula}</TableCell>
+                          <TableRow key={p.id} className={`group ${statusRowClass(p.status)}`}>
                             <TableCell className="text-xs lg:text-sm font-medium py-3">{p.nome}</TableCell>
+                            <TableCell className="font-mono text-xs lg:text-sm py-3">{p.matricula}</TableCell>
                             <TableCell className="font-mono text-xs lg:text-sm hidden lg:table-cell py-3">{p.cpf}</TableCell>
-                            <TableCell className="hidden md:table-cell py-3">
-                              <Badge variant="outline" className="text-[10px] lg:text-xs capitalize px-2 py-0">{p.role}</Badge>
-                            </TableCell>
+                            <TableCell className="text-xs lg:text-sm hidden md:table-cell py-3 whitespace-nowrap">{maskDate(p.vinculo_inicio || '') || '—'}</TableCell>
+                            <TableCell className="text-xs lg:text-sm hidden md:table-cell py-3 whitespace-nowrap">{maskDate(p.vinculo_fim || '') || '—'}</TableCell>
                             <TableCell className="text-xs lg:text-sm hidden sm:table-cell py-3">{p.total_cotas || 0}</TableCell>
+                            <TableCell className="py-3">
+                              <Badge variant="outline" className={`text-[10px] lg:text-xs px-2 py-0 border ${statusBadgeClass(p.status)}`}>
+                                {normalizeStatus(p.status)}
+                              </Badge>
+                            </TableCell>
                             <TableCell className="text-right sticky right-0 bg-card/95 backdrop-blur-sm z-10 border-l border-border px-4 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)] group-hover:bg-accent/50 transition-colors">
                               <div className="flex items-center justify-end gap-1">
                                 <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-background" onClick={() => openEditDialog(p)} title="Editar">
