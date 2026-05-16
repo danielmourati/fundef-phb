@@ -11,6 +11,7 @@ interface Professor {
   vinculo_fim: string | null;
   total_cotas: number | null;
   role: string;
+  status?: string | null;
 }
 
 interface MatriculaItem extends Professor {
