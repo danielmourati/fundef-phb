@@ -276,7 +276,7 @@ const AdminPage = () => {
         // Normaliza total_cotas
         if (obj.total_cotas) obj.total_cotas = obj.total_cotas.replace(/\D/g, '') || '0';
         return obj;
-      });
+      }).filter(obj => Object.values(obj).some(v => v && v.trim() !== ''));
       // Detecta duplicatas pela mesma chave usada no servidor (matricula+cpf).
       // Linhas que compartilham essa chave seriam mescladas silenciosamente no upsert
       // — então alertamos o usuário mesmo quando os demais campos divergem.
