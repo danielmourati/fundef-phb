@@ -789,7 +789,7 @@ const AdminPage = () => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Vínculo Início</Label>
+                <Label>Data de Admissão</Label>
                 <Input
                   value={formData.vinculo_inicio}
                   onChange={e => setFormData({...formData, vinculo_inicio: maskDate(e.target.value)})}
@@ -799,7 +799,7 @@ const AdminPage = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Vínculo Fim</Label>
+                <Label>Data da Aposentadoria</Label>
                 <Input
                   value={formData.vinculo_fim}
                   onChange={e => setFormData({...formData, vinculo_fim: maskDate(e.target.value)})}
@@ -815,18 +815,31 @@ const AdminPage = () => {
                 <Input type="number" value={formData.total_cotas} onChange={e => setFormData({...formData, total_cotas: parseInt(e.target.value) || 0})} />
               </div>
               <div className="space-y-2">
-                <Label>Perfil (Role)</Label>
-                <Select value={formData.role} onValueChange={v => setFormData({...formData, role: v})}>
+                <Label>Status do Servidor</Label>
+                <Select value={formData.status} onValueChange={v => setFormData({...formData, status: v})}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="professor">Professor</SelectItem>
-                    <SelectItem value="admin">Administrador</SelectItem>
-                    <SelectItem value="juridico">Jurídico</SelectItem>
+                    {STATUS_OPTIONS.map(s => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Perfil (Role)</Label>
+              <Select value={formData.role} onValueChange={v => setFormData({...formData, role: v})}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="professor">Professor</SelectItem>
+                  <SelectItem value="admin">Administrador</SelectItem>
+                  <SelectItem value="juridico">Jurídico</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>
