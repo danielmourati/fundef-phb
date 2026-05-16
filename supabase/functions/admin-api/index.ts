@@ -111,6 +111,7 @@ Deno.serve(async (req) => {
         vinculo_fim: body.vinculo_fim || null,
         total_cotas: Number(body.total_cotas) || 0,
         role: body.role || "professor",
+        status: (body.status || "ATIVO").toUpperCase(),
       };
       const { error } = await supabase.from("professors").insert(payload);
       if (error) throw error;
@@ -127,6 +128,7 @@ Deno.serve(async (req) => {
         vinculo_fim: body.vinculo_fim || null,
         total_cotas: Number(body.total_cotas) || 0,
         role: body.role || "professor",
+        status: (body.status || "ATIVO").toUpperCase(),
       };
       if (body.senha && body.senha !== "***") {
         const { data: hashData } = await supabase.rpc("hash_password", { plain_password: body.senha });
@@ -134,15 +136,6 @@ Deno.serve(async (req) => {
         update.senha = "***";
       }
       const { error } = await supabase.from("professors").update(update).eq("id", body.id);
-      if (error) throw error;
-      return jsonResponse({ success: true });
-    }
-
-    // DELETE professor
-    if (req.method === "DELETE" && action === "delete_professor") {
-      const id = url.searchParams.get("id");
-      if (!id) throw new Error("ID obrigatório");
-      const { error } = await supabase.from("professors").delete().eq("id", id);
       if (error) throw error;
       return jsonResponse({ success: true });
     }
