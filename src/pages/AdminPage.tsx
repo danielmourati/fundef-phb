@@ -174,11 +174,11 @@ const AdminPage = () => {
       return;
     }
     if (!isValidDate(formData.vinculo_inicio)) {
-      toast.error('Vínculo Início inválido (use DD/MM/AAAA).');
+      toast.error('Data de Admissão inválida (use DD/MM/AAAA).');
       return;
     }
     if (!isValidDate(formData.vinculo_fim)) {
-      toast.error('Vínculo Fim inválido (use DD/MM/AAAA).');
+      toast.error('Data da Aposentadoria inválida (use DD/MM/AAAA).');
       return;
     }
     const payload = { ...formData, cpf: unmaskCPF(formData.cpf) };
