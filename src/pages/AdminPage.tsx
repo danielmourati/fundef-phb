@@ -211,12 +211,23 @@ const AdminPage = () => {
     fetchData();
   };
 
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
+  const [clearPassword, setClearPassword] = useState('');
+  const [clearing, setClearing] = useState(false);
+
+  const openClearDialog = () => {
+    setClearPassword('');
+    setClearDialogOpen(true);
+  };
+
   const handleClearDatabase = async () => {
-    if (!confirm('ATENÇÃO: Isso excluirá TODOS os professores e contestações do sistema. Esta ação não pode ser desfeita. Deseja continuar?')) return;
-    setLoading(true);
-    const { data, error } = await apiCall('POST', 'delete_all_professors');
-    setLoading(false);
+    if (!clearPassword) { toast.error('Informe sua senha de administrador.'); return; }
+    setClearing(true);
+    const { data, error } = await apiCall('POST', 'delete_all_professors', { password: clearPassword });
+    setClearing(false);
     if (error || data?.error) { toast.error(data?.error || 'Erro ao limpar base.'); return; }
+    setClearDialogOpen(false);
+    setClearPassword('');
     toast.success('Base de dados limpa com sucesso!');
     fetchData();
   };
@@ -593,7 +604,7 @@ const AdminPage = () => {
                         <><Upload className="w-4 h-4 mr-1.5" /> Importar</>
                       )}
                     </Button>
-                    <Button size="sm" variant="destructive" className="flex-1 sm:flex-none" onClick={handleClearDatabase}>
+                    <Button size="sm" variant="destructive" className="flex-1 sm:flex-none" onClick={openClearDialog}>
                       <Trash className="w-4 h-4 mr-1.5" /> Limpar Base
                     </Button>
                     <Button size="sm" className="flex-1 sm:flex-none" onClick={openAddDialog}>
@@ -929,6 +940,41 @@ const AdminPage = () => {
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
             <Button onClick={handleSaveProf}>{editingProf ? 'Salvar' : 'Adicionar'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmação para limpar base (exige senha do admin) */}
+      <Dialog open={clearDialogOpen} onOpenChange={(o) => { if (!clearing) setClearDialogOpen(o); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">⚠️ Limpar base de dados</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p>
+              Esta ação irá <strong>excluir TODOS os professores e contestações</strong> do
+              sistema. Contas de administrador e jurídico serão preservadas.
+            </p>
+            <p className="text-destructive font-medium">Esta ação não pode ser desfeita.</p>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Confirme com sua senha de administrador</label>
+              <Input
+                type="password"
+                value={clearPassword}
+                onChange={(e) => setClearPassword(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleClearDatabase(); }}
+                placeholder="Digite sua senha"
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setClearDialogOpen(false)} disabled={clearing}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleClearDatabase} disabled={clearing || !clearPassword}>
+              {clearing ? 'Limpando...' : 'Confirmar e limpar'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
