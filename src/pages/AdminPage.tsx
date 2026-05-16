@@ -155,6 +155,7 @@ const AdminPage = () => {
       vinculo_fim: maskDate(p.vinculo_fim || ''),
       total_cotas: p.total_cotas || 0,
       role: p.role,
+      status: normalizeStatus(p.status),
     });
     setDialogOpen(true);
   };
