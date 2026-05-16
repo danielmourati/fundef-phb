@@ -194,8 +194,8 @@ Deno.serve(async (req) => {
           status: (r.status || "ATIVO").toString().toUpperCase().trim(),
         };
         if (matricula) {
-          // Dedup dentro do chunk: a última ocorrência prevalece
-          byMat.set(matricula, record);
+          // Dedup por (matricula + cpf): mesma matrícula com CPFs diferentes são pessoas distintas
+          byKey.set(`${matricula}|${cpf}`, record);
         } else {
           // Sem matrícula: insere sempre como novo vínculo (sem upsert)
           semMatricula.push(record);
