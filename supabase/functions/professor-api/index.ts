@@ -146,6 +146,36 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: true });
     }
 
+    // POST change password
+    if (req.method === "POST" && action === "change_password") {
+      const body = await req.json();
+      const newPassword = body.new_password;
+      if (!newPassword || newPassword.length < 8) {
+         throw new Error("Senha inválida.");
+      }
+
+      // First get the user's CPF
+      const { data: prof } = await supabase
+        .from("professors")
+        .select("cpf")
+        .eq("id", user.sub)
+        .single();
+      
+      if (!prof?.cpf) throw new Error("Professor não encontrado.");
+
+      // Hash the new password
+      const { data: hashData } = await supabase.rpc("hash_password", { plain_password: newPassword });
+
+      // Update all records with the same CPF
+      const { error } = await supabase
+        .from("professors")
+        .update({ senha_hash: hashData })
+        .eq("cpf", prof.cpf);
+      
+      if (error) throw error;
+      return jsonResponse({ success: true });
+    }
+
     // === JURIDICO ACTIONS ===
 
     // GET all contestacoes (for juridico role)

@@ -6,7 +6,6 @@ interface Professor {
   nome: string;
   cpf: string;
   matricula: string;
-  data_nascimento: string | null;
   vinculo_inicio: string | null;
   vinculo_fim: string | null;
   total_cotas: number | null;
@@ -23,6 +22,7 @@ interface AuthContextType {
   token: string | null;
   loading: boolean;
   matriculas: MatriculaItem[];
+  requiresPasswordChange: boolean;
   setMatriculaAtiva: (id: string) => void;
   login: (identificador: string, senha: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
@@ -36,6 +36,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [professor, setProfessor] = useState<Professor | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [matriculas, setMatriculas] = useState<MatriculaItem[]>([]);
+  const [requiresPasswordChange, setRequiresPasswordChange] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -50,6 +51,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setProfessor(parsed.professor);
             setToken(parsed.token);
             setMatriculas(parsed.matriculas || []);
+            setRequiresPasswordChange(parsed.requiresPasswordChange || false);
           } else {
             localStorage.removeItem(STORAGE_KEY);
           }
@@ -61,8 +63,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(false);
   }, []);
 
-  const persist = (prof: Professor, tk: string, mats: MatriculaItem[]) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ professor: prof, token: tk, matriculas: mats }));
+  const persist = (prof: Professor, tk: string, mats: MatriculaItem[], reqPwdChange: boolean) => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ professor: prof, token: tk, matriculas: mats, requiresPasswordChange: reqPwdChange }));
   };
 
   const login = async (identificador: string, senha: string) => {
@@ -83,7 +85,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const first = mats[0];
         prof = {
           id: first.id, nome: first.nome, cpf: first.cpf, matricula: first.matricula,
-          data_nascimento: first.data_nascimento, vinculo_inicio: first.vinculo_inicio,
+          vinculo_inicio: first.vinculo_inicio,
           vinculo_fim: first.vinculo_fim, total_cotas: first.total_cotas,
           status: first.status, role: first.role,
         };
@@ -93,7 +95,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setProfessor(prof);
       setToken(tk);
       setMatriculas(mats);
-      persist(prof, tk, mats);
+      const reqPwdChange = data.requires_password_change || false;
+      setRequiresPasswordChange(reqPwdChange);
+      persist(prof, tk, mats, reqPwdChange);
       return { success: true };
     } catch {
       return { success: false, error: 'Erro de conexão com o servidor.' };
@@ -105,24 +109,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!found) return;
     const prof: Professor = {
       id: found.id, nome: found.nome, cpf: found.cpf, matricula: found.matricula,
-      data_nascimento: found.data_nascimento, vinculo_inicio: found.vinculo_inicio,
+      vinculo_inicio: found.vinculo_inicio,
       vinculo_fim: found.vinculo_fim, total_cotas: found.total_cotas,
       status: found.status, role: found.role,
     };
     setProfessor(prof);
     setToken(found.token);
-    persist(prof, found.token, matriculas);
+    persist(prof, found.token, matriculas, requiresPasswordChange);
   };
 
   const logout = () => {
     setProfessor(null);
     setToken(null);
     setMatriculas([]);
+    setRequiresPasswordChange(false);
     localStorage.removeItem(STORAGE_KEY);
   };
 
   return (
-    <AuthContext.Provider value={{ professor, token, loading, matriculas, setMatriculaAtiva, login, logout }}>
+    <AuthContext.Provider value={{ professor, token, loading, matriculas, requiresPasswordChange, setMatriculaAtiva, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

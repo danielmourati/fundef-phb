@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     if (req.method === "GET" && action === "professors") {
       const { data, error } = await supabase
         .from("professors")
-        .select("id, matricula, nome, cpf, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, status, role")
+        .select("id, matricula, nome, cpf, vinculo_inicio, vinculo_fim, total_cotas, status, role")
         .order("nome");
       if (error) throw error;
       return jsonResponse(data);
@@ -101,12 +101,11 @@ Deno.serve(async (req) => {
     // POST professor (create)
     if (req.method === "POST" && action === "create_professor") {
       const body = await req.json();
-      const senha = body.senha || body.data_nascimento?.replace(/\D/g, "") || "";
+      const senha = body.senha || body.cpf?.replace(/\D/g, "") || "";
       const { data: hashData } = await supabase.rpc("hash_password", { plain_password: senha });
       const payload = {
         nome: body.nome, cpf: body.cpf, matricula: body.matricula,
         senha: "***", senha_hash: hashData,
-        data_nascimento: body.data_nascimento || null,
         vinculo_inicio: body.vinculo_inicio || null,
         vinculo_fim: body.vinculo_fim || null,
         total_cotas: Number(body.total_cotas) || 0,
@@ -123,7 +122,6 @@ Deno.serve(async (req) => {
       const body = await req.json();
       const update: Record<string, unknown> = {
         nome: body.nome, cpf: body.cpf, matricula: body.matricula,
-        data_nascimento: body.data_nascimento || null,
         vinculo_inicio: body.vinculo_inicio || null,
         vinculo_fim: body.vinculo_fim || null,
         total_cotas: Number(body.total_cotas) || 0,
@@ -165,12 +163,11 @@ Deno.serve(async (req) => {
       const rows = body.rows as Array<Record<string, string>>;
       const toInsert = [];
       for (const r of rows) {
-        const senha = r.data_nascimento?.replace(/\D/g, "") || r.senha || "";
+        const senha = r.cpf?.replace(/\D/g, "") || r.senha || "";
         const { data: hashData } = await supabase.rpc("hash_password", { plain_password: senha });
         toInsert.push({
           nome: r.nome || "", cpf: r.cpf || "", matricula: r.matricula || "",
           senha: "***", senha_hash: hashData,
-          data_nascimento: r.data_nascimento || null,
           vinculo_inicio: r.vinculo_inicio || null,
           vinculo_fim: r.vinculo_fim || null,
           total_cotas: parseInt(r.total_cotas) || 0,

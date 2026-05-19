@@ -114,7 +114,7 @@ const LoginPage = () => {
                 <Input
                   id="senha"
                   type={showPassword ? "text" : "password"}
-                  placeholder="Data de nascimento (DDMMAAAA)"
+                  placeholder="Digite sua senha"
                   value={senha}
                   onChange={(e) => setSenha(e.target.value)}
                   required
@@ -159,7 +159,7 @@ const LoginPage = () => {
           </div>
 
           <p className="text-center text-xs text-muted-foreground">
-            A senha padrão é sua data de nascimento (somente números).
+            A senha padrão no primeiro acesso é o seu CPF (somente números).
           </p>
         </div>
 

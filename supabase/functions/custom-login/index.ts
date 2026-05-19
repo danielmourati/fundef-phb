@@ -47,6 +47,7 @@ Deno.serve(async (req) => {
 
     let professor: any = null;
     let fetchErr: any = null;
+    let requires_password_change = false;
 
     if (tipo === "admin" || rawId.includes("@")) {
       // Login por e-mail (admin/jurídico) na tabela users
@@ -100,14 +101,14 @@ Deno.serve(async (req) => {
             hashed_password: c.senha_hash,
           });
           ok = !!data;
-        } else if (c.data_nascimento) {
-          const parts = String(c.data_nascimento).split("-");
-          if (parts.length === 3) {
-            const [y, m, d] = parts;
-            ok = senha === `${d}${m}${y}`;
-          }
         }
-        if (ok) { professor = c; break; }
+        if (ok) { 
+          professor = c; 
+          if (senha === c.cpf) {
+            requires_password_change = true;
+          }
+          break; 
+        }
       }
     }
 
@@ -187,7 +188,7 @@ Deno.serve(async (req) => {
     // Return professor data (without sensitive fields) + token + matriculas
     const { senha_hash: _, ...safeProf } = professor;
     return new Response(
-      JSON.stringify({ professor: safeProf, token, matriculas }),
+      JSON.stringify({ professor: safeProf, token, matriculas, requires_password_change }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {

@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
-import { LogOut, User, AlertTriangle, Bell, Check, FileText } from 'lucide-react';
+import { LogOut, User, AlertTriangle, Bell, Check, FileText, Lock, CheckCircle2, Circle } from 'lucide-react';
 import { toast } from 'sonner';
 
 const STEPS = ['Pendente', 'Em Análise', 'Validado'] as const;
@@ -40,7 +40,7 @@ interface Contestacao {
 }
 
 const DashboardPage = () => {
-  const { professor, token, logout, matriculas, setMatriculaAtiva } = useAuth();
+  const { professor, token, logout, matriculas, setMatriculaAtiva, requiresPasswordChange } = useAuth();
   const navigate = useNavigate();
   const [motivo, setMotivo] = useState('');
   const [descricao, setDescricao] = useState('');
@@ -50,6 +50,11 @@ const DashboardPage = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [contestacoes, setContestacoes] = useState<Contestacao[]>([]);
   const [activeSection, setActiveSection] = useState<'dados' | 'mensagens' | 'contestacoes'>('dados');
+
+  // Password change state
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
 
   const authHeaders = { Authorization: `Bearer ${token}` };
 
@@ -139,6 +144,96 @@ const DashboardPage = () => {
       default: return 'bg-blue-100 text-blue-700 border-blue-200';
     }
   };
+
+  if (requiresPasswordChange) {
+    const isLengthOk = newPassword.length >= 8;
+    const hasUpper = /[A-Z]/.test(newPassword);
+    const hasNumber = /[0-9]/.test(newPassword);
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(newPassword);
+    const isMatch = newPassword === confirmPassword && newPassword.length > 0;
+    const canSubmit = isLengthOk && hasUpper && hasNumber && hasSpecial && isMatch;
+
+    const handleChangePassword = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!canSubmit) return;
+      setChangingPassword(true);
+      const { data, error } = await supabase.functions.invoke('professor-api?action=change_password', {
+        method: 'POST',
+        headers: authHeaders,
+        body: { new_password: newPassword },
+      });
+      setChangingPassword(false);
+      if (error || data?.error) {
+        toast.error(data?.error || 'Erro ao alterar senha.');
+      } else {
+        toast.success('Senha alterada com sucesso!');
+        const stored = localStorage.getItem('fundef_session');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          parsed.requiresPasswordChange = false;
+          localStorage.setItem('fundef_session', JSON.stringify(parsed));
+        }
+        window.location.reload();
+      }
+    };
+
+    return (
+      <div className="h-screen w-full bg-background flex flex-col items-center justify-center p-4">
+        <Card className="w-full max-w-md shadow-lg border-primary/20">
+          <CardContent className="p-6">
+            <div className="flex flex-col items-center mb-6 text-center">
+              <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+                <Lock className="w-6 h-6 text-primary" />
+              </div>
+              <h2 className="text-xl font-bold">Atualização Obrigatória</h2>
+              <p className="text-sm text-muted-foreground mt-2">
+                Para sua segurança, é necessário cadastrar uma nova senha no seu primeiro acesso.
+              </p>
+            </div>
+            
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label>Nova Senha</Label>
+                <Input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Confirmar Nova Senha</Label>
+                <Input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
+              </div>
+
+              <div className="bg-muted/50 p-4 rounded-lg space-y-2 mt-4">
+                <p className="text-xs font-semibold mb-2">Sua senha deve conter:</p>
+                <div className="flex items-center gap-2 text-xs">
+                  {isLengthOk ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <Circle className="w-4 h-4 text-muted-foreground" />}
+                  <span className={isLengthOk ? "text-green-600 font-medium" : "text-muted-foreground"}>Mínimo de 8 caracteres</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  {hasUpper ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <Circle className="w-4 h-4 text-muted-foreground" />}
+                  <span className={hasUpper ? "text-green-600 font-medium" : "text-muted-foreground"}>Pelo menos uma letra maiúscula</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  {hasNumber ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <Circle className="w-4 h-4 text-muted-foreground" />}
+                  <span className={hasNumber ? "text-green-600 font-medium" : "text-muted-foreground"}>Pelo menos um número</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  {hasSpecial ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <Circle className="w-4 h-4 text-muted-foreground" />}
+                  <span className={hasSpecial ? "text-green-600 font-medium" : "text-muted-foreground"}>Pelo menos um caractere especial (!@#$%^&*)</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  {isMatch ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <Circle className="w-4 h-4 text-muted-foreground" />}
+                  <span className={isMatch ? "text-green-600 font-medium" : "text-muted-foreground"}>As senhas coincidem</span>
+                </div>
+              </div>
+
+              <Button type="submit" className="w-full mt-4" disabled={!canSubmit || changingPassword}>
+                {changingPassword ? 'Atualizando...' : 'Salvar Nova Senha'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen overflow-hidden flex flex-col bg-background">
