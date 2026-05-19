@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { LogOut, User, AlertTriangle, Bell, Check, FileText, Lock, CheckCircle2, Circle } from 'lucide-react';
 import { toast } from 'sonner';
-import { maskPhone, statusBadgeClass, normalizeStatus } from '@/lib/masks';
+import { maskPhone } from '@/lib/masks';
 
 
 interface Message {
@@ -329,12 +329,6 @@ const DashboardPage = () => {
                     <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Matrícula</p>
                     <p className="text-2xl font-bold tracking-tight">{professor.matricula}</p>
                   </div>
-                  <Badge className={`${professor.status === 'Validado' ? 'bg-green-100 text-green-700 border-green-200' :
-                      professor.status === 'Em Análise' ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                        'bg-yellow-100 text-yellow-700 border-yellow-200'
-                    } border text-xs font-semibold`}>
-                    {professor.status}
-                  </Badge>
                 </div>
 
                 <div className="border-t mx-5" />
@@ -358,38 +352,6 @@ const DashboardPage = () => {
                   </div>
                 </div>
 
-                <div className="border-t mx-5" />
-
-                <div className="px-5 py-4">
-                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-3">Situação do Processo</p>
-                  <div className="flex items-center">
-                    {STEPS.map((step, i) => {
-                      const isActive = i <= currentStepIndex;
-                      const isCurrent = i === currentStepIndex;
-                      const colors = stepColors[step];
-                      return (
-                        <div key={step} className="flex items-center flex-1 last:flex-none">
-                          <div className="flex flex-col items-center gap-1.5 min-w-[60px]">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${isCurrent
-                                ? `${colors.dot} text-white border-transparent shadow-md`
-                                : isActive
-                                  ? `${colors.dot} text-white border-transparent opacity-70`
-                                  : 'bg-muted border-border text-muted-foreground'
-                              }`}>
-                              {i + 1}
-                            </div>
-                            <span className={`text-[11px] font-medium ${isCurrent ? colors.active : isActive ? 'text-foreground/70' : 'text-muted-foreground'}`}>
-                              {step}
-                            </span>
-                          </div>
-                          {i < STEPS.length - 1 && (
-                            <div className={`flex-1 h-0.5 mx-1 mt-[-18px] rounded ${isActive && i < currentStepIndex ? 'bg-primary/40' : 'bg-border'}`} />
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
               </CardContent>
             </Card>
 
