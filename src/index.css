@@ -93,12 +93,15 @@
 }
 
 @layer utilities {
-  .no-scrollbar {
+  .admin-scroll-area,
+  .dashboard-scroll-area {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
-  .no-scrollbar::-webkit-scrollbar {
+  .admin-scroll-area::-webkit-scrollbar,
+  .dashboard-scroll-area::-webkit-scrollbar {
     display: none;
   }
 }
+
 
