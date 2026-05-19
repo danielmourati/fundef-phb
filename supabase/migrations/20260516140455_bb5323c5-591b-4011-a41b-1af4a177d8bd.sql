@@ -1,0 +1,2 @@
+ALTER TABLE public.professors DROP CONSTRAINT IF EXISTS professors_matricula_key;
+CREATE UNIQUE INDEX IF NOT EXISTS professors_matricula_cpf_key ON public.professors (matricula, cpf) WHERE matricula IS NOT NULL;

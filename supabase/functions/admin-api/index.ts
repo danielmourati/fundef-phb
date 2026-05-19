@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     if (req.method === "GET" && action === "professors") {
       const { data, error } = await supabase
         .from("professors")
-        .select("id, matricula, nome, cpf, vinculo_inicio, vinculo_fim, total_cotas, status, role")
+        .select("id, matricula, nome, cpf, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, status, role")
         .order("nome");
       if (error) throw error;
       return jsonResponse(data);
@@ -67,13 +67,13 @@ Deno.serve(async (req) => {
         .select("id, motivo, descricao, whatsapp, status, created_at, professor_id, protocolo, resposta")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      
+
       const profIds = [...new Set((data || []).map(c => c.professor_id))];
       const { data: profs } = await supabase
         .from("professors")
         .select("id, nome, matricula")
         .in("id", profIds);
-      
+
       const profMap = new Map((profs || []).map(p => [p.id, p]));
       const enriched = (data || []).map(c => ({
         ...c,
@@ -109,8 +109,8 @@ Deno.serve(async (req) => {
         vinculo_inicio: body.vinculo_inicio || null,
         vinculo_fim: body.vinculo_fim || null,
         total_cotas: Number(body.total_cotas) || 0,
-        status: body.status || "Pendente",
         role: body.role || "professor",
+        status: (body.status || "ATIVO").toUpperCase(),
       };
       const { error } = await supabase.from("professors").insert(payload);
       if (error) throw error;
@@ -125,8 +125,8 @@ Deno.serve(async (req) => {
         vinculo_inicio: body.vinculo_inicio || null,
         vinculo_fim: body.vinculo_fim || null,
         total_cotas: Number(body.total_cotas) || 0,
-        status: body.status || "Pendente",
         role: body.role || "professor",
+        status: (body.status || "ATIVO").toUpperCase(),
       };
       if (body.senha && body.senha !== "***") {
         const { data: hashData } = await supabase.rpc("hash_password", { plain_password: body.senha });
@@ -138,21 +138,51 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: true });
     }
 
-    // DELETE professor
-    if (req.method === "DELETE" && action === "delete_professor") {
-      const id = url.searchParams.get("id");
-      if (!id) throw new Error("ID obrigatório");
-      const { error } = await supabase.from("professors").delete().eq("id", id);
-      if (error) throw error;
-      return jsonResponse({ success: true });
-    }
-
-    // DELETE all professors (Clear database) - Allowing POST for compatibility
+    // DELETE all professors (Clear database) - requires admin password confirmation
     if ((req.method === "DELETE" || req.method === "POST") && action === "delete_all_professors") {
+      let body: { password?: string } = {};
+      try { body = await req.json(); } catch { /* allow empty */ }
+      const password = String(body.password || "");
+      if (!password) {
+        return new Response(JSON.stringify({ error: "Senha de administrador obrigatória." }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      // Busca o admin atual (na tabela users) e valida a senha
+      let { data: adminRow } = await supabase
+        .from("users")
+        .select("id, role, senha_hash")
+        .eq("id", user.sub)
+        .maybeSingle();
+      if (!adminRow) {
+        const { data: profAdmin } = await supabase
+          .from("professors")
+          .select("id, role, senha_hash")
+          .eq("id", user.sub)
+          .maybeSingle();
+        adminRow = profAdmin;
+      }
+      if (!adminRow || adminRow.role !== "admin" || !adminRow.senha_hash) {
+        return new Response(JSON.stringify({ error: "Administrador não encontrado." }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { data: pwOk } = await supabase.rpc("verify_password", {
+        plain_password: password,
+        hashed_password: adminRow.senha_hash,
+      });
+      if (!pwOk) {
+        return new Response(JSON.stringify({ error: "Senha incorreta." }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       // First delete all contestations as they depend on professors
       await supabase.from("contestacoes").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-      // Then delete all professors
-      const { error } = await supabase.from("professors").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      // Then delete all professors (preserve admin/juridico accounts)
+      const { error } = await supabase
+        .from("professors")
+        .delete()
+        .not("role", "in", "(admin,juridico)");
       if (error) throw error;
       return jsonResponse({ success: true });
     }
@@ -161,80 +191,100 @@ Deno.serve(async (req) => {
     if (req.method === "POST" && action === "import_csv") {
       const body = await req.json();
       const rows = body.rows as Array<Record<string, string>>;
-      const toInsert = [];
+      // Normaliza qualquer formato de data para DD/MM/AAAA
+      const normalizeDateBR = (v: string | null | undefined): string | null => {
+        if (!v) return null;
+        const s = String(v).trim();
+        if (!s) return null;
+        // ISO YYYY-MM-DD
+        const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+        // DD/MM/YYYY ou DD-MM-YYYY
+        const br = s.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
+        if (br) return `${br[1]}/${br[2]}/${br[3]}`;
+        // DDMMYYYY
+        const digits = s.replace(/\D/g, "");
+        if (digits.length === 8) return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+        return s;
+      };
+      const byKey = new Map<string, Record<string, unknown>>();
+      const semMatricula: Record<string, unknown>[] = [];
       for (const r of rows) {
-        const senha = r.cpf?.replace(/\D/g, "") || r.senha || "";
+        const senha = r.data_nascimento?.replace(/\D/g, "") || r.senha || "";
         const { data: hashData } = await supabase.rpc("hash_password", { plain_password: senha });
-        toInsert.push({
-          nome: r.nome || "", cpf: r.cpf || "", matricula: r.matricula || "",
+        const record = {
+          nome: String(r.nome || "").trim(),
+          cpf,
+          matricula: matricula || null,
           senha: "***", senha_hash: hashData,
+          data_nascimento: r.data_nascimento || null,
           vinculo_inicio: r.vinculo_inicio || null,
           vinculo_fim: r.vinculo_fim || null,
           total_cotas: parseInt(r.total_cotas) || 0,
-          status: "Pendente", role: "professor",
+          status: r.status || "Pendente", role: "professor",
         });
       }
-      const { error } = await supabase.from("professors").insert(toInsert);
-      if (error) throw error;
-      return jsonResponse({ success: true, count: toInsert.length });
+const { error } = await supabase.from("professors").insert(toInsert);
+if (error) throw error;
+return jsonResponse({ success: true, count: toInsert.length });
     }
 
-    // PUT settings
-    if (req.method === "PUT" && action === "save_settings") {
-      const body = await req.json();
-      const { key, value } = body;
-      const { data: existing } = await supabase.from("system_settings").select("id").eq("key", key).maybeSingle();
-      if (existing) {
-        await supabase.from("system_settings").update({ value }).eq("id", existing.id);
-      } else {
-        await supabase.from("system_settings").insert({ key, value });
-      }
-      return jsonResponse({ success: true });
-    }
+// PUT settings
+if (req.method === "PUT" && action === "save_settings") {
+  const body = await req.json();
+  const { key, value } = body;
+  const { data: existing } = await supabase.from("system_settings").select("id").eq("key", key).maybeSingle();
+  if (existing) {
+    await supabase.from("system_settings").update({ value }).eq("id", existing.id);
+  } else {
+    await supabase.from("system_settings").insert({ key, value });
+  }
+  return jsonResponse({ success: true });
+}
 
-    // POST message (create/send)
-    if (req.method === "POST" && action === "create_message") {
-      const body = await req.json();
-      const title = String(body.title || "").trim();
-      const content = String(body.content || "").trim();
-      const scheduledAt = body.scheduled_at || null;
-      const sent = scheduledAt ? false : true;
+// POST message (create/send)
+if (req.method === "POST" && action === "create_message") {
+  const body = await req.json();
+  const title = String(body.title || "").trim();
+  const content = String(body.content || "").trim();
+  const scheduledAt = body.scheduled_at || null;
+  const sent = scheduledAt ? false : true;
 
-      if (!title || !content) {
-        return new Response(JSON.stringify({ error: "Título e conteúdo são obrigatórios." }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const { error: insertError } = await supabase.from("messages").insert({
-        title, content, created_by: null, // Broadcast message
-        scheduled_at: scheduledAt, sent,
-      });
-      if (insertError) {
-        return new Response(JSON.stringify({ error: `Erro ao salvar mensagem: ${insertError.message}` }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      return jsonResponse({ success: true });
-    }
-
-    // DELETE message
-    if (req.method === "DELETE" && action === "delete_message") {
-      const id = url.searchParams.get("id");
-      if (!id) throw new Error("ID obrigatório");
-      const { error } = await supabase.from("messages").delete().eq("id", id);
-      if (error) throw error;
-      return jsonResponse({ success: true });
-    }
-
-    return new Response(JSON.stringify({ error: "Ação não encontrada." }), {
-      status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (e: any) {
-    return new Response(JSON.stringify({ error: e.message || "Erro interno." }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+  if (!title || !content) {
+    return new Response(JSON.stringify({ error: "Título e conteúdo são obrigatórios." }), {
+      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
+
+  const { error: insertError } = await supabase.from("messages").insert({
+    title, content, created_by: null, // Broadcast message
+    scheduled_at: scheduledAt, sent,
+  });
+  if (insertError) {
+    return new Response(JSON.stringify({ error: `Erro ao salvar mensagem: ${insertError.message}` }), {
+      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  return jsonResponse({ success: true });
+}
+
+// DELETE message
+if (req.method === "DELETE" && action === "delete_message") {
+  const id = url.searchParams.get("id");
+  if (!id) throw new Error("ID obrigatório");
+  const { error } = await supabase.from("messages").delete().eq("id", id);
+  if (error) throw error;
+  return jsonResponse({ success: true });
+}
+
+return new Response(JSON.stringify({ error: "Ação não encontrada." }), {
+  status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+});
+  } catch (e: any) {
+  return new Response(JSON.stringify({ error: e.message || "Erro interno." }), {
+    status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
 });
 
 function jsonResponse(data: unknown) {

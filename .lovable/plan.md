@@ -1,51 +1,50 @@
-# Suporte a múltiplas matrículas por CPF
+## Remoção do campo `status` do professor
 
-## Decisões confirmadas
-- **UX**: seletor de matrículas no topo do painel (abas/dropdown). O card só atualiza ao trocar a matrícula ativa.
-- **Vínculo**: contestações e mensagens lidas continuam vinculadas à **matrícula** (linha em `professors`), não ao CPF.
-- **Modelo de dados**: mantemos 1 linha por matrícula em `professors` (mesmo CPF repetido). Sem migração de dados.
+Vamos remover totalmente a coluna `status` da tabela `professors` e tudo que depende dela. O `status` das **contestações** continua intacto.
 
-## Como vai funcionar para o professor
+### 1. Banco de dados (migração)
+- `ALTER TABLE public.professors DROP COLUMN status;`
+- (Não há trigger nem RLS que dependa dessa coluna.)
 
-1. Login normal com **CPF + data de nascimento**.
-2. Após autenticar, o sistema busca **todas as matrículas** do CPF informado.
-3. Comportamento na tela:
-   - **1 matrícula** → comportamento atual, sem nenhum seletor.
-   - **2 ou mais matrículas** → aparece um **seletor de abas** logo abaixo do nome ("Bem-vindo(a)"), no formato:
-     ```text
-     [ Matrícula 1000171 ]  [ Matrícula 1000245 ]  [ Matrícula 1000388 ]
-     ```
-     A primeira fica selecionada por padrão. Ao clicar em outra, todo o card de dados (vínculo, cotas, status, situação do processo) é trocado.
-4. As abas **Mensagens** e **Contestações** seguem a matrícula ativa:
-   - "Mensagens" mostra os recados daquela matrícula (e o badge de não-lidas considera só ela).
-   - "Contestações" lista somente as daquela matrícula, e novas contestações nascem ligadas à matrícula ativa.
-5. Botão **Sair** continua único (encerra a sessão inteira).
+### 2. Edge Functions
+- `supabase/functions/custom-login/index.ts`
+  - Remover `status` dos `select(...)` de `professors`.
+  - Remover o bloco `if (professor.status === "Inativo") { return 403 }`.
+  - Remover `status` do payload retornado em `matriculas[]`.
+- `supabase/functions/professor-api/index.ts`
+  - Remover `status` do `select` em `action=me`.
+- `supabase/functions/admin-api/index.ts`
+  - Remover `status` do `select` em listagem de professores.
+  - Remover `status` dos inserts/updates de professor (`create_professor`, `update_professor`, importação CSV em massa).
 
-## Mudanças técnicas
+### 3. Frontend
 
-### Backend (`custom-login` edge function)
-- Quando o login for de professor, em vez de retornar **um** registro, retornar:
-  - dados base do usuário (`nome`, `cpf`, `role`)
-  - array `matriculas[]` com cada linha encontrada (`id`, `matricula`, `vinculo_inicio`, `vinculo_fim`, `total_cotas`, `status`)
-- O **token HMAC** continua amarrado ao CPF, mas o payload passa a conter a lista de `professor_ids` autorizados, para o `professor-api` validar que a matrícula consultada pertence ao CPF logado.
+**`src/contexts/AuthContext.tsx`**
+- Remover `status` da interface `Professor` e dos mapeamentos (`first.status`, `found.status`).
 
-### Backend (`professor-api`)
-- Todas as rotas (`messages`, `mark_read`, `contestacoes`, `create_contestacao`) passam a aceitar um parâmetro `professor_id` (matrícula ativa) no body/query.
-- Validação: o `professor_id` recebido **precisa estar** no array de IDs do token. Caso contrário, 403.
-- Substituir os `eq("professor_id", user.sub)` pelo `professor_id` recebido.
+**`src/pages/DashboardPage.tsx`**
+- Remover o `Badge` de status no card "Meus Dados".
+- Remover o stepper "Situação do Processo" inteiro (constantes `STEPS`, `stepColors`, `currentStepIndex` e o bloco JSX correspondente).
 
-### Frontend
-- `AuthContext`: passa a guardar `professor` (dados base) + `matriculas[]` + `matriculaAtivaId`. Função `setMatriculaAtiva(id)`.
-- `DashboardPage`:
-  - Renderiza o seletor de abas só se `matriculas.length > 1`.
-  - Card de dados, badge de status e stepper passam a ler de `matriculaAtiva` (não mais de `professor` direto).
-  - Fetch de mensagens/contestações refeito sempre que `matriculaAtivaId` muda.
-- `LoginPage`: nenhuma mudança visual; só consome o novo formato de resposta.
+**`src/pages/AdminPage.tsx`**
+- Remover `status` da interface `Professor`, do `formData` inicial e dos formulários de criar/editar.
+- Remover os 3 cards de resumo "Validados / Pendentes / Em Análise" (e a lógica `validados/pendentes/emAnalise`).
+- Remover a coluna **Status** das tabelas de professores e da seção de validação pendente.
+- Remover a ação **Ativar/Inativar** (`handleToggleStatus`, ícones `UserCheck`/`UserX`) — não há mais campo para alternar.
+- Ajustar o CSV de exportação de contestações (a coluna Status ali é da contestação, **mantém**).
+- No template/parsing do CSV de importação de professores, remover a coluna `status`.
 
-### Banco de dados
-- **Nenhuma migração necessária.** A estrutura atual (`professors` com CPF repetido por matrícula) já comporta o cenário.
-- Opcional/futuro: índice em `professors(cpf)` para acelerar a busca por múltiplas matrículas (a base é pequena, então não é urgente).
+**`src/pages/JuridicoPage.tsx`**
+- Verificar e remover qualquer referência a `professor.status` (badge/coluna), mantendo `contestacao.status`.
 
-## Fora de escopo
-- Tela do admin/jurídico: continua listando uma linha por matrícula (cada vínculo é tratado independentemente, como hoje).
-- Unificação de "perfil único" por CPF: não será feita agora, conforme decisão de manter o modelo atual.
+### 4. Tipos Supabase
+- `src/integrations/supabase/types.ts` é regenerado automaticamente após a migração — não editar manualmente.
+
+### Impactos
+- Login de professor passa a ser permitido independente de "Inativo" (o controle de acesso por status some). Caso queira manter um modo de "bloquear professor", terá que ser repensado depois.
+- A tela do professor fica mais enxuta: só Matrícula + dados de vínculo + cotas + ações.
+- O painel admin perde os cards de resumo por status e a ação de inativar.
+
+### Fora de escopo
+- `status` das **contestações** (continua existindo e funcionando normalmente).
+- `status` da tabela `users` (admin/jurídico) — não é tocado.

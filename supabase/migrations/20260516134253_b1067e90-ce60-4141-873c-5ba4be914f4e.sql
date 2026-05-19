@@ -1,0 +1,1 @@
+ALTER TABLE public.professors ALTER COLUMN matricula DROP NOT NULL;

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import logoSeduc from '@/assets/logo-seduc.png';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -12,12 +12,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
   LogOut, Upload, Download, Users, AlertTriangle, Settings, Plus, Pencil, Trash2, Save,
-  LayoutDashboard, FileText, Search, Send, MessageSquare, UserX, UserCheck, Menu, Eye, EyeOff, Trash, Loader2,
+  LayoutDashboard, FileText, Search, Send, MessageSquare, Menu, Eye, EyeOff, Trash, Loader2,
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import { maskCPF, unmaskCPF, isValidCPF, maskDate, isValidDate, maskPhone, STATUS_OPTIONS, statusBadgeClass, statusRowClass, normalizeStatus } from '@/lib/masks';
 
 interface Professor {
   id: string;
@@ -28,8 +29,8 @@ interface Professor {
   vinculo_inicio: string | null;
   vinculo_fim: string | null;
   total_cotas: number | null;
-  status: string;
   role: string;
+  status: string | null;
 }
 
 interface Contestacao {
@@ -53,7 +54,8 @@ interface Message {
 
 const emptyProfessor = {
   nome: '', cpf: '', matricula: '', senha: '', data_nascimento: '',
-  vinculo_inicio: '', vinculo_fim: '', total_cotas: 0, status: 'Pendente', role: 'professor',
+  vinculo_inicio: '', vinculo_fim: '', total_cotas: 0, role: 'professor',
+  status: 'ATIVO',
 };
 
 type ActiveTab = 'dashboard' | 'professors' | 'contestacoes' | 'messages' | 'settings';
@@ -93,6 +95,26 @@ const AdminPage = () => {
   const [showModalPassword, setShowModalPassword] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
+  const [dupDialog, setDupDialog] = useState<{
+    open: boolean;
+    groups: Array<Record<string, string>[]>;
+    resolve?: (result: { action: 'keep' | 'dedupe' | 'cancel'; keepIndices?: number[] }) => void;
+  }>({ open: false, groups: [] });
+  const [keepIndices, setKeepIndices] = useState<number[]>([]);
+  const [validationDialog, setValidationDialog] = useState<{
+    open: boolean;
+    errors: Array<{ line: number; field: string; message: string; value?: string }>;
+    missingHeaders: string[];
+  }>({ open: false, errors: [], missingHeaders: [] });
+  const [summaryDialog, setSummaryDialog] = useState<{
+    open: boolean;
+    totalLines: number;
+    emptyDiscarded: number;
+    duplicateGroups: number;
+    keptBySelection: number;
+    dedupedRemoved: number;
+    imported: number;
+  }>({ open: false, totalLines: 0, emptyDiscarded: 0, duplicateGroups: 0, keptBySelection: 0, dedupedRemoved: 0, imported: 0 });
 
   const authHeaders = { Authorization: `Bearer ${token}` };
 
@@ -147,10 +169,13 @@ const AdminPage = () => {
   const openEditDialog = (p: Professor) => {
     setEditingProf(p);
     setFormData({
-      nome: p.nome, cpf: p.cpf, matricula: p.matricula, senha: '',
-      data_nascimento: p.data_nascimento || '', vinculo_inicio: p.vinculo_inicio || '',
-      vinculo_fim: p.vinculo_fim || '', total_cotas: p.total_cotas || 0,
-      status: p.status, role: p.role,
+      nome: p.nome, cpf: maskCPF(p.cpf || ''), matricula: p.matricula, senha: '',
+      data_nascimento: maskDate(p.data_nascimento || ''),
+      vinculo_inicio: maskDate(p.vinculo_inicio || ''),
+      vinculo_fim: maskDate(p.vinculo_fim || ''),
+      total_cotas: p.total_cotas || 0,
+      role: p.role,
+      status: normalizeStatus(p.status),
     });
     setDialogOpen(true);
   };
@@ -160,12 +185,29 @@ const AdminPage = () => {
       toast.error('Nome, Matrícula e CPF são obrigatórios.');
       return;
     }
+    if (!isValidCPF(formData.cpf)) {
+      toast.error('CPF inválido.');
+      return;
+    }
+    if (!isValidDate(formData.data_nascimento)) {
+      toast.error('Data de nascimento inválida (use DD/MM/AAAA).');
+      return;
+    }
+    if (!isValidDate(formData.vinculo_inicio)) {
+      toast.error('Data de Admissão inválida (use DD/MM/AAAA).');
+      return;
+    }
+    if (!isValidDate(formData.vinculo_fim)) {
+      toast.error('Data da Aposentadoria inválida (use DD/MM/AAAA).');
+      return;
+    }
+    const payload = { ...formData, cpf: unmaskCPF(formData.cpf) };
     if (editingProf) {
-      const { data, error } = await apiCall('PUT', 'update_professor', { ...formData, id: editingProf.id });
+      const { data, error } = await apiCall('PUT', 'update_professor', { ...payload, id: editingProf.id });
       if (error || data?.error) { toast.error(data?.error || 'Erro ao atualizar.'); return; }
       toast.success('Professor atualizado!');
     } else {
-      const { data, error } = await apiCall('POST', 'create_professor', formData);
+      const { data, error } = await apiCall('POST', 'create_professor', payload);
       if (error || data?.error) { toast.error(data?.error || 'Erro ao adicionar.'); return; }
       toast.success('Professor adicionado!');
     }
@@ -184,41 +226,63 @@ const AdminPage = () => {
     fetchData();
   };
 
-  const handleClearDatabase = async () => {
-    if (!confirm('ATENÇÃO: Isso excluirá TODOS os professores e contestações do sistema. Esta ação não pode ser desfeita. Deseja continuar?')) return;
-    setLoading(true);
-    const { data, error } = await apiCall('POST', 'delete_all_professors');
-    setLoading(false);
-    if (error || data?.error) { toast.error(data?.error || 'Erro ao limpar base.'); return; }
-    toast.success('Base de dados limpa com sucesso!');
-    fetchData();
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
+  const [clearPassword, setClearPassword] = useState('');
+  const [clearing, setClearing] = useState(false);
+  const [showClearPassword, setShowClearPassword] = useState(false);
+
+  const openClearDialog = () => {
+    setClearPassword('');
+    setClearDialogOpen(true);
   };
 
-  const handleToggleStatus = async (p: Professor) => {
-    const newStatus = p.status === 'Inativo' ? 'Ativo' : 'Inativo';
-    const { data, error } = await apiCall('PUT', 'update_professor', { id: p.id, status: newStatus, nome: p.nome, cpf: p.cpf, matricula: p.matricula, role: p.role });
-    if (error || data?.error) { toast.error(data?.error || 'Erro ao alterar status.'); return; }
-    toast.success(`Usuário ${newStatus === 'Inativo' ? 'inativado' : 'ativado'}!`);
+  const handleClearDatabase = async () => {
+    if (!clearPassword) { toast.error('Informe sua senha de administrador.'); return; }
+    setClearing(true);
+    const { data, error } = await apiCall('POST', 'delete_all_professors', { password: clearPassword });
+    setClearing(false);
+    if (error || data?.error) { toast.error(data?.error || 'Erro ao limpar base.'); return; }
+    setClearDialogOpen(false);
+    setClearPassword('');
+    toast.success('Base de dados limpa com sucesso!');
     fetchData();
   };
 
   const handleCSVImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const text = await file.text();
-    const lines = text.split('\n').filter(l => l.trim());
-    if (lines.length < 2) { toast.error('CSV vazio ou inválido.'); return; }
-    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-    const rows = lines.slice(1).map(line => {
-      const values = line.split(',').map(v => v.trim());
-      const obj: Record<string, string> = {};
-      headers.forEach((h, i) => { obj[h] = values[i] || ''; });
-      return obj;
-    });
-    const { data, error } = await apiCall('POST', 'import_csv', { rows });
-    if (error || data?.error) toast.error(data?.error || 'Erro na importação.');
-    else { toast.success(`${data?.count || rows.length} professor(es) importado(s)!`); fetchData(); }
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    setImporting(true);
+    setImportProgress({ current: 0, total: 0 });
+    try {
+      const text = await file.text();
+      const lines = text.split('\n').filter(l => l.trim());
+      if (lines.length < 2) { toast.error('CSV vazio ou inválido.'); return; }
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const rows = lines.slice(1).map(line => {
+        const values = line.split(',').map(v => v.trim());
+        const obj: Record<string, string> = {};
+        headers.forEach((h, i) => { obj[h] = values[i] || ''; });
+        return obj;
+      });
+      const CHUNK = 100;
+      setImportProgress({ current: 0, total: rows.length });
+      let imported = 0;
+      for (let i = 0; i < rows.length; i += CHUNK) {
+        const chunk = rows.slice(i, i + CHUNK);
+        const { data, error } = await apiCall('POST', 'import_csv', { rows: chunk });
+        if (error || data?.error) {
+          toast.error(data?.error || 'Erro na importação.');
+          return;
+        }
+        imported += data?.count || chunk.length;
+        setImportProgress({ current: imported, total: rows.length });
+      }
+      toast.success(`${imported} professor(es) importado(s)!`);
+      fetchData();
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const exportContestacoes = () => {
@@ -227,7 +291,7 @@ const AdminPage = () => {
       ['Matrícula', 'Nome', 'Motivo', 'Descrição', 'WhatsApp', 'Status', 'Data'].join(','),
       ...contestacoes.map(c => [
         c.professors?.matricula || '', `"${c.professors?.nome || ''}"`,
-        `"${c.motivo}"`, `"${c.descricao}"`, c.whatsapp || '', c.status,
+        `"${c.motivo}"`, `"${c.descricao}"`, c.whatsapp ? maskPhone(c.whatsapp) : '', c.status,
         new Date(c.created_at).toLocaleDateString('pt-BR'),
       ].join(',')),
     ].join('\n');
@@ -288,19 +352,14 @@ const AdminPage = () => {
   const nonAdminProfs = professors;
   const filteredProfs = nonAdminProfs.filter(p =>
     !searchQuery ||
-    p.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.matricula.includes(searchQuery) ||
-    p.cpf.includes(searchQuery)
+    (p.nome || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (p.matricula || '').includes(searchQuery) ||
+    (p.cpf || '').includes(searchQuery)
   );
-  const validados = nonAdminProfs.filter(p => p.status === 'Validado').length;
-  const pendentes = nonAdminProfs.filter(p => p.status === 'Pendente').length;
-  const emAnalise = nonAdminProfs.filter(p => p.status === 'Em Análise').length;
-
   const statCards = [
     { label: 'Total Professores', value: nonAdminProfs.length, icon: Users, color: 'bg-primary/10 text-primary' },
-    { label: 'Validados', value: validados, icon: FileText, color: 'bg-green-50 text-green-600' },
-    { label: 'Pendentes', value: pendentes, icon: AlertTriangle, color: 'bg-yellow-50 text-yellow-600' },
     { label: 'Contestações', value: contestacoes.length, icon: AlertTriangle, color: 'bg-red-50 text-red-600' },
+    { label: 'Mensagens', value: messages.length, icon: MessageSquare, color: 'bg-blue-50 text-blue-600' },
   ];
 
   return (
@@ -320,8 +379,8 @@ const AdminPage = () => {
                 key={item.key}
                 onClick={() => setActiveTab(item.key)}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                   }`}
               >
                 <Icon className="w-4 h-4" />
@@ -371,8 +430,8 @@ const AdminPage = () => {
                         key={item.key}
                         onClick={() => setActiveTab(item.key)}
                         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive
-                            ? 'bg-primary text-primary-foreground shadow-sm'
-                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                           }`}
                       >
                         <Icon className="w-4 h-4" />
@@ -491,6 +550,29 @@ const AdminPage = () => {
                   <h3 className="font-semibold text-foreground">Professores ({nonAdminProfs.length})</h3>
                   <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                     <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleCSVImport} disabled={importing} />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 sm:flex-none"
+                      onClick={() => {
+                        const headers = ['nome', 'matricula', 'cpf', 'data_nascimento', 'vinculo_inicio', 'vinculo_fim', 'total_cotas', 'status'];
+                        const example = [
+                          ['JOSE DA SILVA', '12345', '12345678909', '15/03/1980', '01/04/2005', '', '132', 'ATIVO'],
+                          ['MARIA OLIVEIRA', '12346', '98765432100', '22/07/1975', '10/02/2000', '15/06/2024', '132', 'APOSENTADO'],
+                        ];
+                        const csv = [headers.join(';'), ...example.map(r => r.join(';'))].join('\n');
+                        const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'modelo-importacao-professores.csv';
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      }}
+                      title="Baixar modelo CSV"
+                    >
+                      <Download className="w-4 h-4 mr-1.5" /> Modelo CSV
+                    </Button>
                     <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={() => fileInputRef.current?.click()} disabled={importing}>
                       {importing ? (
                         <>
@@ -501,7 +583,7 @@ const AdminPage = () => {
                         <><Upload className="w-4 h-4 mr-1.5" /> Importar</>
                       )}
                     </Button>
-                    <Button size="sm" variant="destructive" className="flex-1 sm:flex-none" onClick={handleClearDatabase}>
+                    <Button size="sm" variant="destructive" className="flex-1 sm:flex-none" onClick={openClearDialog}>
                       <Trash className="w-4 h-4 mr-1.5" /> Limpar Base
                     </Button>
                     <Button size="sm" className="flex-1 sm:flex-none" onClick={openAddDialog}>
@@ -516,37 +598,36 @@ const AdminPage = () => {
                     <Table>
                       <TableHeader>
                         <TableRow className="hover:bg-transparent">
-                          <TableHead className="text-xs font-medium text-muted-foreground w-[80px] lg:w-[120px]">Matrícula</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground min-w-[150px]">Nome</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground w-[80px] lg:w-[120px]">Mat</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground hidden lg:table-cell">CPF</TableHead>
-                          <TableHead className="text-xs font-medium text-muted-foreground hidden md:table-cell">Perfil</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground hidden md:table-cell whitespace-nowrap">Data de Admissão</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground hidden md:table-cell whitespace-nowrap">Data da Aposentadoria</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground hidden sm:table-cell">Cotas</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">Status</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground text-right sticky right-0 bg-card/95 backdrop-blur-sm z-10 border-l border-border px-4 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {filteredProfs.map(p => (
-                          <TableRow key={p.id} className={`${p.status === 'Inativo' ? 'opacity-50' : ''} group`}>
-                            <TableCell className="font-mono text-xs lg:text-sm py-3">{p.matricula}</TableCell>
+                          <TableRow key={p.id} className={`group ${statusRowClass(p.status)}`}>
                             <TableCell className="text-xs lg:text-sm font-medium py-3">{p.nome}</TableCell>
+                            <TableCell className="font-mono text-xs lg:text-sm py-3">{p.matricula}</TableCell>
                             <TableCell className="font-mono text-xs lg:text-sm hidden lg:table-cell py-3">{p.cpf}</TableCell>
-                            <TableCell className="hidden md:table-cell py-3">
-                              <Badge variant="outline" className="text-[10px] lg:text-xs capitalize px-2 py-0">{p.role}</Badge>
-                            </TableCell>
+                            <TableCell className="text-xs lg:text-sm hidden md:table-cell py-3 whitespace-nowrap">{maskDate(p.vinculo_inicio || '') || '—'}</TableCell>
+                            <TableCell className="text-xs lg:text-sm hidden md:table-cell py-3 whitespace-nowrap">{maskDate(p.vinculo_fim || '') || '—'}</TableCell>
                             <TableCell className="text-xs lg:text-sm hidden sm:table-cell py-3">{p.total_cotas || 0}</TableCell>
+                            <TableCell>
+                              <Badge className={`text-xs font-medium ${p.status === 'Validado' || p.status === 'Ativo' ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-100' :
+                                  p.status === 'Inativo' ? 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-100' :
+                                    p.status === 'Em Análise' ? 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100' :
+                                      'bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-100'
+                                } border`}>{p.status}</Badge>
+                            </TableCell>
                             <TableCell className="text-right sticky right-0 bg-card/95 backdrop-blur-sm z-10 border-l border-border px-4 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)] group-hover:bg-accent/50 transition-colors">
                               <div className="flex items-center justify-end gap-1">
                                 <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-background" onClick={() => openEditDialog(p)} title="Editar">
                                   <Pencil className="w-3.5 h-3.5" />
-                                </Button>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className={`h-8 w-8 hover:bg-background ${p.status === 'Inativo' ? 'text-green-600 hover:text-green-700' : 'text-orange-500 hover:text-orange-600'}`}
-                                  onClick={() => handleToggleStatus(p)}
-                                  title={p.status === 'Inativo' ? 'Ativar' : 'Inativar'}
-                                >
-                                  {p.status === 'Inativo' ? <UserCheck className="w-3.5 h-3.5" /> : <UserX className="w-3.5 h-3.5" />}
                                 </Button>
                                 <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleDeleteProf(p.id, p.nome)} title="Excluir">
                                   <Trash2 className="w-3.5 h-3.5" />
@@ -598,7 +679,7 @@ const AdminPage = () => {
                             <TableCell className="text-sm">{c.professors?.nome}</TableCell>
                             <TableCell className="text-sm">{c.motivo}</TableCell>
                             <TableCell className="max-w-[200px] truncate text-sm">{c.descricao}</TableCell>
-                            <TableCell className="text-sm">{c.whatsapp || '—'}</TableCell>
+                            <TableCell className="text-sm">{c.whatsapp ? maskPhone(c.whatsapp) : '—'}</TableCell>
                             <TableCell><Badge variant="secondary" className="text-xs">{c.status}</Badge></TableCell>
                             <TableCell className="text-sm">{new Date(c.created_at).toLocaleDateString('pt-BR')}</TableCell>
                           </TableRow>
@@ -769,12 +850,27 @@ const AdminPage = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="professor">Professor</SelectItem>
-                    <SelectItem value="admin">Administrador</SelectItem>
-                    <SelectItem value="juridico">Jurídico</SelectItem>
+                    {STATUS_OPTIONS.map(s => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={formData.status} onValueChange={v => setFormData({ ...formData, status: v })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Pendente">Pendente</SelectItem>
+                  <SelectItem value="Ativo">Ativo</SelectItem>
+                  <SelectItem value="Validado">Validado</SelectItem>
+                  <SelectItem value="Em Análise">Em Análise</SelectItem>
+                  <SelectItem value="Inativo">Inativo</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>
@@ -803,6 +899,240 @@ const AdminPage = () => {
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
             <Button onClick={handleSaveProf}>{editingProf ? 'Salvar' : 'Adicionar'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmação para limpar base (exige senha do admin) */}
+      <Dialog open={clearDialogOpen} onOpenChange={(o) => { if (!clearing) setClearDialogOpen(o); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">⚠️ Limpar base de dados</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p>
+              Esta ação irá <strong>excluir TODOS os professores e contestações</strong> do
+              sistema. Contas de administrador e jurídico serão preservadas.
+            </p>
+            <p className="text-destructive font-medium">Esta ação não pode ser desfeita.</p>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Confirme com sua senha de administrador</label>
+              <div className="relative">
+                <Input
+                  type={showClearPassword ? 'text' : 'password'}
+                  value={clearPassword}
+                  onChange={(e) => setClearPassword(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleClearDatabase(); }}
+                  placeholder="Digite sua senha"
+                  autoFocus
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowClearPassword((v) => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
+                  aria-label={showClearPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                  tabIndex={-1}
+                >
+                  {showClearPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setClearDialogOpen(false)} disabled={clearing}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleClearDatabase} disabled={clearing || !clearPassword}>
+              {clearing ? 'Limpando...' : 'Confirmar e limpar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de linhas duplicadas */}
+      <Dialog
+        open={dupDialog.open}
+        onOpenChange={(open) => {
+          if (!open && dupDialog.resolve) dupDialog.resolve({ action: 'cancel' });
+        }}
+      >
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>
+              Linhas duplicadas detectadas ({dupDialog.groups.length} grupo
+              {dupDialog.groups.length !== 1 ? 's' : ''})
+            </DialogTitle>
+          </DialogHeader>
+          <div className="overflow-auto flex-1 border rounded-md">
+            <table className="w-full text-xs">
+              <thead className="bg-muted sticky top-0">
+                <tr>
+                  <th className="px-2 py-1 text-left">Manter</th>
+                  <th className="px-2 py-1 text-left">#</th>
+                  {dupDialog.groups[0] && Object.keys(dupDialog.groups[0][0]).map(k => {
+                    const headerLabels: Record<string, string> = {
+                      nome: 'Nome',
+                      matricula: 'Mat',
+                      cpf: 'CPF',
+                      vinculo_inicio: 'Data de Admissão',
+                      vinculo_fim: 'Data da Aposentadoria',
+                      total_cotas: 'Cotas',
+                      status: 'Status do Servidor',
+                      data_nascimento: 'Data de Nascimento',
+                    };
+                    return (
+                      <th key={k} className="px-2 py-1 text-left whitespace-nowrap">{headerLabels[k] || k}</th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {dupDialog.groups.map((group, gi) => (
+                  <React.Fragment key={gi}>
+                    <tr className="bg-amber-50">
+                      <td colSpan={Object.keys(group[0]).length + 2} className="px-2 py-1 font-semibold text-amber-800">
+                        Grupo {gi + 1} — {group.length} ocorrências (selecione qual manter)
+                      </td>
+                    </tr>
+                    {group.map((row, ri) => (
+                      <tr key={`${gi}-${ri}`} className="border-t hover:bg-muted/30">
+                        <td className="px-2 py-1 text-center">
+                          <input
+                            type="radio"
+                            name={`keep-group-${gi}`}
+                            checked={keepIndices[gi] === ri}
+                            onChange={() => setKeepIndices(prev => {
+                              const next = [...prev];
+                              next[gi] = ri;
+                              return next;
+                            })}
+                            className="cursor-pointer"
+                          />
+                        </td>
+                        <td className="px-2 py-1 text-muted-foreground">{ri + 1}</td>
+                        {Object.keys(group[0]).map(k => (
+                          <td key={k} className="px-2 py-1 whitespace-nowrap">{row[k]}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Foram encontradas linhas com a mesma <strong>matrícula + CPF</strong>. Selecione qual linha
+            manter em cada grupo, ou mantenha todas as cópias.
+          </p>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => dupDialog.resolve?.({ action: 'cancel' })}>
+              Cancelar importação
+            </Button>
+            <Button variant="secondary" onClick={() => dupDialog.resolve?.({ action: 'keep' })}>
+              Manter todas as cópias
+            </Button>
+            <Button onClick={() => dupDialog.resolve?.({ action: 'dedupe', keepIndices })}>
+              Importar com seleção
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de validação do CSV */}
+      <Dialog open={validationDialog.open} onOpenChange={(open) => !open && setValidationDialog({ open: false, errors: [], missingHeaders: [] })}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">
+              CSV inválido — importação bloqueada
+            </DialogTitle>
+          </DialogHeader>
+          {validationDialog.missingHeaders.length > 0 && (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+              <p className="font-semibold text-destructive mb-1">Colunas obrigatórias ausentes:</p>
+              <p className="text-foreground">{validationDialog.missingHeaders.join(', ')}</p>
+              <p className="text-xs text-muted-foreground mt-2">
+                O cabeçalho do CSV deve conter, no mínimo: <strong>nome, matricula, cpf</strong>.
+              </p>
+            </div>
+          )}
+          {validationDialog.errors.length > 0 && (
+            <>
+              <p className="text-sm text-muted-foreground">
+                Foram encontrados <strong>{validationDialog.errors.length}</strong> erro(s) nos dados.
+                Corrija o arquivo e tente novamente.
+              </p>
+              <div className="overflow-auto flex-1 border rounded-md">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted sticky top-0">
+                    <tr>
+                      <th className="px-2 py-1 text-left w-16">Linha</th>
+                      <th className="px-2 py-1 text-left">Campo</th>
+                      <th className="px-2 py-1 text-left">Valor</th>
+                      <th className="px-2 py-1 text-left">Erro</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {validationDialog.errors.slice(0, 200).map((err, i) => (
+                      <tr key={i} className="border-t">
+                        <td className="px-2 py-1 font-mono text-muted-foreground">{err.line}</td>
+                        <td className="px-2 py-1 font-mono">{err.field}</td>
+                        <td className="px-2 py-1 font-mono text-muted-foreground">{err.value || '—'}</td>
+                        <td className="px-2 py-1 text-destructive">{err.message}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {validationDialog.errors.length > 200 && (
+                  <p className="text-xs text-muted-foreground p-2 text-center">
+                    Exibindo os primeiros 200 erros de {validationDialog.errors.length}.
+                  </p>
+                )}
+              </div>
+            </>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setValidationDialog({ open: false, errors: [], missingHeaders: [] })}>
+              Entendi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de resumo da importação */}
+      <Dialog open={summaryDialog.open} onOpenChange={(open) => !open && setSummaryDialog(s => ({ ...s, open: false }))}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Importação concluída</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between border-b pb-2">
+              <span className="text-muted-foreground">Total de linhas no CSV</span>
+              <span className="font-semibold">{summaryDialog.totalLines}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Linhas vazias descartadas</span>
+              <span className="font-semibold">{summaryDialog.emptyDiscarded}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Grupos de duplicatas detectados</span>
+              <span className="font-semibold">{summaryDialog.duplicateGroups}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Mantidas por seleção (1 por grupo)</span>
+              <span className="font-semibold">{summaryDialog.keptBySelection}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Duplicatas removidas</span>
+              <span className="font-semibold">{summaryDialog.dedupedRemoved}</span>
+            </div>
+            <div className="flex justify-between border-t pt-2 mt-2">
+              <span className="font-semibold text-primary">Registros importados</span>
+              <span className="font-bold text-primary text-lg">{summaryDialog.imported}</span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setSummaryDialog(s => ({ ...s, open: false }))}>Fechar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -13,8 +13,8 @@ Deno.serve(async (req) => {
 
   try {
     // Rate limiting: check IP
-    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || 
-               req.headers.get("cf-connecting-ip") || "unknown";
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("cf-connecting-ip") || "unknown";
 
     // Count recent failed attempts from this IP (last 15 min)
     const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
       const email = rawId.toLowerCase();
       const u = await supabase
         .from("users")
-        .select("id, email, role, status, senha_hash")
+        .select("id, email, role, senha_hash")
         .ilike("email", email)
         .maybeSingle();
       if (u.data) {
@@ -67,7 +67,6 @@ Deno.serve(async (req) => {
           vinculo_inicio: null,
           vinculo_fim: null,
           total_cotas: 0,
-          status: u.data.status,
           role: u.data.role,
           senha_hash: u.data.senha_hash,
         };
@@ -78,7 +77,7 @@ Deno.serve(async (req) => {
       const identificador = rawId.replace(/\D/g, "") || rawId;
       const r = await supabase
         .from("professors")
-        .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, status, role, senha_hash")
+        .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, role, status, senha_hash")
         .eq("cpf", identificador)
         .order("matricula", { ascending: true });
       let candidates = r.data || [];
@@ -86,11 +85,31 @@ Deno.serve(async (req) => {
       if (candidates.length === 0) {
         const fb = await supabase
           .from("professors")
-          .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, status, role, senha_hash")
+          .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, role, status, senha_hash")
           .eq("matricula", identificador);
         candidates = fb.data || [];
         fetchErr = fb.error;
       }
+
+      const passwordMatchesBirthDate = (input: string, birthDate: string | null | undefined) => {
+        if (!birthDate) return false;
+        const senhaDigits = input.replace(/\D/g, "");
+        const birth = String(birthDate).trim();
+
+        const isoParts = birth.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (isoParts) {
+          const [, y, m, d] = isoParts;
+          return senhaDigits === `${d}${m}${y}`;
+        }
+
+        const brParts = birth.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+        if (brParts) {
+          const [, d, m, y] = brParts;
+          return senhaDigits === `${d}${m}${y}`;
+        }
+
+        return birth.replace(/\D/g, "") === senhaDigits;
+      };
 
       // Encontrar a primeira linha cuja senha bata
       for (const c of candidates) {
@@ -101,14 +120,14 @@ Deno.serve(async (req) => {
             hashed_password: c.senha_hash,
           });
           ok = !!data;
-        }
-        if (ok) { 
-          professor = c; 
-          if (senha === c.cpf) {
-            requires_password_change = true;
+        } else if (c.data_nascimento) {
+          const parts = String(c.data_nascimento).split("-");
+          if (parts.length === 3) {
+            const [y, m, d] = parts;
+            ok = senha === `${d}${m}${y}`;
           }
-          break; 
         }
+        if (ok) { professor = c; break; }
       }
     }
 
@@ -139,13 +158,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Block inactive users
-    if (professor.status === "Inativo") {
-      return new Response(
-        JSON.stringify({ error: "Sua conta está inativa. Entre em contato com a administração." }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // (status field removed — no inactive blocking by status)
 
     // Log successful attempt
     await supabase.from("login_attempts").insert({ ip_address: ip, matricula: rawId, success: true });
@@ -173,7 +186,7 @@ Deno.serve(async (req) => {
     if (professor.role === "professor" && professor.cpf) {
       const all = await supabase
         .from("professors")
-        .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, status, role")
+        .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, role, status")
         .eq("cpf", professor.cpf)
         .order("matricula", { ascending: true });
       const rows = all.data || [];
