@@ -480,7 +480,7 @@ const AdminPage = () => {
           </div>
         </header>
 
-        <main className="flex-1 p-4 lg:p-8 space-y-6 overflow-y-auto no-scrollbar">
+        <main className="admin-scroll-area flex-1 p-4 lg:p-8 space-y-6 overflow-y-auto">
           {/* Dashboard Tab */}
           {activeTab === 'dashboard' && (
             <>
