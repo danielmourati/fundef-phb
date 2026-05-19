@@ -207,15 +207,14 @@ Deno.serve(async (req) => {
         if (digits.length === 8) return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
         return s;
       };
-      const byKey = new Map<string, Record<string, unknown>>();
-      const semMatricula: Record<string, unknown>[] = [];
+      const toInsert: any[] = [];
       for (const r of rows) {
         const senha = r.data_nascimento?.replace(/\D/g, "") || r.senha || "";
         const { data: hashData } = await supabase.rpc("hash_password", { plain_password: senha });
-        const record = {
+        toInsert.push({
           nome: String(r.nome || "").trim(),
-          cpf,
-          matricula: matricula || null,
+          cpf: r.cpf?.replace(/\D/g, "") || "",
+          matricula: r.matricula || null,
           senha: "***", senha_hash: hashData,
           data_nascimento: r.data_nascimento || null,
           vinculo_inicio: r.vinculo_inicio || null,
@@ -224,9 +223,9 @@ Deno.serve(async (req) => {
           status: r.status || "Pendente", role: "professor",
         });
       }
-const { error } = await supabase.from("professors").insert(toInsert);
-if (error) throw error;
-return jsonResponse({ success: true, count: toInsert.length });
+      const { error } = await supabase.from("professors").insert(toInsert);
+      if (error) throw error;
+      return jsonResponse({ success: true, count: toInsert.length });
     }
 
 // PUT settings

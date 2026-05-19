@@ -91,26 +91,6 @@ Deno.serve(async (req) => {
         fetchErr = fb.error;
       }
 
-      const passwordMatchesBirthDate = (input: string, birthDate: string | null | undefined) => {
-        if (!birthDate) return false;
-        const senhaDigits = input.replace(/\D/g, "");
-        const birth = String(birthDate).trim();
-
-        const isoParts = birth.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-        if (isoParts) {
-          const [, y, m, d] = isoParts;
-          return senhaDigits === `${d}${m}${y}`;
-        }
-
-        const brParts = birth.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-        if (brParts) {
-          const [, d, m, y] = brParts;
-          return senhaDigits === `${d}${m}${y}`;
-        }
-
-        return birth.replace(/\D/g, "") === senhaDigits;
-      };
-
       // Encontrar a primeira linha cuja senha bata
       for (const c of candidates) {
         let ok = false;
@@ -127,7 +107,13 @@ Deno.serve(async (req) => {
             ok = senha === `${d}${m}${y}`;
           }
         }
-        if (ok) { professor = c; break; }
+        if (ok) {
+          professor = c;
+          if (senha === c.cpf) {
+            requires_password_change = true;
+          }
+          break;
+        }
       }
     }
 
