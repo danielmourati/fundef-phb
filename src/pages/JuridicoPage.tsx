@@ -115,7 +115,11 @@ const JuridicoPage = () => {
         setTimeout(() => resolve(), 2000);
       });
       if (img.complete && img.naturalWidth > 0) {
-        doc.addImage(img, 'PNG', 14, 8, 60, 18);
+        const maxH = 14;
+        const ratio = img.naturalWidth / img.naturalHeight;
+        const h = maxH;
+        const w = h * ratio;
+        doc.addImage(img, 'PNG', 14, 8, w, h);
       }
     } catch { /* continue without logo */ }
 

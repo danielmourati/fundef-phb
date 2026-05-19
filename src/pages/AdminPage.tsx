@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
   LogOut, Upload, Download, Users, AlertTriangle, Settings, Plus, Pencil, Trash2, Save,
-  LayoutDashboard, FileText, Search, Send, MessageSquare, UserX, UserCheck, Menu, Eye, EyeOff, Trash,
+  LayoutDashboard, FileText, Search, Send, MessageSquare, UserX, UserCheck, Menu, Eye, EyeOff, Trash, Loader2,
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -91,6 +91,8 @@ const AdminPage = () => {
   const [sendingMsg, setSendingMsg] = useState(false);
   const [msgDialogOpen, setMsgDialogOpen] = useState(false);
   const [showModalPassword, setShowModalPassword] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
 
   const authHeaders = { Authorization: `Bearer ${token}` };
 
@@ -207,16 +209,12 @@ const AdminPage = () => {
     const lines = text.split('\n').filter(l => l.trim());
     if (lines.length < 2) { toast.error('CSV vazio ou inválido.'); return; }
     const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-     const rows = lines.slice(1).map(line => {
-       const values = line.split(',').map(v => v.trim());
-       const obj: Record<string, string> = {};
-       headers.forEach((h, i) => { 
-         if (h !== 'status') {
-           obj[h] = values[i] || ''; 
-         }
-       });
-       return obj;
-     });
+    const rows = lines.slice(1).map(line => {
+      const values = line.split(',').map(v => v.trim());
+      const obj: Record<string, string> = {};
+      headers.forEach((h, i) => { obj[h] = values[i] || ''; });
+      return obj;
+    });
     const { data, error } = await apiCall('POST', 'import_csv', { rows });
     if (error || data?.error) toast.error(data?.error || 'Erro na importação.');
     else { toast.success(`${data?.count || rows.length} professor(es) importado(s)!`); fetchData(); }
@@ -321,11 +319,10 @@ const AdminPage = () => {
               <button
                 key={item.key}
                 onClick={() => setActiveTab(item.key)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  isActive
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive
                     ? 'bg-primary text-primary-foreground shadow-sm'
                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                }`}
+                  }`}
               >
                 <Icon className="w-4 h-4" />
                 {item.label}
@@ -373,11 +370,10 @@ const AdminPage = () => {
                       <button
                         key={item.key}
                         onClick={() => setActiveTab(item.key)}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                          isActive
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive
                             ? 'bg-primary text-primary-foreground shadow-sm'
                             : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                        }`}
+                          }`}
                       >
                         <Icon className="w-4 h-4" />
                         {item.label}
@@ -494,9 +490,16 @@ const AdminPage = () => {
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-6 py-4 border-b border-border gap-4">
                   <h3 className="font-semibold text-foreground">Professores ({nonAdminProfs.length})</h3>
                   <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-                    <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleCSVImport} />
-                    <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={() => fileInputRef.current?.click()}>
-                      <Upload className="w-4 h-4 mr-1.5" /> Importar
+                    <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleCSVImport} disabled={importing} />
+                    <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+                      {importing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                          {importProgress.total > 0 ? `Importando ${importProgress.current}/${importProgress.total}` : 'Importando...'}
+                        </>
+                      ) : (
+                        <><Upload className="w-4 h-4 mr-1.5" /> Importar</>
+                      )}
                     </Button>
                     <Button size="sm" variant="destructive" className="flex-1 sm:flex-none" onClick={handleClearDatabase}>
                       <Trash className="w-4 h-4 mr-1.5" /> Limpar Base
@@ -727,41 +730,41 @@ const AdminPage = () => {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Nome *</Label>
-                <Input value={formData.nome} onChange={e => setFormData({...formData, nome: e.target.value})} />
+                <Input value={formData.nome} onChange={e => setFormData({ ...formData, nome: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <Label>CPF *</Label>
-                <Input value={formData.cpf} onChange={e => setFormData({...formData, cpf: e.target.value})} placeholder="00000000000" />
+                <Input value={formData.cpf} onChange={e => setFormData({ ...formData, cpf: e.target.value })} placeholder="00000000000" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Matrícula *</Label>
-                <Input value={formData.matricula} onChange={e => setFormData({...formData, matricula: e.target.value})} />
+                <Input value={formData.matricula} onChange={e => setFormData({ ...formData, matricula: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <Label>Data Nascimento</Label>
-                <Input value={formData.data_nascimento} onChange={e => setFormData({...formData, data_nascimento: e.target.value})} placeholder="01011980" />
+                <Input value={formData.data_nascimento} onChange={e => setFormData({ ...formData, data_nascimento: e.target.value })} placeholder="01011980" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Vínculo Início</Label>
-                <Input value={formData.vinculo_inicio} onChange={e => setFormData({...formData, vinculo_inicio: e.target.value})} placeholder="01/2001" />
+                <Input value={formData.vinculo_inicio} onChange={e => setFormData({ ...formData, vinculo_inicio: e.target.value })} placeholder="01/2001" />
               </div>
               <div className="space-y-2">
                 <Label>Vínculo Fim</Label>
-                <Input value={formData.vinculo_fim} onChange={e => setFormData({...formData, vinculo_fim: e.target.value})} placeholder="12/2003" />
+                <Input value={formData.vinculo_fim} onChange={e => setFormData({ ...formData, vinculo_fim: e.target.value })} placeholder="12/2003" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Total de Cotas</Label>
-                <Input type="number" value={formData.total_cotas} onChange={e => setFormData({...formData, total_cotas: parseInt(e.target.value) || 0})} />
+                <Input type="number" value={formData.total_cotas} onChange={e => setFormData({ ...formData, total_cotas: parseInt(e.target.value) || 0 })} />
               </div>
               <div className="space-y-2">
                 <Label>Perfil (Role)</Label>
-                <Select value={formData.role} onValueChange={v => setFormData({...formData, role: v})}>
+                <Select value={formData.role} onValueChange={v => setFormData({ ...formData, role: v })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>

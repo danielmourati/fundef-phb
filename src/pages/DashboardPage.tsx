@@ -40,7 +40,7 @@ interface Contestacao {
 }
 
 const DashboardPage = () => {
-  const { professor, token, logout } = useAuth();
+  const { professor, token, logout, matriculas, setMatriculaAtiva } = useAuth();
   const navigate = useNavigate();
   const [motivo, setMotivo] = useState('');
   const [descricao, setDescricao] = useState('');
@@ -61,7 +61,7 @@ const DashboardPage = () => {
       fetchMessages();
       fetchContestacoes();
     }
-  }, [professor, token]);
+  }, [professor?.id, token]);
 
   if (!professor) return null;
   if (professor.role === 'admin' || professor.role === 'juridico') return null;
@@ -175,6 +175,33 @@ const DashboardPage = () => {
             <p className="font-semibold text-lg leading-tight">{professor.nome}</p>
           </div>
         </div>
+
+        {/* Seletor de matrículas (aparece somente quando há mais de uma) */}
+        {matriculas.length > 1 && (
+          <div className="space-y-1.5">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider px-1">
+              Você possui {matriculas.length} matrículas. Selecione para visualizar:
+            </p>
+            <div className="flex gap-1.5 overflow-x-auto pb-1">
+              {matriculas.map(m => {
+                const active = m.id === professor.id;
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => setMatriculaAtiva(m.id)}
+                    className={`shrink-0 px-3 py-1.5 rounded-md text-xs font-semibold border transition-colors ${
+                      active
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-background text-foreground border-border hover:bg-muted'
+                    }`}
+                  >
+                    Matrícula {m.matricula}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Navigation Tabs */}
         <div className="flex gap-1 bg-muted/50 rounded-lg p-1">
