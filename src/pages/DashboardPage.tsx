@@ -260,7 +260,7 @@ const DashboardPage = () => {
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto no-scrollbar p-4 space-y-5 pb-20 max-w-2xl mx-auto w-full">
+      <main className="dashboard-scroll-area flex-1 overflow-y-auto p-4 space-y-5 pb-20 max-w-2xl mx-auto w-full">
         {/* Greeting */}
         <div className="flex items-center gap-3 pt-2">
           <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
