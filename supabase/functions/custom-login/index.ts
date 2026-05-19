@@ -6,6 +6,20 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
+const onlyDigits = (value: string | null | undefined) => String(value || "").replace(/\D/g, "");
+
+const passwordMatchesBirthDate = (input: string, birthDate: string | null | undefined) => {
+  const senhaDigits = onlyDigits(input);
+  const dateDigits = onlyDigits(birthDate);
+  if (!senhaDigits || dateDigits.length !== 8) return false;
+
+  const rawDate = String(birthDate || "").trim();
+  const iso = rawDate.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return senhaDigits === `${iso[3]}${iso[2]}${iso[1]}`;
+
+  return senhaDigits === dateDigits;
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -100,16 +114,14 @@ Deno.serve(async (req) => {
             hashed_password: c.senha_hash,
           });
           ok = !!data;
-        } else if (c.data_nascimento) {
-          const parts = String(c.data_nascimento).split("-");
-          if (parts.length === 3) {
-            const [y, m, d] = parts;
-            ok = senha === `${d}${m}${y}`;
-          }
+        }
+
+        if (!ok && (passwordMatchesBirthDate(senha, c.data_nascimento) || onlyDigits(senha) === onlyDigits(c.cpf))) {
+          ok = true;
         }
         if (ok) {
           professor = c;
-          if (senha === c.cpf) {
+          if (onlyDigits(senha) === onlyDigits(c.cpf)) {
             requires_password_change = true;
           }
           break;
