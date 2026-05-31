@@ -211,16 +211,17 @@ Deno.serve(async (req) => {
       };
       const toInsert: any[] = [];
       for (const r of rows) {
-        const senha = r.data_nascimento?.replace(/\D/g, "") || r.senha || "";
+        const cpfDigits = r.cpf?.replace(/\D/g, "") || "";
+        const senha = (r.senha && String(r.senha).trim()) || cpfDigits || "";
         const { data: hashData } = await supabase.rpc("hash_password", { plain_password: senha });
         toInsert.push({
           nome: String(r.nome || "").trim(),
-          cpf: r.cpf?.replace(/\D/g, "") || "",
+          cpf: cpfDigits,
           matricula: r.matricula || null,
           senha: "***", senha_hash: hashData,
-          data_nascimento: r.data_nascimento || null,
           vinculo_inicio: r.vinculo_inicio || null,
           vinculo_fim: r.vinculo_fim || null,
+          carga_horaria: parseInt(r.carga_horaria) || 0,
           total_cotas: parseInt(r.total_cotas) || 0,
           status: r.status || "Pendente", role: "professor",
         });
