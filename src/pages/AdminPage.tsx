@@ -623,16 +623,16 @@ const AdminPage = () => {
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-6 py-4 border-b border-border gap-4">
                   <h3 className="font-semibold text-foreground">Professores ({nonAdminProfs.length})</h3>
                   <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-                    <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleCSVImport} disabled={importing} />
+                    <input ref={fileInputRef} type="file" accept=".csv,.pdf,application/pdf" className="hidden" onChange={handleFileImport} disabled={importing} />
                     <Button
                       size="sm"
                       variant="outline"
                       className="flex-1 sm:flex-none"
                       onClick={() => {
-                        const headers = ['nome', 'matricula', 'cpf', 'data_nascimento', 'vinculo_inicio', 'vinculo_fim', 'total_cotas', 'status'];
+                        const headers = ['nome', 'matricula', 'cpf', 'vinculo_inicio', 'vinculo_fim', 'carga_horaria', 'total_cotas', 'status'];
                         const example = [
-                          ['JOSE DA SILVA', '12345', '12345678909', '15/03/1980', '01/04/2005', '', '132', 'ATIVO'],
-                          ['MARIA OLIVEIRA', '12346', '98765432100', '22/07/1975', '10/02/2000', '15/06/2024', '132', 'APOSENTADO'],
+                          ['JOSE DA SILVA', '12345', '12345678909', '01/04/2005', '', '40', '132', 'ATIVO'],
+                          ['MARIA OLIVEIRA', '12346', '98765432100', '10/02/2000', '15/06/2024', '20', '132', 'APOSENTADO'],
                         ];
                         const csv = [headers.join(';'), ...example.map(r => r.join(';'))].join('\n');
                         const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
