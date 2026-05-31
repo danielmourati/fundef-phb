@@ -162,6 +162,7 @@ export type Database = {
       }
       professors: {
         Row: {
+          carga_horaria: number | null
           cpf: string
           created_at: string
           data_nascimento: string | null
@@ -179,6 +180,7 @@ export type Database = {
           vinculo_inicio: string | null
         }
         Insert: {
+          carga_horaria?: number | null
           cpf: string
           created_at?: string
           data_nascimento?: string | null
@@ -196,6 +198,7 @@ export type Database = {
           vinculo_inicio?: string | null
         }
         Update: {
+          carga_horaria?: number | null
           cpf?: string
           created_at?: string
           data_nascimento?: string | null
