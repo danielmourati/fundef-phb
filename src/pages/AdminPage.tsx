@@ -954,7 +954,7 @@ const AdminPage = () => {
               <Label>
                 {editingProf
                   ? 'Redefinir senha (deixe vazio para manter a atual)'
-                  : 'Senha (deixe vazio para usar a data de nascimento)'}
+                  : 'Senha (deixe vazio para usar o CPF como senha inicial)'}
               </Label>
               <div className="relative">
                 <Input
