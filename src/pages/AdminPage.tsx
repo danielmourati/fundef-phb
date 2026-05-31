@@ -914,9 +914,17 @@ const AdminPage = () => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
+                <Label>Carga Horária (semanal)</Label>
+                <Input type="number" value={formData.carga_horaria} onChange={e => setFormData({ ...formData, carga_horaria: parseInt(e.target.value) || 0 })} placeholder="40" />
+              </div>
+              <div className="space-y-2">
                 <Label>Total de Cotas</Label>
                 <Input type="number" value={formData.total_cotas} onChange={e => setFormData({ ...formData, total_cotas: parseInt(e.target.value) || 0 })} />
               </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2 col-start-2">
+
               <div className="space-y-2">
                 <Label>Perfil (Role)</Label>
                 <Select value={formData.role} onValueChange={v => setFormData({ ...formData, role: v })}>
