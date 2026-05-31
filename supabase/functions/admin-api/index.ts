@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     if (req.method === "GET" && action === "professors") {
       const { data, error } = await supabase
         .from("professors")
-        .select("id, matricula, nome, cpf, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, status, role")
+        .select("id, matricula, nome, cpf, data_nascimento, vinculo_inicio, vinculo_fim, carga_horaria, total_cotas, status, role")
         .order("nome");
       if (error) throw error;
       return jsonResponse(data);
@@ -108,6 +108,7 @@ Deno.serve(async (req) => {
         senha: "***", senha_hash: hashData,
         vinculo_inicio: body.vinculo_inicio || null,
         vinculo_fim: body.vinculo_fim || null,
+        carga_horaria: Number(body.carga_horaria) || 0,
         total_cotas: Number(body.total_cotas) || 0,
         role: body.role || "professor",
         status: (body.status || "ATIVO").toUpperCase(),
@@ -124,6 +125,7 @@ Deno.serve(async (req) => {
         nome: body.nome, cpf: body.cpf, matricula: body.matricula,
         vinculo_inicio: body.vinculo_inicio || null,
         vinculo_fim: body.vinculo_fim || null,
+        carga_horaria: Number(body.carga_horaria) || 0,
         total_cotas: Number(body.total_cotas) || 0,
         role: body.role || "professor",
         status: (body.status || "ATIVO").toUpperCase(),
@@ -209,16 +211,17 @@ Deno.serve(async (req) => {
       };
       const toInsert: any[] = [];
       for (const r of rows) {
-        const senha = r.data_nascimento?.replace(/\D/g, "") || r.senha || "";
+        const cpfDigits = r.cpf?.replace(/\D/g, "") || "";
+        const senha = (r.senha && String(r.senha).trim()) || cpfDigits || "";
         const { data: hashData } = await supabase.rpc("hash_password", { plain_password: senha });
         toInsert.push({
           nome: String(r.nome || "").trim(),
-          cpf: r.cpf?.replace(/\D/g, "") || "",
+          cpf: cpfDigits,
           matricula: r.matricula || null,
           senha: "***", senha_hash: hashData,
-          data_nascimento: r.data_nascimento || null,
           vinculo_inicio: r.vinculo_inicio || null,
           vinculo_fim: r.vinculo_fim || null,
+          carga_horaria: parseInt(r.carga_horaria) || 0,
           total_cotas: parseInt(r.total_cotas) || 0,
           status: r.status || "Pendente", role: "professor",
         });

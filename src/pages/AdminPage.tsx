@@ -28,6 +28,7 @@ interface Professor {
   data_nascimento: string | null;
   vinculo_inicio: string | null;
   vinculo_fim: string | null;
+  carga_horaria: number | null;
   total_cotas: number | null;
   role: string;
   status: string | null;
@@ -54,7 +55,7 @@ interface Message {
 
 const emptyProfessor = {
   nome: '', cpf: '', matricula: '', senha: '', data_nascimento: '',
-  vinculo_inicio: '', vinculo_fim: '', total_cotas: 0, role: 'professor',
+  vinculo_inicio: '', vinculo_fim: '', carga_horaria: 0, total_cotas: 0, role: 'professor',
   status: 'ATIVO',
 };
 
@@ -173,6 +174,7 @@ const AdminPage = () => {
       data_nascimento: maskDate(p.data_nascimento || ''),
       vinculo_inicio: maskDate(p.vinculo_inicio || ''),
       vinculo_fim: maskDate(p.vinculo_fim || ''),
+      carga_horaria: p.carga_horaria || 0,
       total_cotas: p.total_cotas || 0,
       role: p.role,
       status: normalizeStatus(p.status),
@@ -189,7 +191,7 @@ const AdminPage = () => {
       toast.error('CPF inválido.');
       return;
     }
-    if (!isValidDate(formData.data_nascimento)) {
+    if (formData.data_nascimento && !isValidDate(formData.data_nascimento)) {
       toast.error('Data de nascimento inválida (use DD/MM/AAAA).');
       return;
     }
@@ -248,22 +250,92 @@ const AdminPage = () => {
     fetchData();
   };
 
-  const handleCSVImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const parsePdfRows = async (file: File): Promise<Record<string, string>[]> => {
+    // Lazy import para não impactar bundle inicial
+    const pdfjs: any = await import('pdfjs-dist/build/pdf.mjs');
+    // worker via URL ESM
+    pdfjs.GlobalWorkerOptions.workerSrc = (await import('pdfjs-dist/build/pdf.worker.mjs?url')).default;
+    const buf = await file.arrayBuffer();
+    const doc = await pdfjs.getDocument({ data: buf }).promise;
+    const expected = ['nome', 'matricula', 'cpf', 'vinculo_inicio', 'vinculo_fim', 'carga_horaria', 'total_cotas', 'status'];
+    const rows: Record<string, string>[] = [];
+
+    for (let p = 1; p <= doc.numPages; p++) {
+      const page = await doc.getPage(p);
+      const tc = await page.getTextContent();
+      // Agrupa items por linha (Y aproximado)
+      const linesMap = new Map<number, { x: number; s: string }[]>();
+      for (const it of tc.items as any[]) {
+        const y = Math.round(it.transform[5]);
+        const x = it.transform[4];
+        const s = String(it.str || '').trim();
+        if (!s) continue;
+        if (!linesMap.has(y)) linesMap.set(y, []);
+        linesMap.get(y)!.push({ x, s });
+      }
+      const ys = [...linesMap.keys()].sort((a, b) => b - a); // topo->baixo
+      for (const y of ys) {
+        const parts = linesMap.get(y)!.sort((a, b) => a.x - b.x).map(p => p.s);
+        const lineText = parts.join(' ');
+        // ignorar cabeçalhos
+        if (/nome.*cpf|cpf.*nome|matr[ií]cula/i.test(lineText) && !/\d{11}/.test(lineText)) continue;
+        const cpfMatch = lineText.match(/\b\d{11}\b|\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/);
+        if (!cpfMatch) continue;
+
+        // Estratégia simples: dividir por 2+ espaços
+        const cols = lineText.split(/\s{2,}|\t+/).map(c => c.trim()).filter(Boolean);
+        const obj: Record<string, string> = {};
+        if (cols.length >= expected.length) {
+          expected.forEach((h, i) => { obj[h] = cols[i] || ''; });
+        } else {
+          // Heurística: encontra CPF, datas e números
+          const dates = (lineText.match(/\d{2}[\/\-]\d{2}[\/\-]\d{4}/g) || []);
+          obj.cpf = cpfMatch[0];
+          obj.vinculo_inicio = dates[0] || '';
+          obj.vinculo_fim = dates[1] || '';
+          // matricula: primeiro número de 3-8 dígitos que não seja CPF nem ano
+          const nums = (lineText.match(/\b\d{2,8}\b/g) || []).filter(n => n !== cpfMatch[0].replace(/\D/g, '') && !/^(19|20)\d{2}$/.test(n));
+          obj.matricula = nums[0] || '';
+          obj.carga_horaria = nums.find(n => /^(10|20|30|40)$/.test(n)) || '';
+          obj.total_cotas = nums[nums.length - 1] || '';
+          // nome: tudo antes do CPF/matricula
+          const idxCpf = lineText.indexOf(cpfMatch[0]);
+          obj.nome = lineText.slice(0, idxCpf).replace(obj.matricula, '').trim();
+          obj.status = '';
+        }
+        rows.push(obj);
+      }
+    }
+    return rows;
+  };
+
+  const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setImporting(true);
     setImportProgress({ current: 0, total: 0 });
     try {
-      const text = await file.text();
-      const lines = text.split('\n').filter(l => l.trim());
-      if (lines.length < 2) { toast.error('CSV vazio ou inválido.'); return; }
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-      const rows = lines.slice(1).map(line => {
-        const values = line.split(',').map(v => v.trim());
-        const obj: Record<string, string> = {};
-        headers.forEach((h, i) => { obj[h] = values[i] || ''; });
-        return obj;
-      });
+      const isPdf = /\.pdf$/i.test(file.name) || file.type === 'application/pdf';
+      let rows: Record<string, string>[] = [];
+      if (isPdf) {
+        rows = await parsePdfRows(file);
+        if (rows.length === 0) {
+          toast.error('Nenhuma linha válida encontrada no PDF (verifique se o texto é selecionável).');
+          return;
+        }
+      } else {
+        const text = await file.text();
+        const lines = text.split('\n').filter(l => l.trim());
+        if (lines.length < 2) { toast.error('CSV vazio ou inválido.'); return; }
+        const sep = lines[0].includes(';') ? ';' : ',';
+        const headers = lines[0].split(sep).map(h => h.trim().toLowerCase().replace(/^\ufeff/, ''));
+        rows = lines.slice(1).map(line => {
+          const values = line.split(sep).map(v => v.trim());
+          const obj: Record<string, string> = {};
+          headers.forEach((h, i) => { obj[h] = values[i] || ''; });
+          return obj;
+        });
+      }
       const CHUNK = 100;
       setImportProgress({ current: 0, total: rows.length });
       let imported = 0;
@@ -279,6 +351,8 @@ const AdminPage = () => {
       }
       toast.success(`${imported} professor(es) importado(s)!`);
       fetchData();
+    } catch (err: any) {
+      toast.error(`Erro ao processar arquivo: ${err?.message || err}`);
     } finally {
       setImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -549,16 +623,16 @@ const AdminPage = () => {
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-6 py-4 border-b border-border gap-4">
                   <h3 className="font-semibold text-foreground">Professores ({nonAdminProfs.length})</h3>
                   <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-                    <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleCSVImport} disabled={importing} />
+                    <input ref={fileInputRef} type="file" accept=".csv,.pdf,application/pdf" className="hidden" onChange={handleFileImport} disabled={importing} />
                     <Button
                       size="sm"
                       variant="outline"
                       className="flex-1 sm:flex-none"
                       onClick={() => {
-                        const headers = ['nome', 'matricula', 'cpf', 'data_nascimento', 'vinculo_inicio', 'vinculo_fim', 'total_cotas', 'status'];
+                        const headers = ['nome', 'matricula', 'cpf', 'vinculo_inicio', 'vinculo_fim', 'carga_horaria', 'total_cotas', 'status'];
                         const example = [
-                          ['JOSE DA SILVA', '12345', '12345678909', '15/03/1980', '01/04/2005', '', '132', 'ATIVO'],
-                          ['MARIA OLIVEIRA', '12346', '98765432100', '22/07/1975', '10/02/2000', '15/06/2024', '132', 'APOSENTADO'],
+                          ['JOSE DA SILVA', '12345', '12345678909', '01/04/2005', '', '40', '132', 'ATIVO'],
+                          ['MARIA OLIVEIRA', '12346', '98765432100', '10/02/2000', '15/06/2024', '20', '132', 'APOSENTADO'],
                         ];
                         const csv = [headers.join(';'), ...example.map(r => r.join(';'))].join('\n');
                         const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -580,7 +654,7 @@ const AdminPage = () => {
                           {importProgress.total > 0 ? `Importando ${importProgress.current}/${importProgress.total}` : 'Importando...'}
                         </>
                       ) : (
-                        <><Upload className="w-4 h-4 mr-1.5" /> Importar</>
+                        <><Upload className="w-4 h-4 mr-1.5" /> Importar (CSV/PDF)</>
                       )}
                     </Button>
                     <Button size="sm" variant="destructive" className="flex-1 sm:flex-none" onClick={openClearDialog}>
@@ -840,22 +914,26 @@ const AdminPage = () => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
+                <Label>Carga Horária (semanal)</Label>
+                <Input type="number" value={formData.carga_horaria} onChange={e => setFormData({ ...formData, carga_horaria: parseInt(e.target.value) || 0 })} placeholder="40" />
+              </div>
+              <div className="space-y-2">
                 <Label>Total de Cotas</Label>
                 <Input type="number" value={formData.total_cotas} onChange={e => setFormData({ ...formData, total_cotas: parseInt(e.target.value) || 0 })} />
               </div>
-              <div className="space-y-2">
-                <Label>Perfil (Role)</Label>
-                <Select value={formData.role} onValueChange={v => setFormData({ ...formData, role: v })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATUS_OPTIONS.map(s => (
-                      <SelectItem key={s} value={s}>{s}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Perfil (Role)</Label>
+              <Select value={formData.role} onValueChange={v => setFormData({ ...formData, role: v })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map(s => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Status</Label>
@@ -876,7 +954,7 @@ const AdminPage = () => {
               <Label>
                 {editingProf
                   ? 'Redefinir senha (deixe vazio para manter a atual)'
-                  : 'Senha (deixe vazio para usar a data de nascimento)'}
+                  : 'Senha (deixe vazio para usar o CPF como senha inicial)'}
               </Label>
               <div className="relative">
                 <Input
@@ -977,6 +1055,7 @@ const AdminPage = () => {
                       cpf: 'CPF',
                       vinculo_inicio: 'Data de Admissão',
                       vinculo_fim: 'Data da Aposentadoria',
+                      carga_horaria: 'Carga Horária',
                       total_cotas: 'Cotas',
                       status: 'Status do Servidor',
                       data_nascimento: 'Data de Nascimento',
