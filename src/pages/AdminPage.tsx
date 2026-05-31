@@ -191,7 +191,7 @@ const AdminPage = () => {
       toast.error('CPF inválido.');
       return;
     }
-    if (!isValidDate(formData.data_nascimento)) {
+    if (formData.data_nascimento && !isValidDate(formData.data_nascimento)) {
       toast.error('Data de nascimento inválida (use DD/MM/AAAA).');
       return;
     }
