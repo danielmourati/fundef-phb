@@ -174,6 +174,7 @@ const AdminPage = () => {
       data_nascimento: maskDate(p.data_nascimento || ''),
       vinculo_inicio: maskDate(p.vinculo_inicio || ''),
       vinculo_fim: maskDate(p.vinculo_fim || ''),
+      carga_horaria: p.carga_horaria || 0,
       total_cotas: p.total_cotas || 0,
       role: p.role,
       status: normalizeStatus(p.status),
