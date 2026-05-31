@@ -1055,6 +1055,7 @@ const AdminPage = () => {
                       cpf: 'CPF',
                       vinculo_inicio: 'Data de Admissão',
                       vinculo_fim: 'Data da Aposentadoria',
+                      carga_horaria: 'Carga Horária',
                       total_cotas: 'Cotas',
                       status: 'Status do Servidor',
                       data_nascimento: 'Data de Nascimento',
