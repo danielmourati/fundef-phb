@@ -654,7 +654,7 @@ const AdminPage = () => {
                           {importProgress.total > 0 ? `Importando ${importProgress.current}/${importProgress.total}` : 'Importando...'}
                         </>
                       ) : (
-                        <><Upload className="w-4 h-4 mr-1.5" /> Importar</>
+                        <><Upload className="w-4 h-4 mr-1.5" /> Importar (CSV/PDF)</>
                       )}
                     </Button>
                     <Button size="sm" variant="destructive" className="flex-1 sm:flex-none" onClick={openClearDialog}>
