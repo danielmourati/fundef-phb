@@ -28,6 +28,7 @@ interface Professor {
   data_nascimento: string | null;
   vinculo_inicio: string | null;
   vinculo_fim: string | null;
+  carga_horaria: number | null;
   total_cotas: number | null;
   role: string;
   status: string | null;
@@ -54,7 +55,7 @@ interface Message {
 
 const emptyProfessor = {
   nome: '', cpf: '', matricula: '', senha: '', data_nascimento: '',
-  vinculo_inicio: '', vinculo_fim: '', total_cotas: 0, role: 'professor',
+  vinculo_inicio: '', vinculo_fim: '', carga_horaria: 0, total_cotas: 0, role: 'professor',
   status: 'ATIVO',
 };
 
