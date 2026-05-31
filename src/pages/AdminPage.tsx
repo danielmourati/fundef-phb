@@ -922,22 +922,18 @@ const AdminPage = () => {
                 <Input type="number" value={formData.total_cotas} onChange={e => setFormData({ ...formData, total_cotas: parseInt(e.target.value) || 0 })} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2 col-start-2">
-
-              <div className="space-y-2">
-                <Label>Perfil (Role)</Label>
-                <Select value={formData.role} onValueChange={v => setFormData({ ...formData, role: v })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATUS_OPTIONS.map(s => (
-                      <SelectItem key={s} value={s}>{s}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label>Perfil (Role)</Label>
+              <Select value={formData.role} onValueChange={v => setFormData({ ...formData, role: v })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map(s => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Status</Label>
