@@ -217,7 +217,7 @@ Deno.serve(async (req) => {
           nome: String(r.nome || "").trim(),
           cpf: cpfDigits,
           matricula: r.matricula || null,
-          senha: "***", senha_hash: hashData,
+          senha_hash: hashData,
           vinculo_inicio: r.vinculo_inicio || null,
           vinculo_fim: r.vinculo_fim || null,
           carga_horaria: parseInt(r.carga_horaria) || 0,
