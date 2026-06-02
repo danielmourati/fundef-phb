@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
       const { data: hashData } = await supabase.rpc("hash_password", { plain_password: senha });
       const payload = {
         nome: body.nome, cpf: body.cpf, matricula: body.matricula,
-        senha: "***", senha_hash: hashData,
+        senha_hash: hashData,
         vinculo_inicio: body.vinculo_inicio || null,
         vinculo_fim: body.vinculo_fim || null,
         carga_horaria: Number(body.carga_horaria) || 0,
@@ -133,7 +133,6 @@ Deno.serve(async (req) => {
       if (body.senha && body.senha !== "***") {
         const { data: hashData } = await supabase.rpc("hash_password", { plain_password: body.senha });
         update.senha_hash = hashData;
-        update.senha = "***";
       }
       const { error } = await supabase.from("professors").update(update).eq("id", body.id);
       if (error) throw error;
