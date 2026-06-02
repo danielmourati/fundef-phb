@@ -274,9 +274,13 @@ const AdminPage = () => {
         linesMap.get(y)!.push({ x, s });
       }
       const ys = [...linesMap.keys()].sort((a, b) => b - a); // topo->baixo
-      const cpfRe = /(\d{3})\.?(\d{3})\.?(\d{3})-?(\d{2})/;
+      // Tolerante a erros do PDF: aceita separadores =, --, -, . e 8-9 dígitos no bloco final
+      const cpfRe = /(\d{3})\.?[-=]?(\d{3})\.?[-=]?(\d{3})[-=.]{0,2}(\d{2})/;
       const isDateLike = (t: string) =>
         /^\d{2}\/\d{2}\/\d{4}$/.test(t) || /^\d{2}\/\d{4}$/.test(t);
+      // Aceita "40H" e variações com letra O em vez de zero (ex: "4OH")
+      const cargaRe = /(\d{1,2}[O0]?|[O0]?\d{1,2})\s*H\b/i;
+      const normalizeCarga = (s: string) => s.replace(/O/gi, '0');
       for (const y of ys) {
         const parts = linesMap.get(y)!.sort((a, b) => a.x - b.x).map(p => p.s);
         const lineText = parts.join(' ').replace(/\s+/g, ' ').trim();
