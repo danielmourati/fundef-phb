@@ -308,9 +308,9 @@ const AdminPage = () => {
         const nome = beforeTokens.join(' ').trim();
         if (!nome) continue;
 
-        // carga horaria: padrão "40H", "20H"
-        const cargaMatch = after.match(/(\d{1,3})\s*H\b/i);
-        const carga = cargaMatch ? cargaMatch[1] : '';
+        // carga horaria: padrão "40H", "20H" (tolera "4OH" com letra O)
+        const cargaMatch = after.match(cargaRe);
+        const carga = cargaMatch ? normalizeCarga(cargaMatch[1]) : '';
         const preCarga = cargaMatch ? after.slice(0, cargaMatch.index!).trim() : '';
         const postCarga = cargaMatch ? after.slice(cargaMatch.index! + cargaMatch[0].length).trim() : after;
 
