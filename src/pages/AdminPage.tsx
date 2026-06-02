@@ -266,43 +266,70 @@ const AdminPage = () => {
       // Agrupa items por linha (Y aproximado)
       const linesMap = new Map<number, { x: number; s: string }[]>();
       for (const it of tc.items as any[]) {
-        const y = Math.round(it.transform[5]);
+        const y = Math.round(it.transform[5] / 2) * 2;
         const x = it.transform[4];
-        const s = String(it.str || '').trim();
-        if (!s) continue;
+        const s = String(it.str || '');
+        if (!s.trim()) continue;
         if (!linesMap.has(y)) linesMap.set(y, []);
         linesMap.get(y)!.push({ x, s });
       }
       const ys = [...linesMap.keys()].sort((a, b) => b - a); // topo->baixo
+      const cpfRe = /(\d{3})\.?(\d{3})\.?(\d{3})-?(\d{2})/;
+      const isDateLike = (t: string) =>
+        /^\d{2}\/\d{2}\/\d{4}$/.test(t) || /^\d{2}\/\d{4}$/.test(t);
       for (const y of ys) {
         const parts = linesMap.get(y)!.sort((a, b) => a.x - b.x).map(p => p.s);
-        const lineText = parts.join(' ');
-        // ignorar cabeçalhos
-        if (/nome.*cpf|cpf.*nome|matr[ií]cula/i.test(lineText) && !/\d{11}/.test(lineText)) continue;
-        const cpfMatch = lineText.match(/\b\d{11}\b|\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/);
-        if (!cpfMatch) continue;
+        const lineText = parts.join(' ').replace(/\s+/g, ' ').trim();
+        if (!lineText) continue;
+        if (/^RELA[ÇC][ÃA]O/i.test(lineText)) continue;
+        if (/\bNOME\b/i.test(lineText) && /\bCPF\b/i.test(lineText)) continue;
+        if (/^CARGA\s+HORARIA$/i.test(lineText)) continue;
 
-        // Estratégia simples: dividir por 2+ espaços
-        const cols = lineText.split(/\s{2,}|\t+/).map(c => c.trim()).filter(Boolean);
-        const obj: Record<string, string> = {};
-        if (cols.length >= expected.length) {
-          expected.forEach((h, i) => { obj[h] = cols[i] || ''; });
-        } else {
-          // Heurística: encontra CPF, datas e números
-          const dates = (lineText.match(/\d{2}[\/\-]\d{2}[\/\-]\d{4}/g) || []);
-          obj.cpf = cpfMatch[0];
-          obj.vinculo_inicio = dates[0] || '';
-          obj.vinculo_fim = dates[1] || '';
-          // matricula: primeiro número de 3-8 dígitos que não seja CPF nem ano
-          const nums = (lineText.match(/\b\d{2,8}\b/g) || []).filter(n => n !== cpfMatch[0].replace(/\D/g, '') && !/^(19|20)\d{2}$/.test(n));
-          obj.matricula = nums[0] || '';
-          obj.carga_horaria = nums.find(n => /^(10|20|30|40)$/.test(n)) || '';
-          obj.total_cotas = nums[nums.length - 1] || '';
-          // nome: tudo antes do CPF/matricula
-          const idxCpf = lineText.indexOf(cpfMatch[0]);
-          obj.nome = lineText.slice(0, idxCpf).replace(obj.matricula, '').trim();
-          obj.status = '';
+        const m = lineText.match(cpfRe);
+        if (!m) continue;
+        const cpf = `${m[1]}${m[2]}${m[3]}${m[4]}`;
+        const before = lineText.slice(0, m.index!).trim();
+        const after = lineText.slice(m.index! + m[0].length).trim();
+
+        // matricula = último token numérico em "before"; nome = restante
+        const beforeTokens = before.split(/\s+/);
+        let matricula = '';
+        for (let i = beforeTokens.length - 1; i >= 0; i--) {
+          if (/^\d{1,8}$/.test(beforeTokens[i])) {
+            matricula = beforeTokens[i];
+            beforeTokens.splice(i, 1);
+            break;
+          }
         }
+        const nome = beforeTokens.join(' ').trim();
+        if (!nome) continue;
+
+        // carga horaria: padrão "40H", "20H"
+        const cargaMatch = after.match(/(\d{1,3})\s*H\b/i);
+        const carga = cargaMatch ? cargaMatch[1] : '';
+        const preCarga = cargaMatch ? after.slice(0, cargaMatch.index!).trim() : '';
+        const postCarga = cargaMatch ? after.slice(cargaMatch.index! + cargaMatch[0].length).trim() : after;
+
+        const dateTokens = preCarga.split(/\s+/).filter(Boolean);
+        const admissao = dateTokens[0] && isDateLike(dateTokens[0]) ? dateTokens[0] : '';
+        const aposent = dateTokens[1] && isDateLike(dateTokens[1]) ? dateTokens[1] : '';
+
+        const postTokens = postCarga.split(/\s+/).filter(Boolean);
+        const cotas = postTokens[0] && /^\d+$/.test(postTokens[0]) ? postTokens[0] : '';
+        const status = (postTokens.slice(1).join(' ') || 'ATIVO').toUpperCase();
+
+        const obj: Record<string, string> = {
+          nome,
+          matricula,
+          cpf,
+          vinculo_inicio: admissao,
+          vinculo_fim: aposent,
+          carga_horaria: carga,
+          total_cotas: cotas,
+          status,
+        };
+        // mantém compat com `expected` (silencia lint)
+        void expected;
         rows.push(obj);
       }
     }
