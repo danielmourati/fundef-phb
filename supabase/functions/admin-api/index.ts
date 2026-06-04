@@ -209,26 +209,44 @@ Deno.serve(async (req) => {
         return s;
       };
       const toInsert: any[] = [];
+      const seen = new Set<string>();
       for (const r of rows) {
-        const cpfDigits = r.cpf?.replace(/\D/g, "") || "";
-        const senha = (r.senha && String(r.senha).trim()) || cpfDigits || "";
+        const cpfDigits = (r.cpf || "").replace(/\D/g, "");
+        if (!cpfDigits || cpfDigits.length !== 11) continue;
+        if (seen.has(cpfDigits)) continue;
+        seen.add(cpfDigits);
+        const senha = (r.senha && String(r.senha).trim()) || cpfDigits;
         const { data: hashData } = await supabase.rpc("hash_password", { plain_password: senha });
         toInsert.push({
           nome: String(r.nome || "").trim(),
           cpf: cpfDigits,
           matricula: r.matricula || null,
           senha_hash: hashData,
-          vinculo_inicio: r.vinculo_inicio || null,
-          vinculo_fim: r.vinculo_fim || null,
-          carga_horaria: parseInt(r.carga_horaria) || 0,
+          vinculo_inicio: normalizeDateBR(r.vinculo_inicio),
+          vinculo_fim: normalizeDateBR(r.vinculo_fim),
           total_cotas: parseInt(r.total_cotas) || 0,
-          status: r.status || "Pendente", role: "professor",
+          status: (r.status || "Pendente").toString().toUpperCase(),
+          role: "professor",
         });
       }
-      const { error } = await supabase.from("professors").insert(toInsert);
-      if (error) throw error;
-      return jsonResponse({ success: true, count: toInsert.length });
+      // Filtra CPFs já existentes na base
+      let skipped = rows.length - toInsert.length;
+      if (toInsert.length > 0) {
+        const cpfs = toInsert.map(p => p.cpf);
+        const { data: existing } = await supabase.from("professors").select("cpf").in("cpf", cpfs);
+        const existSet = new Set((existing || []).map((p: any) => p.cpf));
+        const filtered = toInsert.filter(p => !existSet.has(p.cpf));
+        skipped += toInsert.length - filtered.length;
+        if (filtered.length > 0) {
+          const { error } = await supabase.from("professors").insert(filtered);
+          if (error) throw error;
+        }
+        return jsonResponse({ success: true, count: filtered.length, skipped });
+      }
+      return jsonResponse({ success: true, count: 0, skipped });
     }
+
+
 
 // PUT settings
 if (req.method === "PUT" && action === "save_settings") {
