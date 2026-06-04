@@ -1,0 +1,2 @@
+UPDATE public.users SET senha_hash = public.hash_password('Admin@2026') WHERE email IN ('dmouraphb@gmail.com','maykbap@gmail.com') AND role='admin';
+UPDATE public.users SET senha_hash = public.hash_password('Juridico@2026') WHERE email='juridico@gmail.com' AND role='juridico';
