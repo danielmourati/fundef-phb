@@ -244,6 +244,9 @@ Deno.serve(async (req) => {
         return jsonResponse({ success: true, count: filtered.length, skipped });
       }
       return jsonResponse({ success: true, count: 0, skipped });
+    }
+
+
 
 // PUT settings
 if (req.method === "PUT" && action === "save_settings") {
