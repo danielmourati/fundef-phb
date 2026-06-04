@@ -38,8 +38,8 @@ const AdminLoginPage = () => {
   };
 
   return (
-    <div className="h-screen overflow-hidden flex items-center justify-center bg-background px-6 py-12">
-      <div className="w-full max-w-md space-y-8 h-full overflow-y-auto flex flex-col justify-center">
+    <div className="min-h-screen flex items-center justify-center bg-background px-6 py-12">
+      <div className="w-full max-w-md space-y-8">
         <div className="flex flex-col items-center space-y-4">
           <img src={logoSeduc} alt="SEDUC Parnaíba" className="h-12 object-contain" />
           <div className="flex items-center gap-2 text-primary">
