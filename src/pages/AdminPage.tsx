@@ -367,20 +367,67 @@ const AdminPage = () => {
           return obj;
         });
       }
+      // ===== Validação client-side =====
+      const ALLOWED = ['nome', 'matricula', 'cpf', 'vinculo_inicio', 'vinculo_fim', 'total_cotas', 'status'];
+      const existingCpfs = new Set(professors.map(p => (p.cpf || '').replace(/\D/g, '')));
+      const existingMats = new Set(professors.map(p => (p.matricula || '').trim()).filter(Boolean));
+      const seenCpf = new Set<string>();
+      const seenMat = new Set<string>();
+      const valid: Record<string, string>[] = [];
+      const errors: string[] = [];
+      const dupFile: string[] = [];
+      const dupBase: string[] = [];
+      rows.forEach((r, idx) => {
+        const ln = idx + 2;
+        const clean: Record<string, string> = {};
+        ALLOWED.forEach(k => { clean[k] = String(r[k] ?? '').trim(); });
+        const nome = clean.nome;
+        const cpf = clean.cpf.replace(/\D/g, '');
+        const mat = clean.matricula;
+        if (!nome) { errors.push(`Linha ${ln}: nome ausente`); return; }
+        if (!cpf) { errors.push(`Linha ${ln}: CPF ausente (${nome})`); return; }
+        if (cpf.length !== 11) { errors.push(`Linha ${ln}: CPF inválido "${clean.cpf}" (${nome})`); return; }
+        if (clean.total_cotas && isNaN(Number(clean.total_cotas))) {
+          errors.push(`Linha ${ln}: total_cotas não numérico "${clean.total_cotas}" (${nome})`); return;
+        }
+        if (seenCpf.has(cpf)) { dupFile.push(`Linha ${ln}: CPF duplicado no arquivo ${cpf} (${nome})`); return; }
+        if (mat && seenMat.has(mat)) { dupFile.push(`Linha ${ln}: matrícula duplicada no arquivo ${mat} (${nome})`); return; }
+        if (existingCpfs.has(cpf)) { dupBase.push(`Linha ${ln}: CPF já existe na base ${cpf} (${nome})`); return; }
+        if (mat && existingMats.has(mat)) { dupBase.push(`Linha ${ln}: matrícula já existe na base ${mat} (${nome})`); return; }
+        seenCpf.add(cpf);
+        if (mat) seenMat.add(mat);
+        clean.cpf = cpf;
+        valid.push(clean);
+      });
+
+      const totalProblems = errors.length + dupFile.length + dupBase.length;
+      if (totalProblems > 0) {
+        const preview = [...errors, ...dupFile, ...dupBase].slice(0, 15).join('\n');
+        const msg = `Foram encontradas ${totalProblems} inconsistência(s):\n` +
+          `• ${errors.length} com erro de dados\n` +
+          `• ${dupFile.length} duplicadas no arquivo\n` +
+          `• ${dupBase.length} já existentes na base\n\n` +
+          `${preview}${totalProblems > 15 ? `\n... e mais ${totalProblems - 15}` : ''}\n\n` +
+          `Importar somente as ${valid.length} linha(s) válida(s)?\n(OK = importar, Cancelar = abortar)`;
+        console.warn('[Importação] Inconsistências:', { errors, dupFile, dupBase });
+        if (!window.confirm(msg)) { toast.info('Importação cancelada.'); return; }
+      }
+      if (valid.length === 0) { toast.error('Nenhuma linha válida para importar.'); return; }
+
       const CHUNK = 100;
-      setImportProgress({ current: 0, total: rows.length });
+      setImportProgress({ current: 0, total: valid.length });
       let imported = 0;
-      for (let i = 0; i < rows.length; i += CHUNK) {
-        const chunk = rows.slice(i, i + CHUNK);
+      for (let i = 0; i < valid.length; i += CHUNK) {
+        const chunk = valid.slice(i, i + CHUNK);
         const { data, error } = await apiCall('POST', 'import_csv', { rows: chunk });
         if (error || data?.error) {
           toast.error(data?.error || 'Erro na importação.');
           return;
         }
         imported += data?.count || chunk.length;
-        setImportProgress({ current: imported, total: rows.length });
+        setImportProgress({ current: imported, total: valid.length });
       }
-      toast.success(`${imported} professor(es) importado(s)!`);
+      toast.success(`${imported} professor(es) importado(s)!${totalProblems > 0 ? ` (${totalProblems} ignorada(s))` : ''}`);
       fetchData();
     } catch (err: any) {
       toast.error(`Erro ao processar arquivo: ${err?.message || err}`);
