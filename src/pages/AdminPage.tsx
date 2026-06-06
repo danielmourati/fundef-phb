@@ -399,11 +399,25 @@ const AdminPage = () => {
       }
 
       // ===== Validação client-side com classificação por linha =====
+      // Chave única = cpf + matrícula (permite 2º vínculo: mesmo CPF, matrícula diferente)
       const ALLOWED = ['nome', 'matricula', 'cpf', 'vinculo_inicio', 'vinculo_fim', 'total_cotas', 'status'];
-      const existingCpfs = new Set(professors.map(p => (p.cpf || '').replace(/\D/g, '')));
-      const existingMats = new Set(professors.map(p => (p.matricula || '').trim()).filter(Boolean));
-      const seenCpf = new Map<string, number>();
-      const seenMat = new Map<string, number>();
+      const existingByCpf = new Map<string, Set<string>>();
+      professors.forEach(p => {
+        const c = (p.cpf || '').replace(/\D/g, '');
+        if (!c) return;
+        const m = (p.matricula || '').trim();
+        if (!existingByCpf.has(c)) existingByCpf.set(c, new Set());
+        existingByCpf.get(c)!.add(m);
+      });
+      const existingMatToCpf = new Map<string, string>();
+      professors.forEach(p => {
+        const m = (p.matricula || '').trim();
+        const c = (p.cpf || '').replace(/\D/g, '');
+        if (m) existingMatToCpf.set(m, c);
+      });
+      const seenPair = new Map<string, number>();
+      const seenCpf = new Map<string, { line: number; mat: string }>();
+      const seenMat = new Map<string, { line: number; cpf: string }>();
       const items: ReviewItem[] = [];
 
       rows.forEach((r, idx) => {
@@ -432,24 +446,78 @@ const AdminPage = () => {
           items.push({ line: ln, status: 'error', reason: `total_cotas não numérico "${clean.total_cotas}"`, data: clean, selectable: false });
           return;
         }
+
+        const pairKey = `${cpf}|${mat}`;
+
+        // 1) Linha idêntica (cpf+matrícula) já vista no arquivo
+        if (seenPair.has(pairKey)) {
+          items.push({
+            line: ln, status: 'dup_file',
+            reason: `Linha duplicada (cpf+matrícula) — 1ª ocorrência linha ${seenPair.get(pairKey)}`,
+            data: clean, selectable: false,
+          });
+          return;
+        }
+
+        // 2) cpf+matrícula já existe na base
+        if (existingByCpf.get(cpf)?.has(mat)) {
+          items.push({
+            line: ln, status: 'dup_base',
+            reason: 'Cadastro já existe (cpf+matrícula) na base',
+            data: clean, selectable: true,
+          });
+          return;
+        }
+
+        // 3) CPF repetido no arquivo, matrícula diferente → 2º vínculo válido
         if (seenCpf.has(cpf)) {
-          items.push({ line: ln, status: 'dup_file', reason: `CPF repetido (1ª ocorrência linha ${seenCpf.get(cpf)})`, data: clean, selectable: true });
+          const prev = seenCpf.get(cpf)!;
+          items.push({
+            line: ln, status: 'valid',
+            reason: `2º vínculo — CPF também na linha ${prev.line} (matrícula ${prev.mat || '—'})`,
+            data: clean, selectable: true,
+          });
+          seenPair.set(pairKey, ln);
+          if (mat) seenMat.set(mat, { line: ln, cpf });
           return;
         }
-        if (mat && seenMat.has(mat)) {
-          items.push({ line: ln, status: 'dup_file', reason: `Matrícula repetida (1ª ocorrência linha ${seenMat.get(mat)})`, data: clean, selectable: true });
+
+        // 4) CPF já na base com outra matrícula → 2º vínculo válido
+        if (existingByCpf.has(cpf)) {
+          items.push({
+            line: ln, status: 'valid',
+            reason: '2º vínculo — CPF já cadastrado com outra matrícula',
+            data: clean, selectable: true,
+          });
+          seenPair.set(pairKey, ln);
+          seenCpf.set(cpf, { line: ln, mat });
+          if (mat) seenMat.set(mat, { line: ln, cpf });
           return;
         }
-        if (existingCpfs.has(cpf)) {
-          items.push({ line: ln, status: 'dup_base', reason: 'CPF já existe na base', data: clean, selectable: true });
+
+        // 5) Matrícula repetida no arquivo com CPF diferente
+        if (mat && seenMat.has(mat) && seenMat.get(mat)!.cpf !== cpf) {
+          items.push({
+            line: ln, status: 'dup_file',
+            reason: `Matrícula repetida (1ª ocorrência linha ${seenMat.get(mat)!.line}, CPF diferente)`,
+            data: clean, selectable: true,
+          });
           return;
         }
-        if (mat && existingMats.has(mat)) {
-          items.push({ line: ln, status: 'dup_base', reason: 'Matrícula já existe na base', data: clean, selectable: true });
+
+        // 6) Matrícula já na base pertencendo a outro CPF
+        if (mat && existingMatToCpf.has(mat) && existingMatToCpf.get(mat) !== cpf) {
+          items.push({
+            line: ln, status: 'dup_base',
+            reason: 'Matrícula já existe na base (CPF diferente)',
+            data: clean, selectable: true,
+          });
           return;
         }
-        seenCpf.set(cpf, ln);
-        if (mat) seenMat.set(mat, ln);
+
+        seenPair.set(pairKey, ln);
+        seenCpf.set(cpf, { line: ln, mat });
+        if (mat) seenMat.set(mat, { line: ln, cpf });
         items.push({ line: ln, status: 'valid', reason: '', data: clean, selectable: true });
       });
 
