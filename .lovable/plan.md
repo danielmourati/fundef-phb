@@ -1,46 +1,64 @@
-## Ajuste da importação de professores
+## Modal de Divergências da Importação
 
-Pelo enunciado, as colunas válidas passam a ser exatamente:
-`nome, matricula, cpf, vinculo_inicio, vinculo_fim, total_cotas, status`
-(remove-se `data_nascimento` e também `carga_horaria`, que estava no template antigo mas não consta na lista nova).
+Substituir o atual `window.confirm` (linha 404-414 de `src/pages/AdminPage.tsx`) por um **Dialog** com checkboxes para o admin selecionar quais registros importar.
 
-### Mudanças
+### Fluxo
 
-**1. `src/pages/AdminPage.tsx` — template CSV de exemplo (linha 663-668)**
-- Novo cabeçalho: `nome;matricula;cpf;vinculo_inicio;vinculo_fim;total_cotas;status`.
-- Atualizar a linha de exemplo para refletir essas 7 colunas.
+1. Usuário escolhe arquivo CSV/PDF.
+2. `handleFileImport` faz o parse e roda a validação atual (nome, CPF, total_cotas, duplicidade no arquivo, duplicidade na base).
+3. Em vez de `confirm()`, abre o **modal de divergências** com todas as linhas (válidas + problemáticas), permitindo selecionar manualmente o que importar.
+4. Ao confirmar, segue o envio em chunks atual para `import_csv`.
 
-**2. `src/pages/AdminPage.tsx` — `handleFileImport` (linhas 343-391)**
-Antes de enviar para o backend, validar o lote inteiro no cliente:
-- Normalizar `cpf` (apenas dígitos) e `matricula` (trim).
-- Ignorar linhas sem `nome` ou `cpf`.
-- Detectar **CPF inválido** (≠ 11 dígitos) → lista de erros.
-- Detectar **duplicidade dentro do arquivo** por `cpf` e por `matricula`.
-- Detectar **duplicidade contra a base atual** comparando com a lista `professors` já carregada em memória (mesmo CPF ou mesma matrícula).
-- Ao final da validação:
-  - Se houver erros/duplicatas: abrir um diálogo/relatório resumido (toast + console + um modal simples ou `alert` com contagem e primeiras N ocorrências) e oferecer importar **apenas as linhas válidas/únicas** ou **cancelar**.
-  - Se tudo ok: seguir o fluxo atual em chunks de 100.
+### Estrutura do Modal
 
-**3. `supabase/functions/admin-api/index.ts` — branch `import_csv` (linhas ~205-243)**
-- Remover `data_nascimento` (não existe no payload atual, ok) e remover `carga_horaria` do insert (passar a 0 implicitamente ou simplesmente omitir, mantendo default do banco).
-- Após montar `toInsert`, antes do `insert`:
-  - Deduplicar por `cpf` no próprio array.
-  - Buscar `professors` existentes com `cpf in (...)` e descartar duplicatas, retornando contagem de inseridos vs. ignorados.
-- Resposta passa a ser `{ success: true, count, skipped }` para o frontend exibir.
+Componente novo: `src/components/ImportReviewDialog.tsx`.
 
-**4. Remover do formulário e da tabela de professores o campo `data_nascimento`?**
-Não — o pedido é só sobre **importação**. O campo continua existindo no cadastro manual e na edição (linha ~933) sem alteração.
+Cabeçalho com resumo:
 
-### Validações cobertas no relatório de inconsistências
-- CPF ausente ou com formato inválido.
-- Nome ausente.
-- Datas (`vinculo_inicio`, `vinculo_fim`) em formato não reconhecido (mantém normalização atual no backend, só avisa).
-- `total_cotas` não numérico.
-- `status` fora de {ATIVO, INATIVO, PENDENTE} (apenas warning, não bloqueia).
-- Duplicidade de CPF / matrícula no arquivo.
-- Duplicidade de CPF / matrícula contra base atual.
+- Total de linhas / Válidas / Erros / Duplicadas no arquivo / Já na base.
+
+Barra de ações:
+
+- Filtro por categoria (Todas | Válidas | Erros | Dup. arquivo | Dup. base).
+- Busca por nome/CPF/matrícula.
+- Botões: "Selecionar todas válidas", "Selecionar tudo", "Limpar seleção".
+- Contador "X selecionada(s) de N".
+
+Tabela com scroll (`ScrollArea`, max-h ~60vh):
+
+```text
+[ ✓ ] Linha | Status     | Nome              | CPF         | Matrícula | Motivo
+[ ✓ ] 2     | Válida     | João Silva        | 123...      | 1001      | —
+[   ] 13    | Dup arquivo| Maria Souza       | 456...      | 1002      | CPF repetido L14
+[   ] 174   | Erro       | Carlos            | 999 (9 dig) | 1003      | CPF inválido
+[   ] 22    | Dup base   | Ana Lima          | 321...      | 1004      | CPF já existe
+```
+
+Regras de seleção:
+
+- Linhas válidas vêm pré-marcadas.
+- Linhas com erro de dado (CPF inválido, nome ausente, total_cotas inválido) **ficam desabilitadas** (não podem ser marcadas; o backend rejeitaria).
+- Linhas duplicadas no arquivo ou na base podem ser marcadas manualmente pelo admin (o backend ainda fará dedupe final por CPF; ficará registrado no toast).
+
+Rodapé:
+
+- `Cancelar` | `Importar N selecionada(s)` (botão primário, desabilita se N=0).
+
+### Mudanças em `src/pages/AdminPage.tsx`
+
+- Novo state: `reviewState: { open, items, summary } | null`, onde `items` é o array com `{ line, status: 'valid'|'error'|'dup_file'|'dup_base', reason, data, selectable, selected }`.
+- `handleFileImport` para após popular `items` e abre o modal; não envia diretamente.
+- Lógica de chunked POST atual é extraída para `runImport(rows)` e chamada pelo `onConfirm` do modal.
+- Remove o `window.confirm` e o bloco preview de erro.
 
 ### Fora de escopo
-- Atualização (upsert) de professores já existentes — atualmente o fluxo é só inserção; o relatório apenas marcará e pulará duplicatas.
 
-Quer que eu inclua um **modo "atualizar existentes"** (upsert por CPF) no mesmo fluxo, ou manter apenas inserção + skip de duplicatas?
+- Sem modo "atualizar/upsert".
+- Sem alteração no edge function `admin-api/import_csv`; ele continua deduplicando por CPF como rede de segurança final.
+- Sem mudanças no template CSV nem nas colunas aceitas (`nome, matricula, cpf, vinculo_inicio, vinculo_fim, total_cotas, status`).
+
+### Componentes shadcn usados
+
+`Dialog`, `Checkbox`, `Table`, `ScrollArea`, `Button`, `Input` (busca), `Badge` (status), `Tabs` (filtros).  
+  
+`Exibir Status (Ativo, Aposentada, Exonerada etc) no card de inoformações do professor na sua própria área de visualização.`

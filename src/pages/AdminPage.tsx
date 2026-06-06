@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { maskCPF, unmaskCPF, isValidCPF, maskDate, isValidDate, maskPhone, STATUS_OPTIONS, statusBadgeClass, statusRowClass, normalizeStatus } from '@/lib/masks';
+import { ImportReviewDialog, type ReviewItem } from '@/components/ImportReviewDialog';
 
 interface Professor {
   id: string;
@@ -116,6 +117,7 @@ const AdminPage = () => {
     dedupedRemoved: number;
     imported: number;
   }>({ open: false, totalLines: 0, emptyDiscarded: 0, duplicateGroups: 0, keptBySelection: 0, dedupedRemoved: 0, imported: 0 });
+  const [reviewState, setReviewState] = useState<{ open: boolean; items: ReviewItem[] }>({ open: false, items: [] });
 
   const authHeaders = { Authorization: `Bearer ${token}` };
 
@@ -340,6 +342,34 @@ const AdminPage = () => {
     return rows;
   };
 
+  const runImport = async (rows: Record<string, string>[]) => {
+    if (rows.length === 0) { toast.error('Nenhuma linha selecionada.'); return; }
+    setImporting(true);
+    setImportProgress({ current: 0, total: rows.length });
+    try {
+      const CHUNK = 100;
+      let imported = 0;
+      let skipped = 0;
+      for (let i = 0; i < rows.length; i += CHUNK) {
+        const chunk = rows.slice(i, i + CHUNK);
+        const { data, error } = await apiCall('POST', 'import_csv', { rows: chunk });
+        if (error || data?.error) {
+          toast.error(data?.error || 'Erro na importação.');
+          return;
+        }
+        imported += data?.count || 0;
+        skipped += data?.skipped || 0;
+        setImportProgress({ current: Math.min(i + chunk.length, rows.length), total: rows.length });
+      }
+      toast.success(`${imported} professor(es) importado(s)!${skipped > 0 ? ` (${skipped} ignorada(s) pelo servidor)` : ''}`);
+      fetchData();
+    } catch (err: any) {
+      toast.error(`Erro ao importar: ${err?.message || err}`);
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -367,68 +397,66 @@ const AdminPage = () => {
           return obj;
         });
       }
-      // ===== Validação client-side =====
+
+      // ===== Validação client-side com classificação por linha =====
       const ALLOWED = ['nome', 'matricula', 'cpf', 'vinculo_inicio', 'vinculo_fim', 'total_cotas', 'status'];
       const existingCpfs = new Set(professors.map(p => (p.cpf || '').replace(/\D/g, '')));
       const existingMats = new Set(professors.map(p => (p.matricula || '').trim()).filter(Boolean));
-      const seenCpf = new Set<string>();
-      const seenMat = new Set<string>();
-      const valid: Record<string, string>[] = [];
-      const errors: string[] = [];
-      const dupFile: string[] = [];
-      const dupBase: string[] = [];
+      const seenCpf = new Map<string, number>();
+      const seenMat = new Map<string, number>();
+      const items: ReviewItem[] = [];
+
       rows.forEach((r, idx) => {
         const ln = idx + 2;
         const clean: Record<string, string> = {};
         ALLOWED.forEach(k => { clean[k] = String(r[k] ?? '').trim(); });
         const nome = clean.nome;
-        const cpf = clean.cpf.replace(/\D/g, '');
+        const cpfRaw = clean.cpf;
+        const cpf = cpfRaw.replace(/\D/g, '');
         const mat = clean.matricula;
-        if (!nome) { errors.push(`Linha ${ln}: nome ausente`); return; }
-        if (!cpf) { errors.push(`Linha ${ln}: CPF ausente (${nome})`); return; }
-        if (cpf.length !== 11) { errors.push(`Linha ${ln}: CPF inválido "${clean.cpf}" (${nome})`); return; }
-        if (clean.total_cotas && isNaN(Number(clean.total_cotas))) {
-          errors.push(`Linha ${ln}: total_cotas não numérico "${clean.total_cotas}" (${nome})`); return;
-        }
-        if (seenCpf.has(cpf)) { dupFile.push(`Linha ${ln}: CPF duplicado no arquivo ${cpf} (${nome})`); return; }
-        if (mat && seenMat.has(mat)) { dupFile.push(`Linha ${ln}: matrícula duplicada no arquivo ${mat} (${nome})`); return; }
-        if (existingCpfs.has(cpf)) { dupBase.push(`Linha ${ln}: CPF já existe na base ${cpf} (${nome})`); return; }
-        if (mat && existingMats.has(mat)) { dupBase.push(`Linha ${ln}: matrícula já existe na base ${mat} (${nome})`); return; }
-        seenCpf.add(cpf);
-        if (mat) seenMat.add(mat);
         clean.cpf = cpf;
-        valid.push(clean);
-      });
 
-      const totalProblems = errors.length + dupFile.length + dupBase.length;
-      if (totalProblems > 0) {
-        const preview = [...errors, ...dupFile, ...dupBase].slice(0, 15).join('\n');
-        const msg = `Foram encontradas ${totalProblems} inconsistência(s):\n` +
-          `• ${errors.length} com erro de dados\n` +
-          `• ${dupFile.length} duplicadas no arquivo\n` +
-          `• ${dupBase.length} já existentes na base\n\n` +
-          `${preview}${totalProblems > 15 ? `\n... e mais ${totalProblems - 15}` : ''}\n\n` +
-          `Importar somente as ${valid.length} linha(s) válida(s)?\n(OK = importar, Cancelar = abortar)`;
-        console.warn('[Importação] Inconsistências:', { errors, dupFile, dupBase });
-        if (!window.confirm(msg)) { toast.info('Importação cancelada.'); return; }
-      }
-      if (valid.length === 0) { toast.error('Nenhuma linha válida para importar.'); return; }
-
-      const CHUNK = 100;
-      setImportProgress({ current: 0, total: valid.length });
-      let imported = 0;
-      for (let i = 0; i < valid.length; i += CHUNK) {
-        const chunk = valid.slice(i, i + CHUNK);
-        const { data, error } = await apiCall('POST', 'import_csv', { rows: chunk });
-        if (error || data?.error) {
-          toast.error(data?.error || 'Erro na importação.');
+        if (!nome) {
+          items.push({ line: ln, status: 'error', reason: 'Nome ausente', data: clean, selectable: false });
           return;
         }
-        imported += data?.count || chunk.length;
-        setImportProgress({ current: imported, total: valid.length });
-      }
-      toast.success(`${imported} professor(es) importado(s)!${totalProblems > 0 ? ` (${totalProblems} ignorada(s))` : ''}`);
-      fetchData();
+        if (!cpf) {
+          items.push({ line: ln, status: 'error', reason: 'CPF ausente', data: clean, selectable: false });
+          return;
+        }
+        if (cpf.length !== 11) {
+          items.push({ line: ln, status: 'error', reason: `CPF inválido "${cpfRaw}" (${cpf.length} dígitos)`, data: clean, selectable: false });
+          return;
+        }
+        if (clean.total_cotas && isNaN(Number(clean.total_cotas))) {
+          items.push({ line: ln, status: 'error', reason: `total_cotas não numérico "${clean.total_cotas}"`, data: clean, selectable: false });
+          return;
+        }
+        if (seenCpf.has(cpf)) {
+          items.push({ line: ln, status: 'dup_file', reason: `CPF repetido (1ª ocorrência linha ${seenCpf.get(cpf)})`, data: clean, selectable: true });
+          return;
+        }
+        if (mat && seenMat.has(mat)) {
+          items.push({ line: ln, status: 'dup_file', reason: `Matrícula repetida (1ª ocorrência linha ${seenMat.get(mat)})`, data: clean, selectable: true });
+          return;
+        }
+        if (existingCpfs.has(cpf)) {
+          items.push({ line: ln, status: 'dup_base', reason: 'CPF já existe na base', data: clean, selectable: true });
+          return;
+        }
+        if (mat && existingMats.has(mat)) {
+          items.push({ line: ln, status: 'dup_base', reason: 'Matrícula já existe na base', data: clean, selectable: true });
+          return;
+        }
+        seenCpf.set(cpf, ln);
+        if (mat) seenMat.set(mat, ln);
+        items.push({ line: ln, status: 'valid', reason: '', data: clean, selectable: true });
+      });
+
+      if (items.length === 0) { toast.error('Nenhuma linha encontrada no arquivo.'); return; }
+
+      // Abre o modal de revisão. O envio ocorre via onConfirm -> runImport.
+      setReviewState({ open: true, items });
     } catch (err: any) {
       toast.error(`Erro ao processar arquivo: ${err?.message || err}`);
     } finally {
@@ -436,6 +464,7 @@ const AdminPage = () => {
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
+
 
   const exportContestacoes = () => {
     if (contestacoes.length === 0) { toast.error('Nenhuma contestação.'); return; }
@@ -1293,6 +1322,16 @@ const AdminPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ImportReviewDialog
+        open={reviewState.open}
+        items={reviewState.items}
+        onCancel={() => { setReviewState({ open: false, items: [] }); toast.info('Importação cancelada.'); }}
+        onConfirm={async (rows) => {
+          setReviewState({ open: false, items: [] });
+          await runImport(rows);
+        }}
+      />
     </div>
   );
 };
