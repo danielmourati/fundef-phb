@@ -1322,6 +1322,16 @@ const AdminPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ImportReviewDialog
+        open={reviewState.open}
+        items={reviewState.items}
+        onCancel={() => { setReviewState({ open: false, items: [] }); toast.info('Importação cancelada.'); }}
+        onConfirm={async (rows) => {
+          setReviewState({ open: false, items: [] });
+          await runImport(rows);
+        }}
+      />
     </div>
   );
 };
