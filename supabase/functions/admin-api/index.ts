@@ -213,14 +213,16 @@ Deno.serve(async (req) => {
       for (const r of rows) {
         const cpfDigits = (r.cpf || "").replace(/\D/g, "");
         if (!cpfDigits || cpfDigits.length !== 11) continue;
-        if (seen.has(cpfDigits)) continue;
-        seen.add(cpfDigits);
+        const matKey = (r.matricula || "").toString().trim();
+        const pairKey = `${cpfDigits}|${matKey}`;
+        if (seen.has(pairKey)) continue;
+        seen.add(pairKey);
         const senha = (r.senha && String(r.senha).trim()) || cpfDigits;
         const { data: hashData } = await supabase.rpc("hash_password", { plain_password: senha });
         toInsert.push({
           nome: String(r.nome || "").trim(),
           cpf: cpfDigits,
-          matricula: r.matricula || null,
+          matricula: matKey || null,
           senha_hash: hashData,
           vinculo_inicio: normalizeDateBR(r.vinculo_inicio),
           vinculo_fim: normalizeDateBR(r.vinculo_fim),
@@ -229,13 +231,13 @@ Deno.serve(async (req) => {
           role: "professor",
         });
       }
-      // Filtra CPFs já existentes na base
+      // Filtra pares (cpf+matrícula) já existentes na base
       let skipped = rows.length - toInsert.length;
       if (toInsert.length > 0) {
         const cpfs = toInsert.map(p => p.cpf);
-        const { data: existing } = await supabase.from("professors").select("cpf").in("cpf", cpfs);
-        const existSet = new Set((existing || []).map((p: any) => p.cpf));
-        const filtered = toInsert.filter(p => !existSet.has(p.cpf));
+        const { data: existing } = await supabase.from("professors").select("cpf, matricula").in("cpf", cpfs);
+        const existSet = new Set((existing || []).map((p: any) => `${p.cpf}|${(p.matricula || '').trim()}`));
+        const filtered = toInsert.filter(p => !existSet.has(`${p.cpf}|${(p.matricula || '').trim()}`));
         skipped += toInsert.length - filtered.length;
         if (filtered.length > 0) {
           const { error } = await supabase.from("professors").insert(filtered);
