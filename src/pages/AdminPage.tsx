@@ -117,6 +117,7 @@ const AdminPage = () => {
     dedupedRemoved: number;
     imported: number;
   }>({ open: false, totalLines: 0, emptyDiscarded: 0, duplicateGroups: 0, keptBySelection: 0, dedupedRemoved: 0, imported: 0 });
+  const [reviewState, setReviewState] = useState<{ open: boolean; items: ReviewItem[] }>({ open: false, items: [] });
 
   const authHeaders = { Authorization: `Bearer ${token}` };
 
