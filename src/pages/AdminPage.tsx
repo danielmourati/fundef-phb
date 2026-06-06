@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { maskCPF, unmaskCPF, isValidCPF, maskDate, isValidDate, maskPhone, STATUS_OPTIONS, statusBadgeClass, statusRowClass, normalizeStatus } from '@/lib/masks';
+import { ImportReviewDialog, type ReviewItem } from '@/components/ImportReviewDialog';
 
 interface Professor {
   id: string;
