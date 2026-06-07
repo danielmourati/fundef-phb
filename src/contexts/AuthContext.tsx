@@ -39,6 +39,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [requiresPasswordChange, setRequiresPasswordChange] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Normaliza role: apenas 'admin' e 'juridico' são papéis especiais; qualquer
+  // outro valor (incluindo status do banco como 'ATIVO') é tratado como professor.
+  const normalizeRole = (r: string | null | undefined): string => {
+    const v = (r || '').toString().toLowerCase().trim();
+    return v === 'admin' || v === 'juridico' ? v : 'professor';
+  };
+  const normalizeProfessor = (p: Professor): Professor => ({ ...p, role: normalizeRole(p.role) });
+  const normalizeMats = (mats: MatriculaItem[]): MatriculaItem[] =>
+    mats.map((m) => ({ ...m, role: normalizeRole(m.role) }));
+
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
@@ -48,9 +58,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (payloadB64) {
           const payload = JSON.parse(atob(payloadB64));
           if (payload.exp > Date.now()) {
-            setProfessor(parsed.professor);
+            setProfessor(parsed.professor ? normalizeProfessor(parsed.professor) : null);
             setToken(parsed.token);
-            setMatriculas(parsed.matriculas || []);
+            setMatriculas(normalizeMats(parsed.matriculas || []));
             setRequiresPasswordChange(parsed.requiresPasswordChange || false);
           } else {
             localStorage.removeItem(STORAGE_KEY);
