@@ -129,6 +129,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       vinculo_inicio: found.vinculo_inicio,
       vinculo_fim: found.vinculo_fim, total_cotas: found.total_cotas,
       role: found.role, status: (found as any).status ?? null,
+      vinculo_status: found.vinculo_status ?? null,
     });
     setProfessor(prof);
     setToken(found.token);
