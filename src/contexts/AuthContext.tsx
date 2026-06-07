@@ -46,9 +46,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const v = (r || '').toString().toLowerCase().trim();
     return v === 'admin' || v === 'juridico' ? v : 'professor';
   };
-  const normalizeProfessor = (p: Professor): Professor => ({ ...p, role: normalizeRole(p.role) });
+  const normalizeProfessor = (p: Professor): Professor => ({
+    ...p,
+    vinculo_status: p.vinculo_status ?? p.role ?? null,
+    role: normalizeRole(p.role),
+  });
   const normalizeMats = (mats: MatriculaItem[]): MatriculaItem[] =>
-    mats.map((m) => ({ ...m, role: normalizeRole(m.role) }));
+    mats.map((m) => ({ ...m, vinculo_status: m.vinculo_status ?? m.role ?? null, role: normalizeRole(m.role) }));
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
