@@ -104,6 +104,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           vinculo_inicio: first.vinculo_inicio,
           vinculo_fim: first.vinculo_fim, total_cotas: first.total_cotas,
           role: first.role, status: (first as any).status ?? null,
+          vinculo_status: first.vinculo_status ?? null,
         });
         tk = first.token;
       }
