@@ -39,6 +39,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [requiresPasswordChange, setRequiresPasswordChange] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Normaliza role: apenas 'admin' e 'juridico' são papéis especiais; qualquer
+  // outro valor (incluindo status do banco como 'ATIVO') é tratado como professor.
+  const normalizeRole = (r: string | null | undefined): string => {
+    const v = (r || '').toString().toLowerCase().trim();
+    return v === 'admin' || v === 'juridico' ? v : 'professor';
+  };
+  const normalizeProfessor = (p: Professor): Professor => ({ ...p, role: normalizeRole(p.role) });
+  const normalizeMats = (mats: MatriculaItem[]): MatriculaItem[] =>
+    mats.map((m) => ({ ...m, role: normalizeRole(m.role) }));
+
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
@@ -48,9 +58,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (payloadB64) {
           const payload = JSON.parse(atob(payloadB64));
           if (payload.exp > Date.now()) {
-            setProfessor(parsed.professor);
+            setProfessor(parsed.professor ? normalizeProfessor(parsed.professor) : null);
             setToken(parsed.token);
-            setMatriculas(parsed.matriculas || []);
+            setMatriculas(normalizeMats(parsed.matriculas || []));
             setRequiresPasswordChange(parsed.requiresPasswordChange || false);
           } else {
             localStorage.removeItem(STORAGE_KEY);
@@ -77,18 +87,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return { success: false, error: data?.error || 'CPF ou senha incorretos.' };
       }
 
-      const mats: MatriculaItem[] = data.matriculas || [];
+      const matsRaw: MatriculaItem[] = data.matriculas || [];
+      const mats = normalizeMats(matsRaw);
       // Se houver matrículas, usar a primeira (ordenada) como ativa para garantir consistência
-      let prof: Professor = data.professor;
+      let prof: Professor = normalizeProfessor(data.professor);
       let tk: string = data.token;
       if (mats.length > 0) {
         const first = mats[0];
-        prof = {
+        prof = normalizeProfessor({
           id: first.id, nome: first.nome, cpf: first.cpf, matricula: first.matricula,
           vinculo_inicio: first.vinculo_inicio,
           vinculo_fim: first.vinculo_fim, total_cotas: first.total_cotas,
           role: first.role, status: (first as any).status ?? null,
-        };
+        });
         tk = first.token;
       }
 
@@ -107,12 +118,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const setMatriculaAtiva = (id: string) => {
     const found = matriculas.find(m => m.id === id);
     if (!found) return;
-    const prof: Professor = {
+    const prof: Professor = normalizeProfessor({
       id: found.id, nome: found.nome, cpf: found.cpf, matricula: found.matricula,
       vinculo_inicio: found.vinculo_inicio,
       vinculo_fim: found.vinculo_fim, total_cotas: found.total_cotas,
       role: found.role, status: (found as any).status ?? null,
-    };
+    });
     setProfessor(prof);
     setToken(found.token);
     persist(prof, found.token, matriculas, requiresPasswordChange);
