@@ -118,12 +118,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const setMatriculaAtiva = (id: string) => {
     const found = matriculas.find(m => m.id === id);
     if (!found) return;
-    const prof: Professor = {
+    const prof: Professor = normalizeProfessor({
       id: found.id, nome: found.nome, cpf: found.cpf, matricula: found.matricula,
       vinculo_inicio: found.vinculo_inicio,
       vinculo_fim: found.vinculo_fim, total_cotas: found.total_cotas,
       role: found.role, status: (found as any).status ?? null,
-    };
+    });
     setProfessor(prof);
     setToken(found.token);
     persist(prof, found.token, matriculas, requiresPasswordChange);
