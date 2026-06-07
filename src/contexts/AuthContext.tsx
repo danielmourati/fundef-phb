@@ -87,18 +87,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return { success: false, error: data?.error || 'CPF ou senha incorretos.' };
       }
 
-      const mats: MatriculaItem[] = data.matriculas || [];
+      const matsRaw: MatriculaItem[] = data.matriculas || [];
+      const mats = normalizeMats(matsRaw);
       // Se houver matrículas, usar a primeira (ordenada) como ativa para garantir consistência
-      let prof: Professor = data.professor;
+      let prof: Professor = normalizeProfessor(data.professor);
       let tk: string = data.token;
       if (mats.length > 0) {
         const first = mats[0];
-        prof = {
+        prof = normalizeProfessor({
           id: first.id, nome: first.nome, cpf: first.cpf, matricula: first.matricula,
           vinculo_inicio: first.vinculo_inicio,
           vinculo_fim: first.vinculo_fim, total_cotas: first.total_cotas,
           role: first.role, status: (first as any).status ?? null,
-        };
+        });
         tk = first.token;
       }
 
