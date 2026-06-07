@@ -324,12 +324,31 @@ const DashboardPage = () => {
           <>
             <Card className="overflow-hidden">
               <CardContent className="p-0">
-                <div className="flex items-center justify-between px-5 pt-5 pb-3">
+                <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-3">
                   <div>
                     <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Matrícula</p>
                     <p className="text-2xl font-bold tracking-tight">{professor.matricula}</p>
                   </div>
+                  {(() => {
+                    const raw = (professor.vinculo_status || '').toString().toUpperCase().trim();
+                    if (!raw) return null;
+                    const variants: Record<string, string> = {
+                      ATIVO: 'bg-green-100 text-green-700 border-green-200',
+                      APOSENTADO: 'bg-blue-100 text-blue-700 border-blue-200',
+                      INATIVO: 'bg-muted text-muted-foreground border-border',
+                      EXONERADO: 'bg-red-100 text-red-700 border-red-200',
+                      FALECIDO: 'bg-zinc-200 text-zinc-700 border-zinc-300',
+                    };
+                    const cls = variants[raw] || 'bg-primary/10 text-primary border-primary/20';
+                    return (
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Status</span>
+                        <Badge className={`text-[11px] font-semibold border ${cls}`}>{raw}</Badge>
+                      </div>
+                    );
+                  })()}
                 </div>
+
 
                 <div className="border-t mx-5" />
 
