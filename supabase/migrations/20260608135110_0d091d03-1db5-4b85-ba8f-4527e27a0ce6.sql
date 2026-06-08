@@ -1,0 +1,1 @@
+ALTER TABLE public.professors ADD COLUMN IF NOT EXISTS cargo TEXT;

@@ -163,6 +163,7 @@ export type Database = {
       professors: {
         Row: {
           carga_horaria: number | null
+          cargo: string | null
           cpf: string
           created_at: string
           data_nascimento: string | null
@@ -180,6 +181,7 @@ export type Database = {
         }
         Insert: {
           carga_horaria?: number | null
+          cargo?: string | null
           cpf: string
           created_at?: string
           data_nascimento?: string | null
@@ -197,6 +199,7 @@ export type Database = {
         }
         Update: {
           carga_horaria?: number | null
+          cargo?: string | null
           cpf?: string
           created_at?: string
           data_nascimento?: string | null
