@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
       const identificador = rawId.replace(/\D/g, "") || rawId;
       const r = await supabase
         .from("professors")
-        .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, role, status, senha_hash")
+        .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, carga_horaria, total_cotas, cargo, role, status, senha_hash")
         .eq("cpf", identificador)
         .order("matricula", { ascending: true });
       let candidates = r.data || [];
@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
       if (candidates.length === 0) {
         const fb = await supabase
           .from("professors")
-          .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, role, status, senha_hash")
+          .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, carga_horaria, total_cotas, cargo, role, status, senha_hash")
           .eq("matricula", identificador);
         candidates = fb.data || [];
         fetchErr = fb.error;
@@ -184,7 +184,7 @@ Deno.serve(async (req) => {
     if (professor.role === "professor" && professor.cpf) {
       const all = await supabase
         .from("professors")
-        .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, role, status")
+        .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, carga_horaria, total_cotas, cargo, role, status")
         .eq("cpf", professor.cpf)
         .order("matricula", { ascending: true });
       const rows = all.data || [];

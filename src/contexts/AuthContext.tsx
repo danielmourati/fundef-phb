@@ -8,7 +8,9 @@ interface Professor {
   matricula: string;
   vinculo_inicio: string | null;
   vinculo_fim: string | null;
+  carga_horaria?: number | null;
   total_cotas: number | null;
+  cargo?: string | null;
   role: string;
   status?: string | null;
   vinculo_status?: string | null;
@@ -102,7 +104,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         prof = normalizeProfessor({
           id: first.id, nome: first.nome, cpf: first.cpf, matricula: first.matricula,
           vinculo_inicio: first.vinculo_inicio,
-          vinculo_fim: first.vinculo_fim, total_cotas: first.total_cotas,
+          vinculo_fim: first.vinculo_fim,
+          carga_horaria: first.carga_horaria ?? null,
+          total_cotas: first.total_cotas,
+          cargo: first.cargo ?? null,
           role: first.role, status: (first as any).status ?? null,
           vinculo_status: first.vinculo_status ?? null,
         });
@@ -127,7 +132,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const prof: Professor = normalizeProfessor({
       id: found.id, nome: found.nome, cpf: found.cpf, matricula: found.matricula,
       vinculo_inicio: found.vinculo_inicio,
-      vinculo_fim: found.vinculo_fim, total_cotas: found.total_cotas,
+      vinculo_fim: found.vinculo_fim,
+      carga_horaria: found.carga_horaria ?? null,
+      total_cotas: found.total_cotas,
+      cargo: found.cargo ?? null,
       role: found.role, status: (found as any).status ?? null,
       vinculo_status: found.vinculo_status ?? null,
     });

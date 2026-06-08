@@ -354,6 +354,14 @@ const DashboardPage = () => {
 
                 <div className="grid grid-cols-2 gap-x-6 gap-y-4 px-5 py-4">
                   <div>
+                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Cargo</p>
+                    <p className="font-medium text-sm">{(professor as any).cargo || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Carga Horária</p>
+                    <p className="font-medium text-sm">{(professor as any).carga_horaria ? `${(professor as any).carga_horaria}H` : '—'}</p>
+                  </div>
+                  <div>
                     <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Data de Admissão</p>
                     <p className="font-medium text-sm">{formatDate(professor.vinculo_inicio)}</p>
                   </div>
@@ -370,6 +378,7 @@ const DashboardPage = () => {
                     <p className="font-medium text-sm">{professor.total_cotas ?? '—'} meses</p>
                   </div>
                 </div>
+
 
               </CardContent>
             </Card>

@@ -400,7 +400,7 @@ const AdminPage = () => {
 
       // ===== Validação client-side com classificação por linha =====
       // Chave única = cpf + matrícula (permite 2º vínculo: mesmo CPF, matrícula diferente)
-      const ALLOWED = ['nome', 'matricula', 'cpf', 'vinculo_inicio', 'vinculo_fim', 'total_cotas', 'status'];
+      const ALLOWED = ['nome', 'matricula', 'cpf', 'vinculo_inicio', 'vinculo_fim', 'carga_horaria', 'total_cotas', 'cargo'];
       const existingByCpf = new Map<string, Set<string>>();
       professors.forEach(p => {
         const c = (p.cpf || '').replace(/\D/g, '');

@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     if (req.method === "GET" && action === "professors") {
       const { data, error } = await supabase
         .from("professors")
-        .select("id, matricula, nome, cpf, data_nascimento, vinculo_inicio, vinculo_fim, carga_horaria, total_cotas, status, role")
+        .select("id, matricula, nome, cpf, data_nascimento, vinculo_inicio, vinculo_fim, carga_horaria, total_cotas, cargo, status, role")
         .order("nome");
       if (error) throw error;
       return jsonResponse(data);
@@ -110,6 +110,7 @@ Deno.serve(async (req) => {
         vinculo_fim: body.vinculo_fim || null,
         carga_horaria: Number(body.carga_horaria) || 0,
         total_cotas: Number(body.total_cotas) || 0,
+        cargo: body.cargo || null,
         role: body.role || "professor",
         status: (body.status || "ATIVO").toUpperCase(),
       };
@@ -127,6 +128,7 @@ Deno.serve(async (req) => {
         vinculo_fim: body.vinculo_fim || null,
         carga_horaria: Number(body.carga_horaria) || 0,
         total_cotas: Number(body.total_cotas) || 0,
+        cargo: body.cargo || null,
         role: body.role || "professor",
         status: (body.status || "ATIVO").toUpperCase(),
       };
@@ -219,6 +221,9 @@ Deno.serve(async (req) => {
         seen.add(pairKey);
         const senha = (r.senha && String(r.senha).trim()) || cpfDigits;
         const { data: hashData } = await supabase.rpc("hash_password", { plain_password: senha });
+        // Parse carga_horaria: aceita "40H", "20h", "40", etc.
+        const cargaDigits = String(r.carga_horaria || "").replace(/\D/g, "");
+        const carga = cargaDigits ? parseInt(cargaDigits) : 0;
         toInsert.push({
           nome: String(r.nome || "").trim(),
           cpf: cpfDigits,
@@ -226,8 +231,10 @@ Deno.serve(async (req) => {
           senha_hash: hashData,
           vinculo_inicio: normalizeDateBR(r.vinculo_inicio),
           vinculo_fim: normalizeDateBR(r.vinculo_fim),
+          carga_horaria: carga,
           total_cotas: parseInt(r.total_cotas) || 0,
-          status: (r.status || "Pendente").toString().toUpperCase(),
+          cargo: (r.cargo && String(r.cargo).trim()) || null,
+          status: (r.status || "ATIVO").toString().toUpperCase(),
           role: "professor",
         });
       }
