@@ -608,6 +608,15 @@ const AdminPage = () => {
     (p.matricula || '').includes(searchQuery) ||
     (p.cpf || '').includes(searchQuery)
   );
+
+  // Paginação
+  const totalPages = Math.max(1, Math.ceil(filteredProfs.length / itemsPerPage));
+  const paginatedProfs = filteredProfs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  // Resetar página quando busca mudar
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
   const statCards = [
     { label: 'Total Professores', value: nonAdminProfs.length, icon: Users, color: 'bg-primary/10 text-primary' },
     { label: 'Contestações', value: contestacoes.length, icon: AlertTriangle, color: 'bg-red-50 text-red-600' },
