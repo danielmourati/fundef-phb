@@ -855,88 +855,90 @@ const AdminPage = () => {
                 {loading ? (
                   <div className="p-6 text-muted-foreground text-sm">Carregando...</div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="hover:bg-transparent">
-                          <TableHead className="text-xs font-medium text-muted-foreground min-w-[150px]">Nome</TableHead>
-                          <TableHead className="text-xs font-medium text-muted-foreground w-[80px] lg:w-[120px]">Mat</TableHead>
-                          <TableHead className="text-xs font-medium text-muted-foreground hidden lg:table-cell">CPF</TableHead>
-                          <TableHead className="text-xs font-medium text-muted-foreground hidden md:table-cell whitespace-nowrap">Data de Admissão</TableHead>
-                          <TableHead className="text-xs font-medium text-muted-foreground hidden md:table-cell whitespace-nowrap">Data da Aposentadoria</TableHead>
-                          <TableHead className="text-xs font-medium text-muted-foreground hidden sm:table-cell">Cotas</TableHead>
-                          <TableHead className="text-xs font-medium text-muted-foreground">Status</TableHead>
-                          <TableHead className="text-xs font-medium text-muted-foreground text-right sticky right-0 bg-card/95 backdrop-blur-sm z-10 border-l border-border px-4 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]">Ações</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                      {paginatedProfs.map(p => (
-                          <TableRow key={p.id} className={`group ${statusRowClass(p.status)}`}>
-                            <TableCell className="text-xs lg:text-sm font-medium py-3">{p.nome}</TableCell>
-                            <TableCell className="font-mono text-xs lg:text-sm py-3">{p.matricula}</TableCell>
-                            <TableCell className="font-mono text-xs lg:text-sm hidden lg:table-cell py-3">{p.cpf}</TableCell>
-                            <TableCell className="text-xs lg:text-sm hidden md:table-cell py-3 whitespace-nowrap">{maskDate(p.vinculo_inicio || '') || '—'}</TableCell>
-                            <TableCell className="text-xs lg:text-sm hidden md:table-cell py-3 whitespace-nowrap">{maskDate(p.vinculo_fim || '') || '—'}</TableCell>
-                            <TableCell className="text-xs lg:text-sm hidden sm:table-cell py-3">{p.total_cotas || 0}</TableCell>
-                            <TableCell>
-                              <Badge className={`text-xs font-medium ${p.status === 'Validado' || p.status === 'Ativo' ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-100' :
-                                  p.status === 'Inativo' ? 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-100' :
-                                    p.status === 'Em Análise' ? 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100' :
-                                      'bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-100'
-                                } border`}>{p.status}</Badge>
-                            </TableCell>
-                            <TableCell className="text-right sticky right-0 bg-card/95 backdrop-blur-sm z-10 border-l border-border px-4 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)] group-hover:bg-accent/50 transition-colors">
-                              <div className="flex items-center justify-end gap-1">
-                                <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-background" onClick={() => openEditDialog(p)} title="Editar">
-                                  <Pencil className="w-3.5 h-3.5" />
-                                </Button>
-                                <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleDeleteProf(p.id, p.nome)} title="Excluir">
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </Button>
-                              </div>
-                            </TableCell>
+                  <>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="hover:bg-transparent">
+                            <TableHead className="text-xs font-medium text-muted-foreground min-w-[150px]">Nome</TableHead>
+                            <TableHead className="text-xs font-medium text-muted-foreground w-[80px] lg:w-[120px]">Mat</TableHead>
+                            <TableHead className="text-xs font-medium text-muted-foreground hidden lg:table-cell">CPF</TableHead>
+                            <TableHead className="text-xs font-medium text-muted-foreground hidden md:table-cell whitespace-nowrap">Data de Admissão</TableHead>
+                            <TableHead className="text-xs font-medium text-muted-foreground hidden md:table-cell whitespace-nowrap">Data da Aposentadoria</TableHead>
+                            <TableHead className="text-xs font-medium text-muted-foreground hidden sm:table-cell">Cotas</TableHead>
+                            <TableHead className="text-xs font-medium text-muted-foreground">Status</TableHead>
+                            <TableHead className="text-xs font-medium text-muted-foreground text-right sticky right-0 bg-card/95 backdrop-blur-sm z-10 border-l border-border px-4 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]">Ações</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                  {/* Paginação */}
-                  {filteredProfs.length > itemsPerPage && (
-                    <div className="flex items-center justify-between px-6 py-4 border-t border-border">
-                      <p className="text-xs text-muted-foreground">
-                        Mostrando {((currentPage - 1) * itemsPerPage) + 1}–{Math.min(currentPage * itemsPerPage, filteredProfs.length)} de {filteredProfs.length}
-                      </p>
-                      <Pagination>
-                        <PaginationContent>
-                          <PaginationItem>
-                            <PaginationPrevious
-                              href="#"
-                              onClick={(e) => { e.preventDefault(); setCurrentPage(p => Math.max(1, p - 1)); }}
-                              className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
-                            />
-                          </PaginationItem>
-                          {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                            <PaginationItem key={page}>
-                              <PaginationLink
-                                href="#"
-                                onClick={(e) => { e.preventDefault(); setCurrentPage(page); }}
-                                isActive={page === currentPage}
-                              >
-                                {page}
-                              </PaginationLink>
-                            </PaginationItem>
+                        </TableHeader>
+                        <TableBody>
+                          {paginatedProfs.map(p => (
+                            <TableRow key={p.id} className={`group ${statusRowClass(p.status)}`}>
+                              <TableCell className="text-xs lg:text-sm font-medium py-3">{p.nome}</TableCell>
+                              <TableCell className="font-mono text-xs lg:text-sm py-3">{p.matricula}</TableCell>
+                              <TableCell className="font-mono text-xs lg:text-sm hidden lg:table-cell py-3">{p.cpf}</TableCell>
+                              <TableCell className="text-xs lg:text-sm hidden md:table-cell py-3 whitespace-nowrap">{maskDate(p.vinculo_inicio || '') || '—'}</TableCell>
+                              <TableCell className="text-xs lg:text-sm hidden md:table-cell py-3 whitespace-nowrap">{maskDate(p.vinculo_fim || '') || '—'}</TableCell>
+                              <TableCell className="text-xs lg:text-sm hidden sm:table-cell py-3">{p.total_cotas || 0}</TableCell>
+                              <TableCell>
+                                <Badge className={`text-xs font-medium ${p.status === 'Validado' || p.status === 'Ativo' ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-100' :
+                                    p.status === 'Inativo' ? 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-100' :
+                                      p.status === 'Em Análise' ? 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100' :
+                                        'bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-100'
+                                  } border`}>{p.status}</Badge>
+                              </TableCell>
+                              <TableCell className="text-right sticky right-0 bg-card/95 backdrop-blur-sm z-10 border-l border-border px-4 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)] group-hover:bg-accent/50 transition-colors">
+                                <div className="flex items-center justify-end gap-1">
+                                  <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-background" onClick={() => openEditDialog(p)} title="Editar">
+                                    <Pencil className="w-3.5 h-3.5" />
+                                  </Button>
+                                  <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleDeleteProf(p.id, p.nome)} title="Excluir">
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
                           ))}
-                          <PaginationItem>
-                            <PaginationNext
-                              href="#"
-                              onClick={(e) => { e.preventDefault(); setCurrentPage(p => Math.min(totalPages, p + 1)); }}
-                              className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''}
-                            />
-                          </PaginationItem>
-                        </PaginationContent>
-                      </Pagination>
+                        </TableBody>
+                      </Table>
                     </div>
-                  )}
+                    {/* Paginação */}
+                    {filteredProfs.length > itemsPerPage && (
+                      <div className="flex items-center justify-between px-6 py-4 border-t border-border">
+                        <p className="text-xs text-muted-foreground">
+                          Mostrando {((currentPage - 1) * itemsPerPage) + 1}–{Math.min(currentPage * itemsPerPage, filteredProfs.length)} de {filteredProfs.length}
+                        </p>
+                        <Pagination>
+                          <PaginationContent>
+                            <PaginationItem>
+                              <PaginationPrevious
+                                href="#"
+                                onClick={(e) => { e.preventDefault(); setCurrentPage(p => Math.max(1, p - 1)); }}
+                                className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
+                              />
+                            </PaginationItem>
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                              <PaginationItem key={page}>
+                                <PaginationLink
+                                  href="#"
+                                  onClick={(e) => { e.preventDefault(); setCurrentPage(page); }}
+                                  isActive={page === currentPage}
+                                >
+                                  {page}
+                                </PaginationLink>
+                              </PaginationItem>
+                            ))}
+                            <PaginationItem>
+                              <PaginationNext
+                                href="#"
+                                onClick={(e) => { e.preventDefault(); setCurrentPage(p => Math.min(totalPages, p + 1)); }}
+                                className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''}
+                              />
+                            </PaginationItem>
+                          </PaginationContent>
+                        </Pagination>
+                      </div>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>
