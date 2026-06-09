@@ -808,7 +808,7 @@ const AdminPage = () => {
             <Card>
               <CardContent className="p-0">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-6 py-4 border-b border-border gap-4">
-                  <h3 className="font-semibold text-foreground">Professores ({nonAdminProfs.length})</h3>
+                  <h3 className="font-semibold text-foreground">Professores ({filteredProfs.length})</h3>
                   <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                     <input ref={fileInputRef} type="file" accept=".csv,.pdf,application/pdf" className="hidden" onChange={handleFileImport} disabled={importing} />
                     <Button
