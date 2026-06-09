@@ -870,7 +870,7 @@ const AdminPage = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredProfs.map(p => (
+                      {paginatedProfs.map(p => (
                           <TableRow key={p.id} className={`group ${statusRowClass(p.status)}`}>
                             <TableCell className="text-xs lg:text-sm font-medium py-3">{p.nome}</TableCell>
                             <TableCell className="font-mono text-xs lg:text-sm py-3">{p.matricula}</TableCell>
