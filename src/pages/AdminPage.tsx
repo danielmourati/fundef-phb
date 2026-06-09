@@ -903,12 +903,12 @@ const AdminPage = () => {
                     </div>
                     {/* Paginação */}
                     {filteredProfs.length > itemsPerPage && (
-                      <div className="flex items-center justify-between px-6 py-4 border-t border-border">
-                        <p className="text-xs text-muted-foreground">
+                      <div className="flex flex-col sm:flex-row items-center sm:justify-between gap-3 px-4 sm:px-6 py-4 border-t border-border">
+                        <p className="text-xs text-muted-foreground whitespace-nowrap order-2 sm:order-1">
                           Mostrando {((currentPage - 1) * itemsPerPage) + 1}–{Math.min(currentPage * itemsPerPage, filteredProfs.length)} de {filteredProfs.length}
                         </p>
-                        <Pagination>
-                          <PaginationContent>
+                        <Pagination className="order-1 sm:order-2 mx-0 sm:justify-end w-auto">
+                          <PaginationContent className="flex-wrap justify-center">
                             <PaginationItem>
                               <PaginationPrevious
                                 href="#"
@@ -916,17 +916,32 @@ const AdminPage = () => {
                                 className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
                               />
                             </PaginationItem>
-                            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                              <PaginationItem key={page}>
-                                <PaginationLink
-                                  href="#"
-                                  onClick={(e) => { e.preventDefault(); setCurrentPage(page); }}
-                                  isActive={page === currentPage}
-                                >
-                                  {page}
-                                </PaginationLink>
-                              </PaginationItem>
-                            ))}
+                            {(() => {
+                              const pages: (number | 'ellipsis')[] = [];
+                              const add = (p: number) => { if (!pages.includes(p)) pages.push(p); };
+                              add(1);
+                              const start = Math.max(2, currentPage - 1);
+                              const end = Math.min(totalPages - 1, currentPage + 1);
+                              if (start > 2) pages.push('ellipsis');
+                              for (let i = start; i <= end; i++) add(i);
+                              if (end < totalPages - 1) pages.push('ellipsis');
+                              if (totalPages > 1) add(totalPages);
+                              return pages.map((p, idx) =>
+                                p === 'ellipsis' ? (
+                                  <PaginationItem key={`e-${idx}`}><PaginationEllipsis /></PaginationItem>
+                                ) : (
+                                  <PaginationItem key={p}>
+                                    <PaginationLink
+                                      href="#"
+                                      onClick={(e) => { e.preventDefault(); setCurrentPage(p); }}
+                                      isActive={p === currentPage}
+                                    >
+                                      {p}
+                                    </PaginationLink>
+                                  </PaginationItem>
+                                )
+                              );
+                            })()}
                             <PaginationItem>
                               <PaginationNext
                                 href="#"
