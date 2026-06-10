@@ -57,7 +57,7 @@ interface Message {
 
 const emptyProfessor = {
   nome: '', cpf: '', matricula: '', senha: '', data_nascimento: '',
-  vinculo_inicio: '', vinculo_fim: '', carga_horaria: 0, total_cotas: 0, role: 'professor',
+  vinculo_inicio: '', vinculo_fim: '', carga_horaria: 0, total_cotas: 0, cargo: '', role: 'professor',
   status: 'ATIVO',
 };
 
