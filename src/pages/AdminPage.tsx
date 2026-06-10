@@ -868,26 +868,18 @@ const AdminPage = () => {
                             <TableHead className="text-xs font-medium text-muted-foreground hidden md:table-cell whitespace-nowrap">Data de Admissão</TableHead>
                             <TableHead className="text-xs font-medium text-muted-foreground hidden md:table-cell whitespace-nowrap">Data da Aposentadoria</TableHead>
                             <TableHead className="text-xs font-medium text-muted-foreground hidden sm:table-cell">Cotas</TableHead>
-                            <TableHead className="text-xs font-medium text-muted-foreground">Status</TableHead>
                             <TableHead className="text-xs font-medium text-muted-foreground text-right sticky right-0 bg-card/95 backdrop-blur-sm z-10 border-l border-border px-4 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]">Ações</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {paginatedProfs.map(p => (
-                            <TableRow key={p.id} className={`group ${statusRowClass(p.status)}`}>
+                            <TableRow key={p.id} className="group">
                               <TableCell className="text-xs lg:text-sm font-medium py-3">{p.nome}</TableCell>
                               <TableCell className="font-mono text-xs lg:text-sm py-3">{p.matricula}</TableCell>
                               <TableCell className="font-mono text-xs lg:text-sm hidden lg:table-cell py-3">{p.cpf}</TableCell>
                               <TableCell className="text-xs lg:text-sm hidden md:table-cell py-3 whitespace-nowrap">{maskDate(p.vinculo_inicio || '') || '—'}</TableCell>
                               <TableCell className="text-xs lg:text-sm hidden md:table-cell py-3 whitespace-nowrap">{maskDate(p.vinculo_fim || '') || '—'}</TableCell>
                               <TableCell className="text-xs lg:text-sm hidden sm:table-cell py-3">{p.total_cotas || 0}</TableCell>
-                              <TableCell>
-                                <Badge className={`text-xs font-medium ${p.status === 'Validado' || p.status === 'Ativo' ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-100' :
-                                    p.status === 'Inativo' ? 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-100' :
-                                      p.status === 'Em Análise' ? 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100' :
-                                        'bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-100'
-                                  } border`}>{p.status}</Badge>
-                              </TableCell>
                               <TableCell className="text-right sticky right-0 bg-card/95 backdrop-blur-sm z-10 border-l border-border px-4 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)] group-hover:bg-accent/50 transition-colors">
                                 <div className="flex items-center justify-end gap-1">
                                   <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-background" onClick={() => openEditDialog(p)} title="Editar">
