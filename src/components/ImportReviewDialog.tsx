@@ -101,7 +101,8 @@ export const ImportReviewDialog: React.FC<Props> = ({ open, items, onCancel, onC
     <Dialog open={open} onOpenChange={(o) => { if (!o) onCancel(); }}>
       <DialogContent className="max-w-5xl w-[95vw]">
         <DialogHeader>
-          <DialogTitle>Revisão da importação — divergências encontradas</DialogTitle>
+          <DialogTitle>Conflitos encontrados na importação</DialogTitle>
+          <p className="text-xs text-muted-foreground">Linhas válidas são importadas automaticamente. Selecione abaixo as linhas conflitantes que deseja importar mesmo assim.</p>
         </DialogHeader>
 
         <div className="flex flex-wrap gap-2 text-sm">
