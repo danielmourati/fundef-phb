@@ -32,6 +32,7 @@ interface Professor {
   vinculo_fim: string | null;
   carga_horaria: number | null;
   total_cotas: number | null;
+  cargo?: string | null;
   role: string;
   status: string | null;
 }
@@ -57,7 +58,7 @@ interface Message {
 
 const emptyProfessor = {
   nome: '', cpf: '', matricula: '', senha: '', data_nascimento: '',
-  vinculo_inicio: '', vinculo_fim: '', carga_horaria: 0, total_cotas: 0, role: 'professor',
+  vinculo_inicio: '', vinculo_fim: '', carga_horaria: 0, total_cotas: 0, cargo: '', role: 'professor',
   status: 'ATIVO',
 };
 
@@ -120,7 +121,7 @@ const AdminPage = () => {
     dedupedRemoved: number;
     imported: number;
   }>({ open: false, totalLines: 0, emptyDiscarded: 0, duplicateGroups: 0, keptBySelection: 0, dedupedRemoved: 0, imported: 0 });
-  const [reviewState, setReviewState] = useState<{ open: boolean; items: ReviewItem[] }>({ open: false, items: [] });
+  const [reviewState, setReviewState] = useState<{ open: boolean; items: ReviewItem[]; validRows: Record<string, string>[] }>({ open: false, items: [], validRows: [] });
 
   const authHeaders = { Authorization: `Bearer ${token}` };
 
@@ -181,7 +182,8 @@ const AdminPage = () => {
       vinculo_fim: maskDate(p.vinculo_fim || ''),
       carga_horaria: p.carga_horaria || 0,
       total_cotas: p.total_cotas || 0,
-      role: p.role,
+      cargo: (p as any).cargo || '',
+      role: p.role || 'professor',
       status: normalizeStatus(p.status),
     });
     setDialogOpen(true);
@@ -208,7 +210,7 @@ const AdminPage = () => {
       toast.error('Data da Aposentadoria inválida (use DD/MM/AAAA).');
       return;
     }
-    const payload = { ...formData, cpf: unmaskCPF(formData.cpf) };
+    const payload = { ...formData, cpf: unmaskCPF(formData.cpf), cargo: formData.cargo || null };
     if (editingProf) {
       const { data, error } = await apiCall('PUT', 'update_professor', { ...payload, id: editingProf.id });
       if (error || data?.error) { toast.error(data?.error || 'Erro ao atualizar.'); return; }
@@ -526,8 +528,18 @@ const AdminPage = () => {
 
       if (items.length === 0) { toast.error('Nenhuma linha encontrada no arquivo.'); return; }
 
-      // Abre o modal de revisão. O envio ocorre via onConfirm -> runImport.
-      setReviewState({ open: true, items });
+      // Se não há conflitos, importa direto sem abrir modal
+      const hasConflicts = items.some(it => it.status !== 'valid' || it.reason);
+      if (!hasConflicts) {
+        const rows = items.filter(it => it.status === 'valid').map(it => it.data);
+        await runImport(rows);
+        return;
+      }
+
+      // Abre o modal de revisão mostrando apenas conflitos. O envio ocorre via onConfirm -> runImport.
+      const validRows = items.filter(it => it.status === 'valid' && !it.reason).map(it => it.data);
+      const conflictItems = items.filter(it => it.status !== 'valid' || it.reason);
+      setReviewState({ open: true, items: conflictItems, validRows });
     } catch (err: any) {
       toast.error(`Erro ao processar arquivo: ${err?.message || err}`);
     } finally {
@@ -866,26 +878,18 @@ const AdminPage = () => {
                             <TableHead className="text-xs font-medium text-muted-foreground hidden md:table-cell whitespace-nowrap">Data de Admissão</TableHead>
                             <TableHead className="text-xs font-medium text-muted-foreground hidden md:table-cell whitespace-nowrap">Data da Aposentadoria</TableHead>
                             <TableHead className="text-xs font-medium text-muted-foreground hidden sm:table-cell">Cotas</TableHead>
-                            <TableHead className="text-xs font-medium text-muted-foreground">Status</TableHead>
                             <TableHead className="text-xs font-medium text-muted-foreground text-right sticky right-0 bg-card/95 backdrop-blur-sm z-10 border-l border-border px-4 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]">Ações</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {paginatedProfs.map(p => (
-                            <TableRow key={p.id} className={`group ${statusRowClass(p.status)}`}>
+                            <TableRow key={p.id} className="group">
                               <TableCell className="text-xs lg:text-sm font-medium py-3">{p.nome}</TableCell>
                               <TableCell className="font-mono text-xs lg:text-sm py-3">{p.matricula}</TableCell>
                               <TableCell className="font-mono text-xs lg:text-sm hidden lg:table-cell py-3">{p.cpf}</TableCell>
                               <TableCell className="text-xs lg:text-sm hidden md:table-cell py-3 whitespace-nowrap">{maskDate(p.vinculo_inicio || '') || '—'}</TableCell>
                               <TableCell className="text-xs lg:text-sm hidden md:table-cell py-3 whitespace-nowrap">{maskDate(p.vinculo_fim || '') || '—'}</TableCell>
                               <TableCell className="text-xs lg:text-sm hidden sm:table-cell py-3">{p.total_cotas || 0}</TableCell>
-                              <TableCell>
-                                <Badge className={`text-xs font-medium ${p.status === 'Validado' || p.status === 'Ativo' ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-100' :
-                                    p.status === 'Inativo' ? 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-100' :
-                                      p.status === 'Em Análise' ? 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100' :
-                                        'bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-100'
-                                  } border`}>{p.status}</Badge>
-                              </TableCell>
                               <TableCell className="text-right sticky right-0 bg-card/95 backdrop-blur-sm z-10 border-l border-border px-4 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)] group-hover:bg-accent/50 transition-colors">
                                 <div className="flex items-center justify-end gap-1">
                                   <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-background" onClick={() => openEditDialog(p)} title="Editar">
@@ -1140,17 +1144,17 @@ const AdminPage = () => {
               </div>
               <div className="space-y-2">
                 <Label>Data Nascimento</Label>
-                <Input value={formData.data_nascimento} onChange={e => setFormData({ ...formData, data_nascimento: e.target.value })} placeholder="01011980" />
+                <Input value={formData.data_nascimento} onChange={e => setFormData({ ...formData, data_nascimento: maskDate(e.target.value) })} placeholder="DD/MM/AAAA" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Vínculo Início</Label>
-                <Input value={formData.vinculo_inicio} onChange={e => setFormData({ ...formData, vinculo_inicio: e.target.value })} placeholder="01/2001" />
+                <Label>Data de Admissão</Label>
+                <Input value={formData.vinculo_inicio} onChange={e => setFormData({ ...formData, vinculo_inicio: maskDate(e.target.value) })} placeholder="DD/MM/AAAA" />
               </div>
               <div className="space-y-2">
-                <Label>Vínculo Fim</Label>
-                <Input value={formData.vinculo_fim} onChange={e => setFormData({ ...formData, vinculo_fim: e.target.value })} placeholder="12/2003" />
+                <Label>Data da Aposentadoria</Label>
+                <Input value={formData.vinculo_fim} onChange={e => setFormData({ ...formData, vinculo_fim: maskDate(e.target.value) })} placeholder="DD/MM/AAAA" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -1164,32 +1168,36 @@ const AdminPage = () => {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Perfil (Role)</Label>
-              <Select value={formData.role} onValueChange={v => setFormData({ ...formData, role: v })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {STATUS_OPTIONS.map(s => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Cargo</Label>
+              <Input value={formData.cargo} onChange={e => setFormData({ ...formData, cargo: e.target.value })} placeholder="Ex.: Professor PIII" />
             </div>
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select value={formData.status} onValueChange={v => setFormData({ ...formData, status: v })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Pendente">Pendente</SelectItem>
-                  <SelectItem value="Ativo">Ativo</SelectItem>
-                  <SelectItem value="Validado">Validado</SelectItem>
-                  <SelectItem value="Em Análise">Em Análise</SelectItem>
-                  <SelectItem value="Inativo">Inativo</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Perfil (Role)</Label>
+                <Select value={formData.role || 'professor'} onValueChange={v => setFormData({ ...formData, role: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="professor">Professor</SelectItem>
+                    <SelectItem value="admin">Administrador</SelectItem>
+                    <SelectItem value="juridico">Jurídico</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={formData.status || 'ATIVO'} onValueChange={v => setFormData({ ...formData, status: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map(s => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="space-y-2">
               <Label>
@@ -1460,12 +1468,14 @@ const AdminPage = () => {
       <ImportReviewDialog
         open={reviewState.open}
         items={reviewState.items}
-        onCancel={() => { setReviewState({ open: false, items: [] }); toast.info('Importação cancelada.'); }}
+        onCancel={() => { setReviewState({ open: false, items: [], validRows: [] }); toast.info('Importação cancelada.'); }}
         onConfirm={async (rows) => {
-          setReviewState({ open: false, items: [] });
-          await runImport(rows);
+          const allRows = [...reviewState.validRows, ...rows];
+          setReviewState({ open: false, items: [], validRows: [] });
+          await runImport(allRows);
         }}
       />
+
     </div>
   );
 };

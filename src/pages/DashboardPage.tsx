@@ -329,24 +329,13 @@ const DashboardPage = () => {
                     <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Matrícula</p>
                     <p className="text-2xl font-bold tracking-tight">{professor.matricula}</p>
                   </div>
-                  {(() => {
-                    const raw = (professor.vinculo_status || '').toString().toUpperCase().trim();
-                    if (!raw) return null;
-                    const variants: Record<string, string> = {
-                      ATIVO: 'bg-green-100 text-green-700 border-green-200',
-                      APOSENTADO: 'bg-blue-100 text-blue-700 border-blue-200',
-                      INATIVO: 'bg-muted text-muted-foreground border-border',
-                      EXONERADO: 'bg-red-100 text-red-700 border-red-200',
-                      FALECIDO: 'bg-zinc-200 text-zinc-700 border-zinc-300',
-                    };
-                    const cls = variants[raw] || 'bg-primary/10 text-primary border-primary/20';
-                    return (
-                      <div className="flex flex-col items-end gap-1">
-                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Status</span>
-                        <Badge className={`text-[11px] font-semibold border ${cls}`}>{raw}</Badge>
-                      </div>
-                    );
-                  })()}
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Total de Cotas</p>
+                    <p className="text-2xl font-bold tracking-tight">
+                      {professor.total_cotas ?? '—'}
+                      {professor.total_cotas != null && <span className="text-sm font-medium text-muted-foreground ml-1">meses</span>}
+                    </p>
+                  </div>
                 </div>
 
 
@@ -355,7 +344,7 @@ const DashboardPage = () => {
                 <div className="grid grid-cols-2 gap-x-6 gap-y-4 px-5 py-4">
                   <div>
                     <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Cargo</p>
-                    <p className="font-medium text-sm">{(professor as any).cargo || '—'}</p>
+                    <p className="font-bold text-sm">{(professor as any).cargo || '—'}</p>
                   </div>
                   <div>
                     <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Carga Horária</p>
@@ -374,8 +363,20 @@ const DashboardPage = () => {
                     <p className="font-medium text-sm">{formatCpf(professor.cpf)}</p>
                   </div>
                   <div>
-                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Total de Cotas</p>
-                    <p className="font-medium text-sm">{professor.total_cotas ?? '—'} meses</p>
+                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Status</p>
+                    {(() => {
+                      const raw = (professor.vinculo_status || '').toString().toUpperCase().trim();
+                      if (!raw) return <p className="font-medium text-sm">—</p>;
+                      const variants: Record<string, string> = {
+                        ATIVO: 'bg-green-100 text-green-700 border-green-200',
+                        APOSENTADO: 'bg-blue-100 text-blue-700 border-blue-200',
+                        INATIVO: 'bg-muted text-muted-foreground border-border',
+                        EXONERADO: 'bg-red-100 text-red-700 border-red-200',
+                        FALECIDO: 'bg-zinc-200 text-zinc-700 border-zinc-300',
+                      };
+                      const cls = variants[raw] || 'bg-primary/10 text-primary border-primary/20';
+                      return <Badge className={`text-[11px] font-semibold border ${cls}`}>{raw}</Badge>;
+                    })()}
                   </div>
                 </div>
 
