@@ -1142,17 +1142,17 @@ const AdminPage = () => {
               </div>
               <div className="space-y-2">
                 <Label>Data Nascimento</Label>
-                <Input value={formData.data_nascimento} onChange={e => setFormData({ ...formData, data_nascimento: e.target.value })} placeholder="01011980" />
+                <Input value={formData.data_nascimento} onChange={e => setFormData({ ...formData, data_nascimento: maskDate(e.target.value) })} placeholder="DD/MM/AAAA" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Vínculo Início</Label>
-                <Input value={formData.vinculo_inicio} onChange={e => setFormData({ ...formData, vinculo_inicio: e.target.value })} placeholder="01/2001" />
+                <Label>Data de Admissão</Label>
+                <Input value={formData.vinculo_inicio} onChange={e => setFormData({ ...formData, vinculo_inicio: maskDate(e.target.value) })} placeholder="DD/MM/AAAA" />
               </div>
               <div className="space-y-2">
-                <Label>Vínculo Fim</Label>
-                <Input value={formData.vinculo_fim} onChange={e => setFormData({ ...formData, vinculo_fim: e.target.value })} placeholder="12/2003" />
+                <Label>Data da Aposentadoria</Label>
+                <Input value={formData.vinculo_fim} onChange={e => setFormData({ ...formData, vinculo_fim: maskDate(e.target.value) })} placeholder="DD/MM/AAAA" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -1166,32 +1166,36 @@ const AdminPage = () => {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Perfil (Role)</Label>
-              <Select value={formData.role} onValueChange={v => setFormData({ ...formData, role: v })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {STATUS_OPTIONS.map(s => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Cargo</Label>
+              <Input value={formData.cargo} onChange={e => setFormData({ ...formData, cargo: e.target.value })} placeholder="Ex.: Professor PIII" />
             </div>
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select value={formData.status} onValueChange={v => setFormData({ ...formData, status: v })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Pendente">Pendente</SelectItem>
-                  <SelectItem value="Ativo">Ativo</SelectItem>
-                  <SelectItem value="Validado">Validado</SelectItem>
-                  <SelectItem value="Em Análise">Em Análise</SelectItem>
-                  <SelectItem value="Inativo">Inativo</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Perfil (Role)</Label>
+                <Select value={formData.role || 'professor'} onValueChange={v => setFormData({ ...formData, role: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="professor">Professor</SelectItem>
+                    <SelectItem value="admin">Administrador</SelectItem>
+                    <SelectItem value="juridico">Jurídico</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={formData.status || 'ATIVO'} onValueChange={v => setFormData({ ...formData, status: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map(s => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="space-y-2">
               <Label>
