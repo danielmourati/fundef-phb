@@ -181,7 +181,8 @@ const AdminPage = () => {
       vinculo_fim: maskDate(p.vinculo_fim || ''),
       carga_horaria: p.carga_horaria || 0,
       total_cotas: p.total_cotas || 0,
-      role: p.role,
+      cargo: (p as any).cargo || '',
+      role: p.role || 'professor',
       status: normalizeStatus(p.status),
     });
     setDialogOpen(true);
