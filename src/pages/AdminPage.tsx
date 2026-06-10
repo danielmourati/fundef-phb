@@ -528,8 +528,18 @@ const AdminPage = () => {
 
       if (items.length === 0) { toast.error('Nenhuma linha encontrada no arquivo.'); return; }
 
-      // Abre o modal de revisão. O envio ocorre via onConfirm -> runImport.
-      setReviewState({ open: true, items });
+      // Se não há conflitos, importa direto sem abrir modal
+      const hasConflicts = items.some(it => it.status !== 'valid' || it.reason);
+      if (!hasConflicts) {
+        const rows = items.filter(it => it.status === 'valid').map(it => it.data);
+        await runImport(rows);
+        return;
+      }
+
+      // Abre o modal de revisão mostrando apenas conflitos. O envio ocorre via onConfirm -> runImport.
+      const validRows = items.filter(it => it.status === 'valid' && !it.reason).map(it => it.data);
+      const conflictItems = items.filter(it => it.status !== 'valid' || it.reason);
+      setReviewState({ open: true, items: conflictItems, validRows });
     } catch (err: any) {
       toast.error(`Erro ao processar arquivo: ${err?.message || err}`);
     } finally {
