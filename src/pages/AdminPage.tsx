@@ -210,7 +210,7 @@ const AdminPage = () => {
       toast.error('Data da Aposentadoria inválida (use DD/MM/AAAA).');
       return;
     }
-    const payload = { ...formData, cpf: unmaskCPF(formData.cpf) };
+    const payload = { ...formData, cpf: unmaskCPF(formData.cpf), cargo: formData.cargo || null };
     if (editingProf) {
       const { data, error } = await apiCall('PUT', 'update_professor', { ...payload, id: editingProf.id });
       if (error || data?.error) { toast.error(data?.error || 'Erro ao atualizar.'); return; }
