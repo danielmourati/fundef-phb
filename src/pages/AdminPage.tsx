@@ -32,6 +32,7 @@ interface Professor {
   vinculo_fim: string | null;
   carga_horaria: number | null;
   total_cotas: number | null;
+  cargo?: string | null;
   role: string;
   status: string | null;
 }
