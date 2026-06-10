@@ -55,7 +55,8 @@ Deno.serve(async (req) => {
       const { data, error } = await supabase
         .from("professors")
         .select("id, matricula, nome, cpf, data_nascimento, vinculo_inicio, vinculo_fim, carga_horaria, total_cotas, cargo, status, role")
-        .order("nome");
+        .order("nome")
+        .range(0, 49999);
       if (error) throw error;
       return jsonResponse(data);
     }
