@@ -1468,12 +1468,14 @@ const AdminPage = () => {
       <ImportReviewDialog
         open={reviewState.open}
         items={reviewState.items}
-        onCancel={() => { setReviewState({ open: false, items: [] }); toast.info('Importação cancelada.'); }}
+        onCancel={() => { setReviewState({ open: false, items: [], validRows: [] }); toast.info('Importação cancelada.'); }}
         onConfirm={async (rows) => {
-          setReviewState({ open: false, items: [] });
-          await runImport(rows);
+          const allRows = [...reviewState.validRows, ...rows];
+          setReviewState({ open: false, items: [], validRows: [] });
+          await runImport(allRows);
         }}
       />
+
     </div>
   );
 };
