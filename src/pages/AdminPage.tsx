@@ -224,14 +224,25 @@ const AdminPage = () => {
     fetchData();
   };
 
-  const handleDeleteProf = async (id: string, nome: string) => {
-    if (!confirm(`Excluir ${nome}? Esta ação não pode ser desfeita.`)) return;
-    const { data, error } = await supabase.functions.invoke(`admin-api?action=delete_professor&id=${id}`, {
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; nome: string; matricula?: string; cpf?: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteProf = (id: string, nome: string) => {
+    const p = professors.find(x => x.id === id);
+    setDeleteTarget({ id, nome, matricula: p?.matricula, cpf: p?.cpf });
+  };
+
+  const confirmDeleteProf = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    const { data, error } = await supabase.functions.invoke(`admin-api?action=delete_professor&id=${deleteTarget.id}`, {
       method: 'DELETE',
       headers: authHeaders,
     });
+    setDeleting(false);
     if (error || data?.error) { toast.error(data?.error || 'Erro ao excluir.'); return; }
     toast.success('Professor excluído!');
+    setDeleteTarget(null);
     fetchData();
   };
 
