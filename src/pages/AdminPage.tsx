@@ -224,14 +224,25 @@ const AdminPage = () => {
     fetchData();
   };
 
-  const handleDeleteProf = async (id: string, nome: string) => {
-    if (!confirm(`Excluir ${nome}? Esta ação não pode ser desfeita.`)) return;
-    const { data, error } = await supabase.functions.invoke(`admin-api?action=delete_professor&id=${id}`, {
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; nome: string; matricula?: string; cpf?: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteProf = (id: string, nome: string) => {
+    const p = professors.find(x => x.id === id);
+    setDeleteTarget({ id, nome, matricula: p?.matricula, cpf: p?.cpf });
+  };
+
+  const confirmDeleteProf = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    const { data, error } = await supabase.functions.invoke(`admin-api?action=delete_professor&id=${deleteTarget.id}`, {
       method: 'DELETE',
       headers: authHeaders,
     });
+    setDeleting(false);
     if (error || data?.error) { toast.error(data?.error || 'Erro ao excluir.'); return; }
     toast.success('Professor excluído!');
+    setDeleteTarget(null);
     fetchData();
   };
 
@@ -1231,6 +1242,37 @@ const AdminPage = () => {
       </Dialog>
 
       {/* Confirmação para limpar base (exige senha do admin) */}
+      <Dialog open={!!deleteTarget} onOpenChange={(o) => { if (!deleting && !o) setDeleteTarget(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" /> Excluir professor
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p>Tem certeza que deseja excluir o seguinte professor?</p>
+            {deleteTarget && (
+              <div className="rounded-lg border border-border bg-muted/40 p-3 space-y-1">
+                <p className="font-semibold text-foreground">{deleteTarget.nome}</p>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  {deleteTarget.matricula && <span>Matrícula: <span className="font-medium text-foreground">{deleteTarget.matricula}</span></span>}
+                  {deleteTarget.cpf && <span>CPF: <span className="font-medium text-foreground">{maskCPF(deleteTarget.cpf)}</span></span>}
+                </div>
+              </div>
+            )}
+            <p className="text-destructive font-medium">Esta ação não pode ser desfeita e removerá também as contestações vinculadas.</p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteProf} disabled={deleting}>
+              {deleting ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />Excluindo...</>) : (<><Trash2 className="h-4 w-4 mr-2" />Excluir</>)}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={clearDialogOpen} onOpenChange={(o) => { if (!clearing) setClearDialogOpen(o); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
