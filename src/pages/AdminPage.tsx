@@ -670,7 +670,7 @@ const AdminPage = () => {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-foreground truncate">{professor.nome}</p>
-              <p className="text-xs text-muted-foreground">Administrador</p>
+              <p className="text-xs text-muted-foreground truncate">{professor.matricula || 'Administrador'}</p>
             </div>
           </div>
           <Button variant="ghost" size="sm" onClick={handleLogout} className="w-full justify-start text-muted-foreground hover:text-destructive">
@@ -720,7 +720,7 @@ const AdminPage = () => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{professor.nome}</p>
-                      <p className="text-xs text-muted-foreground">Administrador</p>
+                      <p className="text-xs text-muted-foreground truncate">{professor.matricula || 'Administrador'}</p>
                     </div>
                   </div>
                   <Button variant="ghost" size="sm" onClick={handleLogout} className="w-full justify-start text-muted-foreground hover:text-destructive">
