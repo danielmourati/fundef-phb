@@ -931,32 +931,17 @@ const AdminPage = () => {
                                 className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
                               />
                             </PaginationItem>
-                            {(() => {
-                              const pages: (number | 'ellipsis')[] = [];
-                              const add = (p: number) => { if (!pages.includes(p)) pages.push(p); };
-                              add(1);
-                              const start = Math.max(2, currentPage - 1);
-                              const end = Math.min(totalPages - 1, currentPage + 1);
-                              if (start > 2) pages.push('ellipsis');
-                              for (let i = start; i <= end; i++) add(i);
-                              if (end < totalPages - 1) pages.push('ellipsis');
-                              if (totalPages > 1) add(totalPages);
-                              return pages.map((p, idx) =>
-                                p === 'ellipsis' ? (
-                                  <PaginationItem key={`e-${idx}`}><PaginationEllipsis /></PaginationItem>
-                                ) : (
-                                  <PaginationItem key={p}>
-                                    <PaginationLink
-                                      href="#"
-                                      onClick={(e) => { e.preventDefault(); setCurrentPage(p); }}
-                                      isActive={p === currentPage}
-                                    >
-                                      {p}
-                                    </PaginationLink>
-                                  </PaginationItem>
-                                )
-                              );
-                            })()}
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                              <PaginationItem key={p}>
+                                <PaginationLink
+                                  href="#"
+                                  onClick={(e) => { e.preventDefault(); setCurrentPage(p); }}
+                                  isActive={p === currentPage}
+                                >
+                                  {p}
+                                </PaginationLink>
+                              </PaginationItem>
+                            ))}
                             <PaginationItem>
                               <PaginationNext
                                 href="#"
