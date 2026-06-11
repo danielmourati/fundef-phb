@@ -362,22 +362,6 @@ const DashboardPage = () => {
                     <p className="text-[11px] text-muted-foreground uppercase tracking-wider">CPF</p>
                     <p className="font-medium text-sm">{formatCpf(professor.cpf)}</p>
                   </div>
-                  <div>
-                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Status</p>
-                    {(() => {
-                      const raw = (professor.vinculo_status || '').toString().toUpperCase().trim();
-                      if (!raw) return <p className="font-medium text-sm">—</p>;
-                      const variants: Record<string, string> = {
-                        ATIVO: 'bg-green-100 text-green-700 border-green-200',
-                        APOSENTADO: 'bg-blue-100 text-blue-700 border-blue-200',
-                        INATIVO: 'bg-muted text-muted-foreground border-border',
-                        EXONERADO: 'bg-red-100 text-red-700 border-red-200',
-                        FALECIDO: 'bg-zinc-200 text-zinc-700 border-zinc-300',
-                      };
-                      const cls = variants[raw] || 'bg-primary/10 text-primary border-primary/20';
-                      return <Badge className={`text-[11px] font-semibold border ${cls}`}>{raw}</Badge>;
-                    })()}
-                  </div>
                 </div>
 
 
