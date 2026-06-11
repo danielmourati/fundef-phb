@@ -52,13 +52,23 @@ Deno.serve(async (req) => {
   try {
     // GET professors
     if (req.method === "GET" && action === "professors") {
-      const { data, error } = await supabase
-        .from("professors")
-        .select("id, matricula, nome, cpf, data_nascimento, vinculo_inicio, vinculo_fim, carga_horaria, total_cotas, cargo, status, role")
-        .order("nome")
-        .range(0, 49999);
-      if (error) throw error;
-      return jsonResponse(data);
+      const all: any[] = [];
+      const batchSize = 1000;
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from("professors")
+          .select("id, matricula, nome, cpf, data_nascimento, vinculo_inicio, vinculo_fim, carga_horaria, total_cotas, cargo, status, role")
+          .order("nome")
+          .range(from, from + batchSize - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        all.push(...data);
+        if (data.length < batchSize) break;
+        from += batchSize;
+        if (from >= 50000) break;
+      }
+      return jsonResponse(all);
     }
 
     // GET contestacoes
