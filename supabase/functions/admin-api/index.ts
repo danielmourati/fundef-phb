@@ -142,6 +142,20 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: true });
     }
 
+    // DELETE single professor
+    if (req.method === "DELETE" && action === "delete_professor") {
+      const id = url.searchParams.get("id");
+      if (!id) {
+        return new Response(JSON.stringify({ error: "ID obrigatório." }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      await supabase.from("contestacoes").delete().eq("professor_id", id);
+      const { error } = await supabase.from("professors").delete().eq("id", id);
+      if (error) throw error;
+      return jsonResponse({ success: true });
+    }
+
     // DELETE all professors (Clear database) - requires admin password confirmation
     if ((req.method === "DELETE" || req.method === "POST") && action === "delete_all_professors") {
       let body: { password?: string } = {};
