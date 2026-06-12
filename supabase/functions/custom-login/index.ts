@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
       if (candidates.length === 0) {
         const fb = await supabase
           .from("professors")
-          .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, carga_horaria, total_cotas, cargo, role, status, senha_hash")
+          .select("id, nome, cpf, matricula, vinculo_inicio, vinculo_fim, carga_horaria, total_cotas, cargo, role, senha_hash")
           .eq("matricula", identificador);
         candidates = fb.data || [];
         fetchErr = fb.error;
