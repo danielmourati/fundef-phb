@@ -828,10 +828,10 @@ const AdminPage = () => {
                       variant="outline"
                       className="flex-1 sm:flex-none"
                       onClick={() => {
-                        const headers = ['nome', 'matricula', 'cpf', 'vinculo_inicio', 'vinculo_fim', 'total_cotas', 'status'];
+                        const headers = ['nome', 'matricula', 'cpf', 'vinculo_inicio', 'vinculo_fim', 'total_cotas'];
                         const example = [
-                          ['JOSE DA SILVA', '12345', '12345678909', '01/04/2005', '', '132', 'ATIVO'],
-                          ['MARIA OLIVEIRA', '12346', '98765432100', '10/02/2000', '15/06/2024', '132', 'APOSENTADO'],
+                          ['JOSE DA SILVA', '12345', '12345678909', '01/04/2005', '', '132'],
+                          ['MARIA OLIVEIRA', '12346', '98765432100', '10/02/2000', '15/06/2024', '132'],
                         ];
                         const csv = [headers.join(';'), ...example.map(r => r.join(';'))].join('\n');
                         const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
