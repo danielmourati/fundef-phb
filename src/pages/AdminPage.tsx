@@ -19,7 +19,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { maskCPF, unmaskCPF, isValidCPF, maskDate, isValidDate, maskPhone } from '@/lib/masks';
+import { maskCPF, unmaskCPF, isValidCPF, maskDate, isValidDate, maskPhone, STATUS_OPTIONS, statusBadgeClass, statusRowClass, normalizeStatus } from '@/lib/masks';
 import { ImportReviewDialog, type ReviewItem } from '@/components/ImportReviewDialog';
 
 interface Professor {
@@ -27,12 +27,14 @@ interface Professor {
   matricula: string;
   nome: string;
   cpf: string;
+  data_nascimento: string | null;
   vinculo_inicio: string | null;
   vinculo_fim: string | null;
   carga_horaria: number | null;
   total_cotas: number | null;
   cargo?: string | null;
   role: string;
+  status: string | null;
 }
 
 interface Contestacao {
@@ -55,8 +57,9 @@ interface Message {
 }
 
 const emptyProfessor = {
-  nome: '', cpf: '', matricula: '', senha: '',
+  nome: '', cpf: '', matricula: '', senha: '', data_nascimento: '',
   vinculo_inicio: '', vinculo_fim: '', carga_horaria: 0, total_cotas: 0, cargo: '', role: 'professor',
+  status: 'ATIVO',
 };
 
 type ActiveTab = 'dashboard' | 'professors' | 'contestacoes' | 'messages' | 'settings';
@@ -174,12 +177,14 @@ const AdminPage = () => {
     setEditingProf(p);
     setFormData({
       nome: p.nome, cpf: maskCPF(p.cpf || ''), matricula: p.matricula, senha: '',
+      data_nascimento: maskDate(p.data_nascimento || ''),
       vinculo_inicio: maskDate(p.vinculo_inicio || ''),
       vinculo_fim: maskDate(p.vinculo_fim || ''),
       carga_horaria: p.carga_horaria || 0,
       total_cotas: p.total_cotas || 0,
       cargo: (p as any).cargo || '',
       role: p.role || 'professor',
+      status: normalizeStatus(p.status),
     });
     setDialogOpen(true);
   };
@@ -191,6 +196,10 @@ const AdminPage = () => {
     }
     if (!isValidCPF(formData.cpf)) {
       toast.error('CPF inválido.');
+      return;
+    }
+    if (formData.data_nascimento && !isValidDate(formData.data_nascimento)) {
+      toast.error('Data de nascimento inválida (use DD/MM/AAAA).');
       return;
     }
     if (!isValidDate(formData.vinculo_inicio)) {
@@ -266,7 +275,7 @@ const AdminPage = () => {
     pdfjs.GlobalWorkerOptions.workerSrc = (await import('pdfjs-dist/build/pdf.worker.mjs?url')).default;
     const buf = await file.arrayBuffer();
     const doc = await pdfjs.getDocument({ data: buf }).promise;
-    const expected = ['nome', 'matricula', 'cpf', 'vinculo_inicio', 'vinculo_fim', 'carga_horaria', 'total_cotas'];
+    const expected = ['nome', 'matricula', 'cpf', 'vinculo_inicio', 'vinculo_fim', 'carga_horaria', 'total_cotas', 'status'];
     const rows: Record<string, string>[] = [];
 
     for (let p = 1; p <= doc.numPages; p++) {
@@ -329,6 +338,7 @@ const AdminPage = () => {
 
         const postTokens = postCarga.split(/\s+/).filter(Boolean);
         const cotas = postTokens[0] && /^\d+$/.test(postTokens[0]) ? postTokens[0] : '';
+        const status = (postTokens.slice(1).join(' ') || 'ATIVO').toUpperCase();
 
         const obj: Record<string, string> = {
           nome,
@@ -338,6 +348,7 @@ const AdminPage = () => {
           vinculo_fim: aposent,
           carga_horaria: carga,
           total_cotas: cotas,
+          status,
         };
         // mantém compat com `expected` (silencia lint)
         void expected;
@@ -828,10 +839,10 @@ const AdminPage = () => {
                       variant="outline"
                       className="flex-1 sm:flex-none"
                       onClick={() => {
-                        const headers = ['nome', 'matricula', 'cpf', 'vinculo_inicio', 'vinculo_fim', 'total_cotas'];
+                        const headers = ['nome', 'matricula', 'cpf', 'vinculo_inicio', 'vinculo_fim', 'total_cotas', 'status'];
                         const example = [
-                          ['JOSE DA SILVA', '12345', '12345678909', '01/04/2005', '', '132'],
-                          ['MARIA OLIVEIRA', '12346', '98765432100', '10/02/2000', '15/06/2024', '132'],
+                          ['JOSE DA SILVA', '12345', '12345678909', '01/04/2005', '', '132', 'ATIVO'],
+                          ['MARIA OLIVEIRA', '12346', '98765432100', '10/02/2000', '15/06/2024', '132', 'APOSENTADO'],
                         ];
                         const csv = [headers.join(';'), ...example.map(r => r.join(';'))].join('\n');
                         const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -1127,9 +1138,15 @@ const AdminPage = () => {
             <DialogTitle>{editingProf ? 'Editar Professor' : 'Adicionar Professor'}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-2">
-            <div className="space-y-2">
-              <Label>Nome *</Label>
-              <Input value={formData.nome} onChange={e => setFormData({ ...formData, nome: e.target.value })} />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Nome *</Label>
+                <Input value={formData.nome} onChange={e => setFormData({ ...formData, nome: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>CPF *</Label>
+                <Input value={formData.cpf} onChange={e => setFormData({ ...formData, cpf: e.target.value })} placeholder="00000000000" />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -1137,8 +1154,8 @@ const AdminPage = () => {
                 <Input value={formData.matricula} onChange={e => setFormData({ ...formData, matricula: e.target.value })} />
               </div>
               <div className="space-y-2">
-                <Label>CPF *</Label>
-                <Input value={formData.cpf} onChange={e => setFormData({ ...formData, cpf: e.target.value })} placeholder="00000000000" />
+                <Label>Data Nascimento</Label>
+                <Input value={formData.data_nascimento} onChange={e => setFormData({ ...formData, data_nascimento: maskDate(e.target.value) })} placeholder="DD/MM/AAAA" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -1165,18 +1182,33 @@ const AdminPage = () => {
               <Label>Cargo</Label>
               <Input value={formData.cargo} onChange={e => setFormData({ ...formData, cargo: e.target.value })} placeholder="Ex.: Professor PIII" />
             </div>
-            <div className="space-y-2">
-              <Label>Perfil (Role)</Label>
-              <Select value={formData.role || 'professor'} onValueChange={v => setFormData({ ...formData, role: v })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="professor">Professor</SelectItem>
-                  <SelectItem value="admin">Administrador</SelectItem>
-                  <SelectItem value="juridico">Jurídico</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Perfil (Role)</Label>
+                <Select value={formData.role || 'professor'} onValueChange={v => setFormData({ ...formData, role: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="professor">Professor</SelectItem>
+                    <SelectItem value="admin">Administrador</SelectItem>
+                    <SelectItem value="juridico">Jurídico</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={formData.status || 'ATIVO'} onValueChange={v => setFormData({ ...formData, status: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map(s => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="space-y-2">
               <Label>
@@ -1316,6 +1348,8 @@ const AdminPage = () => {
                       vinculo_fim: 'Data da Aposentadoria',
                       carga_horaria: 'Carga Horária',
                       total_cotas: 'Cotas',
+                      status: 'Status do Servidor',
+                      data_nascimento: 'Data de Nascimento',
                     };
                     return (
                       <th key={k} className="px-2 py-1 text-left whitespace-nowrap">{headerLabels[k] || k}</th>
