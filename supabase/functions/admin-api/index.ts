@@ -130,7 +130,6 @@ Deno.serve(async (req) => {
         total_cotas: Number(body.total_cotas) || 0,
         cargo: body.cargo || null,
         role: body.role || "professor",
-        status: (body.status || "ATIVO").toUpperCase(),
       };
       if (body.senha && body.senha !== "***") {
         const { data: hashData } = await supabase.rpc("hash_password", { plain_password: body.senha });
