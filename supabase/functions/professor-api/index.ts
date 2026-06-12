@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
     if (req.method === "GET" && action === "profile") {
       const { data, error } = await supabase
         .from("professors")
-        .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, role")
+        .select("id, nome, cpf, matricula, vinculo_inicio, vinculo_fim, total_cotas, role")
         .eq("id", user.sub)
         .single();
       if (error) throw error;
