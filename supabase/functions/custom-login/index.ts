@@ -77,7 +77,6 @@ Deno.serve(async (req) => {
           nome: u.data.role === "admin" ? "Administrador" : "Jurídico",
           cpf: "",
           matricula: u.data.email,
-          data_nascimento: null,
           vinculo_inicio: null,
           vinculo_fim: null,
           total_cotas: 0,
