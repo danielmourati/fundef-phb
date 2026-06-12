@@ -247,7 +247,6 @@ Deno.serve(async (req) => {
           carga_horaria: carga,
           total_cotas: parseInt(r.total_cotas) || 0,
           cargo: (r.cargo && String(r.cargo).trim()) || null,
-          status: (r.status || "ATIVO").toString().toUpperCase(),
           role: "professor",
         });
       }
