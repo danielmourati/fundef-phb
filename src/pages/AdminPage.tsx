@@ -72,6 +72,11 @@ const navItems: { key: ActiveTab; label: string; icon: React.ElementType }[] = [
   { key: 'settings', label: 'Configurações', icon: Settings },
 ];
 
+const TEMPLATE_COLUMNS = [
+  'nome', 'matricula', 'cpf', 'vinculo_inicio', 'vinculo_fim',
+  'carga_horaria', 'total_cotas', 'cargo',
+] as const;
+
 const AdminPage = () => {
   const { professor, token, logout } = useAuth();
   const navigate = useNavigate();
