@@ -90,7 +90,7 @@ Deno.serve(async (req) => {
       const identificador = rawId.replace(/\D/g, "") || rawId;
       const r = await supabase
         .from("professors")
-        .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, carga_horaria, total_cotas, cargo, role, status, senha_hash")
+        .select("id, nome, cpf, matricula, vinculo_inicio, vinculo_fim, carga_horaria, total_cotas, cargo, role, senha_hash")
         .eq("cpf", identificador)
         .order("matricula", { ascending: true });
       let candidates = r.data || [];
