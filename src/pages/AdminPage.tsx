@@ -266,7 +266,7 @@ const AdminPage = () => {
     pdfjs.GlobalWorkerOptions.workerSrc = (await import('pdfjs-dist/build/pdf.worker.mjs?url')).default;
     const buf = await file.arrayBuffer();
     const doc = await pdfjs.getDocument({ data: buf }).promise;
-    const expected = ['nome', 'matricula', 'cpf', 'vinculo_inicio', 'vinculo_fim', 'carga_horaria', 'total_cotas', 'status'];
+    const expected = ['nome', 'matricula', 'cpf', 'vinculo_inicio', 'vinculo_fim', 'carga_horaria', 'total_cotas'];
     const rows: Record<string, string>[] = [];
 
     for (let p = 1; p <= doc.numPages; p++) {
