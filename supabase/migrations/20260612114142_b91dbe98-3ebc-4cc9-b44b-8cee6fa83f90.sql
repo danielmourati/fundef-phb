@@ -1,0 +1,1 @@
+ALTER TABLE public.professors DROP COLUMN IF EXISTS data_nascimento; ALTER TABLE public.professors DROP COLUMN IF EXISTS status;
