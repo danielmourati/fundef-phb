@@ -113,7 +113,6 @@ Deno.serve(async (req) => {
         total_cotas: Number(body.total_cotas) || 0,
         cargo: body.cargo || null,
         role: body.role || "professor",
-        status: (body.status || "ATIVO").toUpperCase(),
       };
       const { error } = await supabase.from("professors").insert(payload);
       if (error) throw error;
