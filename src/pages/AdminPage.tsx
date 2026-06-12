@@ -174,14 +174,12 @@ const AdminPage = () => {
     setEditingProf(p);
     setFormData({
       nome: p.nome, cpf: maskCPF(p.cpf || ''), matricula: p.matricula, senha: '',
-      data_nascimento: maskDate(p.data_nascimento || ''),
       vinculo_inicio: maskDate(p.vinculo_inicio || ''),
       vinculo_fim: maskDate(p.vinculo_fim || ''),
       carga_horaria: p.carga_horaria || 0,
       total_cotas: p.total_cotas || 0,
       cargo: (p as any).cargo || '',
       role: p.role || 'professor',
-      status: normalizeStatus(p.status),
     });
     setDialogOpen(true);
   };
@@ -193,10 +191,6 @@ const AdminPage = () => {
     }
     if (!isValidCPF(formData.cpf)) {
       toast.error('CPF inválido.');
-      return;
-    }
-    if (formData.data_nascimento && !isValidDate(formData.data_nascimento)) {
-      toast.error('Data de nascimento inválida (use DD/MM/AAAA).');
       return;
     }
     if (!isValidDate(formData.vinculo_inicio)) {
