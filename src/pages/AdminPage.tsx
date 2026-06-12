@@ -27,14 +27,12 @@ interface Professor {
   matricula: string;
   nome: string;
   cpf: string;
-  data_nascimento: string | null;
   vinculo_inicio: string | null;
   vinculo_fim: string | null;
   carga_horaria: number | null;
   total_cotas: number | null;
   cargo?: string | null;
   role: string;
-  status: string | null;
 }
 
 interface Contestacao {
@@ -57,9 +55,8 @@ interface Message {
 }
 
 const emptyProfessor = {
-  nome: '', cpf: '', matricula: '', senha: '', data_nascimento: '',
+  nome: '', cpf: '', matricula: '', senha: '',
   vinculo_inicio: '', vinculo_fim: '', carga_horaria: 0, total_cotas: 0, cargo: '', role: 'professor',
-  status: 'ATIVO',
 };
 
 type ActiveTab = 'dashboard' | 'professors' | 'contestacoes' | 'messages' | 'settings';
