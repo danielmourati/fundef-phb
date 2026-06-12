@@ -1,0 +1,2 @@
+ALTER TABLE public.professors ADD COLUMN IF NOT EXISTS data_nascimento TEXT;
+ALTER TABLE public.professors ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'ATIVO';
