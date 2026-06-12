@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     if (req.method === "GET" && action === "professors") {
       const { data, error } = await supabase
         .from("professors")
-        .select("id, matricula, nome, cpf, data_nascimento, vinculo_inicio, vinculo_fim, carga_horaria, total_cotas, cargo, status, role")
+        .select("id, matricula, nome, cpf, vinculo_inicio, vinculo_fim, carga_horaria, total_cotas, cargo, role")
         .order("nome")
         .range(0, 49999);
       if (error) throw error;
