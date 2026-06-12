@@ -1,33 +1,42 @@
-## Permitir 2 vínculos: CPF duplicado com matrícula diferente
+## Problema
 
-Hoje qualquer CPF repetido é marcado como `dup_file`/`dup_base`. Vamos permitir duplo vínculo quando a matrícula for diferente — o par único passa a ser **(cpf + matricula)**.
+Hoje:
+- O botão **Modelo CSV** gera cabeçalho `nome;matricula;cpf;vinculo_inicio;vinculo_fim;total_cotas;status` — tem `status` (que já foi removido do sistema) e está faltando `carga_horaria` e `cargo`.
+- O `handleFileImport` aceita as colunas `['nome','matricula','cpf','vinculo_inicio','vinculo_fim','carga_horaria','total_cotas','cargo']` (sem `status`).
+- O arquivo enviado (`lista_complementar.csv`) usa exatamente esse último conjunto, ou seja, **o modelo está divergente do que o importador realmente espera**.
+- Não há validação de cabeçalho: se o usuário enviar um CSV com colunas erradas, a importação segue silenciosamente e os campos viram vazios.
 
-### Mudanças em `src/pages/AdminPage.tsx` (`handleFileImport`)
+## Mudanças (`src/pages/AdminPage.tsx`)
 
-Substituir os mapas atuais por chaves compostas e reorganizar a classificação:
+### 1. Definir um único `TEMPLATE_COLUMNS` no topo do componente
+```ts
+const TEMPLATE_COLUMNS = [
+  'nome','matricula','cpf','vinculo_inicio','vinculo_fim',
+  'carga_horaria','total_cotas','cargo'
+] as const;
+```
+Reaproveitar em três pontos (modelo, validação, parsing) — fonte única de verdade.
 
-- `seenCpfMat: Map<string, number>` → chave `cpf|matricula` (1ª ocorrência no arquivo).
-- `seenCpf: Map<string, { line, matricula }>` → para detectar "mesmo CPF, mesma matrícula" vs "mesmo CPF, matrícula diferente".
-- `existingByCpf: Map<cpf, Set<matricula>>` construído a partir de `professors`.
+### 2. Corrigir o botão **Modelo CSV** (linhas 830-844)
+- Trocar `headers` para `TEMPLATE_COLUMNS`.
+- Atualizar a linha-exemplo para incluir `carga_horaria` (`40`) e `cargo` (`PROFESSOR (A)`) e remover `status`.
 
-Regras por linha (após validações de nome/cpf/total_cotas inalteradas):
+### 3. Validar o cabeçalho do CSV antes de processar (em `handleFileImport`, bloco `else` do CSV, após extrair `headers`)
+Lógica:
+- Normalizar os headers do arquivo (já é feito: lowercase + remover BOM).
+- Calcular:
+  - `missing = TEMPLATE_COLUMNS.filter(c => !headers.includes(c))`
+  - `extras  = headers.filter(h => h && !TEMPLATE_COLUMNS.includes(h))`
+- Se `missing.length > 0` **ou** `extras.length > 0`:
+  - Exibir `toast.error` com mensagem clara:
+    `Colunas divergentes do modelo. Faltando: [...]. Não reconhecidas: [...]. Baixe o "Modelo CSV" e ajuste o arquivo.`
+  - Abortar o `import` (return) sem abrir o modal de revisão.
+- PDF segue o caminho atual (não tem header textual a validar).
 
-1. **dup_file (mesmo cpf+matricula no arquivo)** → `selectable:false` (linha idêntica, backend rejeitaria). Motivo: `"Linha duplicada (cpf+matrícula) — 1ª em Lx"`.
-2. **CPF repetido no arquivo, matrícula diferente** → `valid`, com `reason: "2º vínculo (CPF também na linha Lx com matrícula Y)"`. Pré-marcada.
-3. **dup_base (cpf+matricula já existe)** → `dup_base`, motivo `"Cadastro já existe (cpf+matrícula)"`, `selectable:true` (admin decide; backend ainda deduplica).
-4. **CPF já na base, matrícula nova** → `valid`, reason `"2º vínculo — CPF já cadastrado com matrícula Y"`. Pré-marcada.
-5. **Matrícula repetida (arquivo ou base) com CPF diferente** → continua `dup_file`/`dup_base` selecionável (matrícula não deve se repetir entre pessoas distintas, mas deixamos o admin decidir).
+### 4. Usar `TEMPLATE_COLUMNS` em vez da constante local `ALLOWED` (linha 408)
+Apenas substituir a referência — comportamento inalterado.
 
-### Mudanças no edge function `supabase/functions/admin-api/index.ts` (`import_csv`)
-
-A dedup atual usa apenas `cpfDigits`, o que descarta o 2º vínculo. Trocar para chave composta:
-
-- `seen: Set<string>` com chave `${cpf}|${matricula||''}`.
-- Consulta `existing` por `cpf` continua, mas o filtro vira: rejeita apenas quando existir registro com **mesmo cpf E mesma matrícula** (`existing.some(e => e.cpf===p.cpf && (e.matricula||'') === (p.matricula||''))`). Selecionar também `matricula` no `.select()`.
-- Mantém contador `skipped`.
-
-### Fora de escopo
-
-- Sem mudanças no `ImportReviewDialog` (já mostra motivo/status existentes).
-- Sem mudanças no schema; o campo `matricula` continua opcional. Se a matrícula vier vazia em ambos os registros do mesmo CPF, são tratados como duplicata real (`dup_file`).
-- Sem nova UI; o badge "Válida" cobre o caso de 2º vínculo, com motivo explicando.
+## Fora de escopo
+- Sem mudanças no edge function (já aceita esse conjunto de colunas).
+- Sem mudanças no `ImportReviewDialog`.
+- Sem mudanças no schema do banco.

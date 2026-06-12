@@ -72,6 +72,11 @@ const navItems: { key: ActiveTab; label: string; icon: React.ElementType }[] = [
   { key: 'settings', label: 'Configurações', icon: Settings },
 ];
 
+const TEMPLATE_COLUMNS = [
+  'nome', 'matricula', 'cpf', 'vinculo_inicio', 'vinculo_fim',
+  'carga_horaria', 'total_cotas', 'cargo',
+] as const;
+
 const AdminPage = () => {
   const { professor, token, logout } = useAuth();
   const navigate = useNavigate();
@@ -395,6 +400,15 @@ const AdminPage = () => {
         if (lines.length < 2) { toast.error('CSV vazio ou inválido.'); return; }
         const sep = lines[0].includes(';') ? ';' : ',';
         const headers = lines[0].split(sep).map(h => h.trim().toLowerCase().replace(/^\ufeff/, ''));
+        const missing = TEMPLATE_COLUMNS.filter(c => !headers.includes(c));
+        const extras = headers.filter(h => h && !TEMPLATE_COLUMNS.includes(h as typeof TEMPLATE_COLUMNS[number]));
+        if (missing.length > 0 || extras.length > 0) {
+          const parts: string[] = [];
+          if (missing.length) parts.push(`Faltando: ${missing.join(', ')}`);
+          if (extras.length) parts.push(`Não reconhecidas: ${extras.join(', ')}`);
+          toast.error(`Colunas divergentes do modelo. ${parts.join(' | ')}. Baixe o "Modelo CSV" e ajuste o arquivo.`);
+          return;
+        }
         rows = lines.slice(1).map(line => {
           const values = line.split(sep).map(v => v.trim());
           const obj: Record<string, string> = {};
@@ -405,7 +419,7 @@ const AdminPage = () => {
 
       // ===== Validação client-side com classificação por linha =====
       // Chave única = cpf + matrícula (permite 2º vínculo: mesmo CPF, matrícula diferente)
-      const ALLOWED = ['nome', 'matricula', 'cpf', 'vinculo_inicio', 'vinculo_fim', 'carga_horaria', 'total_cotas', 'cargo'];
+      const ALLOWED = TEMPLATE_COLUMNS;
       const existingByCpf = new Map<string, Set<string>>();
       professors.forEach(p => {
         const c = (p.cpf || '').replace(/\D/g, '');
@@ -828,10 +842,10 @@ const AdminPage = () => {
                       variant="outline"
                       className="flex-1 sm:flex-none"
                       onClick={() => {
-                        const headers = ['nome', 'matricula', 'cpf', 'vinculo_inicio', 'vinculo_fim', 'total_cotas', 'status'];
+                        const headers = [...TEMPLATE_COLUMNS];
                         const example = [
-                          ['JOSE DA SILVA', '12345', '12345678909', '01/04/2005', '', '132', 'ATIVO'],
-                          ['MARIA OLIVEIRA', '12346', '98765432100', '10/02/2000', '15/06/2024', '132', 'APOSENTADO'],
+                          ['JOSE DA SILVA', '12345', '12345678909', '01/04/2005', '', '40', '132', 'PROFESSOR (A)'],
+                          ['MARIA OLIVEIRA', '12346', '98765432100', '10/02/2000', '15/06/2024', '40', '132', 'PROFESSOR (A)'],
                         ];
                         const csv = [headers.join(';'), ...example.map(r => r.join(';'))].join('\n');
                         const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
