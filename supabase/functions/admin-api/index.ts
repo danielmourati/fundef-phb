@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     if (req.method === "GET" && action === "professors") {
       const { data, error } = await supabase
         .from("professors")
-        .select("id, matricula, nome, cpf, data_nascimento, vinculo_inicio, vinculo_fim, carga_horaria, total_cotas, cargo, status, role")
+        .select("id, matricula, nome, cpf, vinculo_inicio, vinculo_fim, carga_horaria, total_cotas, cargo, role")
         .order("nome")
         .range(0, 49999);
       if (error) throw error;
@@ -113,7 +113,6 @@ Deno.serve(async (req) => {
         total_cotas: Number(body.total_cotas) || 0,
         cargo: body.cargo || null,
         role: body.role || "professor",
-        status: (body.status || "ATIVO").toUpperCase(),
       };
       const { error } = await supabase.from("professors").insert(payload);
       if (error) throw error;
@@ -131,7 +130,6 @@ Deno.serve(async (req) => {
         total_cotas: Number(body.total_cotas) || 0,
         cargo: body.cargo || null,
         role: body.role || "professor",
-        status: (body.status || "ATIVO").toUpperCase(),
       };
       if (body.senha && body.senha !== "***") {
         const { data: hashData } = await supabase.rpc("hash_password", { plain_password: body.senha });
@@ -249,7 +247,6 @@ Deno.serve(async (req) => {
           carga_horaria: carga,
           total_cotas: parseInt(r.total_cotas) || 0,
           cargo: (r.cargo && String(r.cargo).trim()) || null,
-          status: (r.status || "ATIVO").toString().toUpperCase(),
           role: "professor",
         });
       }
