@@ -329,7 +329,6 @@ const AdminPage = () => {
 
         const postTokens = postCarga.split(/\s+/).filter(Boolean);
         const cotas = postTokens[0] && /^\d+$/.test(postTokens[0]) ? postTokens[0] : '';
-        const status = (postTokens.slice(1).join(' ') || 'ATIVO').toUpperCase();
 
         const obj: Record<string, string> = {
           nome,
@@ -339,7 +338,6 @@ const AdminPage = () => {
           vinculo_fim: aposent,
           carga_horaria: carga,
           total_cotas: cotas,
-          status,
         };
         // mantém compat com `expected` (silencia lint)
         void expected;
