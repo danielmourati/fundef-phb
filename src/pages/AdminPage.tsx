@@ -400,6 +400,15 @@ const AdminPage = () => {
         if (lines.length < 2) { toast.error('CSV vazio ou inválido.'); return; }
         const sep = lines[0].includes(';') ? ';' : ',';
         const headers = lines[0].split(sep).map(h => h.trim().toLowerCase().replace(/^\ufeff/, ''));
+        const missing = TEMPLATE_COLUMNS.filter(c => !headers.includes(c));
+        const extras = headers.filter(h => h && !TEMPLATE_COLUMNS.includes(h as typeof TEMPLATE_COLUMNS[number]));
+        if (missing.length > 0 || extras.length > 0) {
+          const parts: string[] = [];
+          if (missing.length) parts.push(`Faltando: ${missing.join(', ')}`);
+          if (extras.length) parts.push(`Não reconhecidas: ${extras.join(', ')}`);
+          toast.error(`Colunas divergentes do modelo. ${parts.join(' | ')}. Baixe o "Modelo CSV" e ajuste o arquivo.`);
+          return;
+        }
         rows = lines.slice(1).map(line => {
           const values = line.split(sep).map(v => v.trim());
           const obj: Record<string, string> = {};
