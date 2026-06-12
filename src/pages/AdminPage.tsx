@@ -1139,15 +1139,9 @@ const AdminPage = () => {
                 <Input value={formData.cpf} onChange={e => setFormData({ ...formData, cpf: e.target.value })} placeholder="00000000000" />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Matrícula *</Label>
-                <Input value={formData.matricula} onChange={e => setFormData({ ...formData, matricula: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Data Nascimento</Label>
-                <Input value={formData.data_nascimento} onChange={e => setFormData({ ...formData, data_nascimento: maskDate(e.target.value) })} placeholder="DD/MM/AAAA" />
-              </div>
+            <div className="space-y-2">
+              <Label>Matrícula *</Label>
+              <Input value={formData.matricula} onChange={e => setFormData({ ...formData, matricula: e.target.value })} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
