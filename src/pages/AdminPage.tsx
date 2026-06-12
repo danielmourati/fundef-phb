@@ -19,7 +19,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { maskCPF, unmaskCPF, isValidCPF, maskDate, isValidDate, maskPhone, STATUS_OPTIONS, statusBadgeClass, statusRowClass, normalizeStatus } from '@/lib/masks';
+import { maskCPF, unmaskCPF, isValidCPF, maskDate, isValidDate, maskPhone } from '@/lib/masks';
 import { ImportReviewDialog, type ReviewItem } from '@/components/ImportReviewDialog';
 
 interface Professor {
