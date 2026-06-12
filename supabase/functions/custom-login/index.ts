@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
           ok = !!data;
         }
 
-        if (!ok && (passwordMatchesBirthDate(senha, c.data_nascimento) || onlyDigits(senha) === onlyDigits(c.cpf))) {
+        if (!ok && onlyDigits(senha) === onlyDigits(c.cpf)) {
           ok = true;
         }
         if (ok) {
