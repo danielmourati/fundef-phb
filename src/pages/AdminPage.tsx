@@ -1316,8 +1316,6 @@ const AdminPage = () => {
                       vinculo_fim: 'Data da Aposentadoria',
                       carga_horaria: 'Carga Horária',
                       total_cotas: 'Cotas',
-                      status: 'Status do Servidor',
-                      data_nascimento: 'Data de Nascimento',
                     };
                     return (
                       <th key={k} className="px-2 py-1 text-left whitespace-nowrap">{headerLabels[k] || k}</th>
