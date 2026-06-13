@@ -44,9 +44,8 @@ const LoginPage = () => {
     }
   };
 
-  const handleReport = () => {
-    window.open('https://wa.me/5586994422827', '_blank');
-  };
+  const handleReport = () => setReportOpen(true);
+
 
   return (
     <div className="h-screen overflow-hidden flex flex-col lg:flex-row bg-background">
