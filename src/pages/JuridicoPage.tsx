@@ -31,6 +31,8 @@ interface Contestacao {
   protocolo: string | null;
   resposta: string | null;
   professor: { id: string; nome: string; matricula: string; cpf: string } | null;
+  documento_url?: string | null;
+  documento_nome?: string | null;
 }
 
 const statusOptions = ['Aberta', 'Pendente', 'Deferido', 'Indeferido'];
