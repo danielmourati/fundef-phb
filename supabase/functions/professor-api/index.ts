@@ -36,6 +36,61 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  const url = new URL(req.url);
+  const action = url.searchParams.get("action");
+
+  // PUBLIC: create access report (no auth required)
+  if (req.method === "POST" && action === "create_access_report") {
+    try {
+      const body = await req.json();
+      const nome_completo = String(body.nome_completo || "").trim();
+      const cpf = String(body.cpf || "").replace(/\D/g, "");
+      const tipo_vinculo = String(body.tipo_vinculo || "").trim();
+      const whatsapp = String(body.whatsapp || "").trim();
+      const email = String(body.email || "").trim();
+      const assunto = String(body.assunto || "").trim();
+      const descricao = String(body.descricao || "").trim();
+
+      if (!nome_completo || !cpf || !tipo_vinculo || !whatsapp || !assunto) {
+        return new Response(JSON.stringify({ error: "Preencha os campos obrigatórios." }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (cpf.length !== 11) {
+        return new Response(JSON.stringify({ error: "CPF inválido." }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (nome_completo.length > 150 || tipo_vinculo.length > 60 || whatsapp.length > 30 ||
+          email.length > 150 || assunto.length > 120 || descricao.length > 1000) {
+        return new Response(JSON.stringify({ error: "Campos excedem o limite de caracteres." }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return new Response(JSON.stringify({ error: "E-mail inválido." }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "unknown";
+
+      const { data, error } = await supabase.from("access_reports").insert({
+        nome_completo, cpf, tipo_vinculo, whatsapp,
+        email: email || null,
+        assunto,
+        descricao: descricao || null,
+        ip_address: ip,
+      }).select("protocolo").single();
+      if (error) throw error;
+      return jsonResponse({ success: true, protocolo: data?.protocolo });
+    } catch (e: any) {
+      return new Response(JSON.stringify({ error: e.message || "Erro interno." }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  }
+
   const user = await verifyToken(req.headers.get("authorization"));
   if (!user) {
     return new Response(JSON.stringify({ error: "Não autorizado." }), {
@@ -43,8 +98,6 @@ Deno.serve(async (req) => {
     });
   }
 
-  const url = new URL(req.url);
-  const action = url.searchParams.get("action");
 
   try {
     // GET my profile
