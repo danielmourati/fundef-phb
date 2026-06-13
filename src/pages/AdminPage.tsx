@@ -559,7 +559,14 @@ const AdminPage = () => {
       const hasConflicts = items.some(it => it.status !== 'valid' || it.reason);
       if (!hasConflicts) {
         const rows = items.filter(it => it.status === 'valid').map(it => it.data);
-        await runImport(rows);
+        const reviewCounts = {
+          total: items.length,
+          valid: items.filter(i => i.status === 'valid').length,
+          error: items.filter(i => i.status === 'error').length,
+          dup_file: items.filter(i => i.status === 'dup_file').length,
+          dup_base: items.filter(i => i.status === 'dup_base').length,
+        };
+        await runImport(rows, reviewCounts);
         return;
       }
 
