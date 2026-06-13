@@ -115,11 +115,12 @@ Deno.serve(async (req) => {
     if (req.method === "GET" && action === "contestacoes") {
       const { data, error } = await supabase
         .from("contestacoes")
-        .select("id, motivo, descricao, whatsapp, status, created_at, protocolo, resposta")
+        .select("id, motivo, descricao, whatsapp, status, created_at, protocolo, resposta, documento_path, documento_nome")
         .eq("professor_id", user.sub)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return jsonResponse(data);
+      const withUrls = await attachDocumentUrls(data || []);
+      return jsonResponse(withUrls);
     }
 
     // POST contestacao
@@ -128,6 +129,8 @@ Deno.serve(async (req) => {
       const motivo = String(body.motivo || "").trim();
       const descricao = String(body.descricao || "").trim();
       const whatsapp = String(body.whatsapp || "").trim();
+      const documento_base64 = String(body.documento_base64 || "");
+      const documento_nome = String(body.documento_nome || "anexo-ii.pdf").trim().slice(0, 150);
 
       if (!motivo || !descricao || !whatsapp) {
         return new Response(
@@ -141,13 +144,55 @@ Deno.serve(async (req) => {
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+      if (!documento_base64) {
+        return new Response(
+          JSON.stringify({ error: "Anexo II (PDF) é obrigatório." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
-      const { data, error } = await supabase.from("contestacoes").insert({
+      // Decode + size validation (max 10 MB)
+      let bytes: Uint8Array;
+      try {
+        const binary = atob(documento_base64);
+        bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      } catch {
+        return new Response(JSON.stringify({ error: "Arquivo inválido." }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (bytes.length > 10 * 1024 * 1024) {
+        return new Response(JSON.stringify({ error: "Arquivo excede 10 MB." }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      // Validate PDF magic number "%PDF"
+      if (!(bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46)) {
+        return new Response(JSON.stringify({ error: "O arquivo deve ser um PDF válido." }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: inserted, error } = await supabase.from("contestacoes").insert({
         professor_id: user.sub,
         motivo, descricao, whatsapp,
-      }).select("protocolo").single();
+        documento_nome,
+      }).select("id, protocolo").single();
       if (error) throw error;
-      return jsonResponse({ success: true, protocolo: data?.protocolo });
+
+      const path = `${user.sub}/${inserted.id}.pdf`;
+      const { error: upErr } = await supabase.storage
+        .from("contestacao-documentos")
+        .upload(path, bytes, { contentType: "application/pdf", upsert: true });
+      if (upErr) {
+        // Rollback contestação if upload fails
+        await supabase.from("contestacoes").delete().eq("id", inserted.id);
+        throw upErr;
+      }
+      await supabase.from("contestacoes").update({ documento_path: path }).eq("id", inserted.id);
+
+      return jsonResponse({ success: true, protocolo: inserted.protocolo });
     }
 
     // GET messages (broadcast + personal notifications for professor)
