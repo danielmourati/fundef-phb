@@ -367,3 +367,18 @@ function jsonResponse(data: unknown) {
     status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
+
+async function attachDocumentUrls<T extends { documento_path?: string | null }>(rows: T[]): Promise<(T & { documento_url?: string | null })[]> {
+  const out: (T & { documento_url?: string | null })[] = [];
+  for (const row of rows) {
+    if (row.documento_path) {
+      const { data } = await supabase.storage
+        .from("contestacao-documentos")
+        .createSignedUrl(row.documento_path, 600);
+      out.push({ ...row, documento_url: data?.signedUrl || null });
+    } else {
+      out.push({ ...row, documento_url: null });
+    }
+  }
+  return out;
+}
