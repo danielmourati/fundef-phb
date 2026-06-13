@@ -1,47 +1,74 @@
-## Problema
+## Objetivo
 
-Na imagem enviada, o modal "Conflitos encontrados na importação" exibe:
-- **Total: 1, Válidas: 0, Dup. base: 1**
-- Botão final: **"Importar 0 selecionada(s)"** (desabilitado)
+Substituir o link "Não consegue acessar? Reportar problema" (que hoje abre WhatsApp) por um modal de formulário em `/login` para o professor reportar dificuldade de acesso. Os reports ficam armazenados no banco e podem ser analisados pelo super-admin em uma nova área no painel `/admin`.
 
-Causa: em `handleFileImport` (linhas 553-556 de `src/pages/AdminPage.tsx`), apenas as linhas conflitantes são passadas para o modal — as válidas são separadas em `reviewState.validRows` e mescladas só no `onConfirm`. Resultado: quando o arquivo tem **apenas 1 linha conflitante e nenhuma válida** entre as enviadas ao diálogo, o botão "Importar selecionadas" fica em 0 porque a seleção inicial só marca itens com status `valid` (linhas 42-46 de `ImportReviewDialog.tsx`) — e não há nenhum.
+## Mudanças
 
-Além disso, o usuário não vê quais linhas foram consideradas válidas, perdendo visibilidade do que será importado.
+### 1. Banco de dados (nova tabela `access_reports`)
 
-## Correção (`src/pages/AdminPage.tsx`)
+Campos:
+- `nome_completo` (text, obrigatório)
+- `cpf` (text, obrigatório)
+- `tipo_vinculo` (text, obrigatório) — ex.: Efetivo, Contrato Temporário, Aposentado, Pensionista, Outro
+- `whatsapp` (text, obrigatório)
+- `email` (text, opcional)
+- `assunto` (text, obrigatório) — selecionado em lista fixa
+- `descricao` (text, opcional, livre)
+- `status` (text, default `Aberto`) — Aberto / Em análise / Resolvido / Descartado
+- `resposta_admin` (text)
+- `protocolo` (text, gerado automaticamente, formato `ACC-YYYY-000000`)
+- timestamps padrão
 
-### 1. Passar TODAS as linhas para o modal (válidas + conflitos)
-Trocar o bloco das linhas 553-556 por:
+Acesso restrito (RLS deny-all no cliente; toda leitura/gravação via Edge Functions com `service_role`, padrão já adotado no projeto).
 
-```ts
-// Abre o modal mostrando todas as linhas (válidas pré-selecionadas + conflitos para revisão).
-setReviewState({ open: true, items, validRows: [] });
-```
+Opções fixas de **Assunto** (no front e validadas no back):
+- "Meu nome foi divulgado mas não tenho cadastro"
+- "Não lembro/não tenho CPF cadastrado"
+- "Erro ao acessar com CPF e senha"
+- "Outro"
 
-Agora `items` contém o array completo: válidas + duplicadas + erros. O `ImportReviewDialog` já:
-- Conta corretamente cada categoria (badges Total/Válidas/Erros/Dup.).
-- Pré-seleciona automaticamente as `valid` no `useEffect` (linhas 49-55).
-- Habilita o botão "Importar X selecionada(s)" com X ≥ 1.
+Opções fixas de **Tipo de Vínculo**:
+- "Efetivo", "Contrato Temporário", "Aposentado", "Pensionista", "Outro"
 
-### 2. Simplificar o `onConfirm` (linhas 1486-1490)
-Como agora `rows` já vem com TODAS as linhas selecionadas (válidas + conflitos marcados manualmente), remover a mesclagem com `validRows`:
+### 2. Edge Functions
 
-```ts
-onConfirm={async (rows) => {
-  setReviewState({ open: false, items: [], validRows: [] });
-  await runImport(rows);
-}}
-```
+- `professor-api`: nova rota pública (sem token) `action=create_access_report` — valida campos com zod, aplica rate-limit por IP (reaproveitando padrão de `login_attempts`), gera protocolo e insere no banco. Retorna `{ protocolo }`.
+- `admin-api`: novas rotas (autenticadas como admin)
+  - `action=list_access_reports` (com filtro opcional por status)
+  - `action=update_access_report` (atualizar status e `resposta_admin`)
 
-### 3. (Opcional, mas recomendado) Ajustar título/descrição do modal
-Em `ImportReviewDialog.tsx` (linhas 105-108) o título "Conflitos encontrados na importação" fica enganoso quando há válidas. Trocar para:
-- Título: `Revisão da importação`
-- Descrição: `Linhas válidas já estão selecionadas. Marque também as conflitantes que deseja importar mesmo assim, ou desmarque o que não quiser importar.`
+### 3. Frontend — `/login` (`src/pages/LoginPage.tsx`)
 
-## Fora de escopo
-- Sem mudança no edge function.
-- Sem mudança na lógica de validação/dedup (apenas no fluxo de exibição).
-- Sem mudança no schema.
+- Remover `handleReport` que abre WhatsApp.
+- Manter o link "Não consegue acessar? Reportar problema", mas abrindo um `Dialog` (shadcn) com o formulário.
+- Formulário com validação (zod + máscaras de CPF/telefone já existentes em `src/lib/masks.ts`):
+  - Nome completo *
+  - CPF * (com máscara)
+  - Tipo de vínculo * (Select)
+  - WhatsApp * (com máscara)
+  - E-mail (opcional)
+  - Assunto * (Select)
+  - Descrição (textarea opcional, até 500 caracteres)
+- Submit chama `professor-api?action=create_access_report` sem header de auth.
+- Em sucesso: toast com o número de protocolo e fecha o modal.
 
-## Resultado esperado para o arquivo enviado
-Modal abre com: **Total: 8, Válidas: 7, Dup. base: 1**, 7 linhas pré-marcadas, botão **"Importar 7 selecionada(s)"** habilitado. Usuário pode opcionalmente marcar a duplicada para forçar importação.
+### 4. Frontend — `/admin` (`src/pages/AdminPage.tsx`)
+
+- Nova aba/seção "Reports de Acesso" com:
+  - Lista de reports com badge de status, protocolo, data, nome, CPF e assunto.
+  - Filtro por status.
+  - Drawer/Dialog de detalhe permitindo: alterar status, escrever resposta interna e marcar como Resolvido/Descartado.
+- Usar o mesmo padrão visual das demais seções (cards + Badge de status, igual ao de contestações).
+
+## Detalhes técnicos
+
+- Tabela criada via migration com `GRANT ALL ... TO service_role` (sem grants a `anon`/`authenticated`) e RLS habilitada com policy deny-all (mesmo padrão já usado em `contestacoes`, `messages`, etc.).
+- Sequence `access_report_protocolo_seq` + trigger `BEFORE INSERT` para gerar `protocolo` (espelho de `generate_protocolo`).
+- Rate limit no endpoint público: máx. 5 reports por IP por hora.
+- Sanitização/validação no edge: trim, limites de tamanho, regex de CPF (11 dígitos) e e-mail.
+- Nenhuma alteração no fluxo de login existente.
+
+## Itens fora de escopo
+
+- Notificações por e-mail/WhatsApp para o admin quando chega um novo report (pode ser adicionado depois).
+- Vincular automaticamente um report a um cadastro existente de professor.
