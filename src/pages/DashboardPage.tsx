@@ -363,7 +363,7 @@ const DashboardPage = () => {
                     <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Total de Cotas</p>
                     <p className="text-2xl font-bold tracking-tight">
                       {professor.total_cotas ?? '—'}
-                      {professor.total_cotas != null && <span className="text-sm font-medium text-muted-foreground ml-1">meses</span>}
+                      {professor.total_cotas != null && <span className="text-sm font-medium text-muted-foreground ml-1">cotas</span>}
                     </p>
                   </div>
                 </div>
