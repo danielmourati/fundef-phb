@@ -46,6 +46,8 @@ interface Contestacao {
   status: string;
   created_at: string;
   professors: { nome: string; matricula: string } | null;
+  documento_url?: string | null;
+  documento_nome?: string | null;
 }
 
 interface Message {
