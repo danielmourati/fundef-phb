@@ -120,12 +120,14 @@ const AdminPage = () => {
   const [summaryDialog, setSummaryDialog] = useState<{
     open: boolean;
     totalLines: number;
-    emptyDiscarded: number;
-    duplicateGroups: number;
-    keptBySelection: number;
-    dedupedRemoved: number;
+    validRows: number;
+    errorRows: number;
+    dupFileRows: number;
+    dupBaseRows: number;
+    selectedRows: number;
     imported: number;
-  }>({ open: false, totalLines: 0, emptyDiscarded: 0, duplicateGroups: 0, keptBySelection: 0, dedupedRemoved: 0, imported: 0 });
+    skipped: number;
+  }>({ open: false, totalLines: 0, validRows: 0, errorRows: 0, dupFileRows: 0, dupBaseRows: 0, selectedRows: 0, imported: 0, skipped: 0 });
   const [reviewState, setReviewState] = useState<{ open: boolean; items: ReviewItem[]; validRows: Record<string, string>[] }>({ open: false, items: [], validRows: [] });
 
   const authHeaders = { Authorization: `Bearer ${token}` };
@@ -352,7 +354,7 @@ const AdminPage = () => {
     return rows;
   };
 
-  const runImport = async (rows: Record<string, string>[]) => {
+  const runImport = async (rows: Record<string, string>[], reviewCounts?: { total: number; valid: number; error: number; dup_file: number; dup_base: number }) => {
     if (rows.length === 0) { toast.error('Nenhuma linha selecionada.'); return; }
     setImporting(true);
     setImportProgress({ current: 0, total: rows.length });
@@ -371,6 +373,17 @@ const AdminPage = () => {
         skipped += data?.skipped || 0;
         setImportProgress({ current: Math.min(i + chunk.length, rows.length), total: rows.length });
       }
+      setSummaryDialog({
+        open: true,
+        totalLines: reviewCounts?.total || rows.length,
+        validRows: reviewCounts?.valid || rows.length,
+        errorRows: reviewCounts?.error || 0,
+        dupFileRows: reviewCounts?.dup_file || 0,
+        dupBaseRows: reviewCounts?.dup_base || 0,
+        selectedRows: rows.length,
+        imported,
+        skipped,
+      });
       toast.success(`${imported} professor(es) importado(s)!${skipped > 0 ? ` (${skipped} ignorada(s) pelo servidor)` : ''}`);
       fetchData();
     } catch (err: any) {
@@ -546,7 +559,14 @@ const AdminPage = () => {
       const hasConflicts = items.some(it => it.status !== 'valid' || it.reason);
       if (!hasConflicts) {
         const rows = items.filter(it => it.status === 'valid').map(it => it.data);
-        await runImport(rows);
+        const reviewCounts = {
+          total: items.length,
+          valid: items.filter(i => i.status === 'valid').length,
+          error: items.filter(i => i.status === 'error').length,
+          dup_file: items.filter(i => i.status === 'dup_file').length,
+          dup_base: items.filter(i => i.status === 'dup_base').length,
+        };
+        await runImport(rows, reviewCounts);
         return;
       }
 
@@ -1447,24 +1467,32 @@ const AdminPage = () => {
           </DialogHeader>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between border-b pb-2">
-              <span className="text-muted-foreground">Total de linhas no CSV</span>
+              <span className="text-muted-foreground">Total de linhas no arquivo</span>
               <span className="font-semibold">{summaryDialog.totalLines}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Linhas vazias descartadas</span>
-              <span className="font-semibold">{summaryDialog.emptyDiscarded}</span>
+              <span className="text-muted-foreground">Linhas válidas</span>
+              <span className="font-semibold text-green-600">{summaryDialog.validRows}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Grupos de duplicatas detectados</span>
-              <span className="font-semibold">{summaryDialog.duplicateGroups}</span>
+              <span className="text-muted-foreground">Linhas com erro</span>
+              <span className="font-semibold text-red-600">{summaryDialog.errorRows}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Mantidas por seleção (1 por grupo)</span>
-              <span className="font-semibold">{summaryDialog.keptBySelection}</span>
+              <span className="text-muted-foreground">Duplicadas no arquivo</span>
+              <span className="font-semibold text-yellow-600">{summaryDialog.dupFileRows}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Duplicatas removidas</span>
-              <span className="font-semibold">{summaryDialog.dedupedRemoved}</span>
+              <span className="text-muted-foreground">Já existentes na base</span>
+              <span className="font-semibold text-orange-600">{summaryDialog.dupBaseRows}</span>
+            </div>
+            <div className="flex justify-between border-t pt-2 mt-2">
+              <span className="text-muted-foreground">Selecionadas para importar</span>
+              <span className="font-semibold">{summaryDialog.selectedRows}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Ignoradas pelo servidor</span>
+              <span className="font-semibold">{summaryDialog.skipped}</span>
             </div>
             <div className="flex justify-between border-t pt-2 mt-2">
               <span className="font-semibold text-primary">Registros importados</span>
@@ -1483,7 +1511,14 @@ const AdminPage = () => {
         onCancel={() => { setReviewState({ open: false, items: [], validRows: [] }); toast.info('Importação cancelada.'); }}
         onConfirm={async (rows) => {
           setReviewState({ open: false, items: [], validRows: [] });
-          await runImport(rows);
+          const reviewCounts = {
+            total: reviewState.items.length,
+            valid: reviewState.items.filter(i => i.status === 'valid').length,
+            error: reviewState.items.filter(i => i.status === 'error').length,
+            dup_file: reviewState.items.filter(i => i.status === 'dup_file').length,
+            dup_base: reviewState.items.filter(i => i.status === 'dup_base').length,
+          };
+          await runImport(rows, reviewCounts);
         }}
       />
 
