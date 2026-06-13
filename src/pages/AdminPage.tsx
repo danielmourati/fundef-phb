@@ -1077,7 +1077,58 @@ const AdminPage = () => {
           )}
 
           {/* Messages Tab */}
+          {activeTab === 'access_reports' && (
+            <Card>
+              <CardContent className="p-0">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+                  <h3 className="font-semibold text-foreground">Reports de Acesso ({accessReports.length})</h3>
+                </div>
+                {loading ? (
+                  <div className="p-6 text-muted-foreground text-sm">Carregando...</div>
+                ) : accessReports.length === 0 ? (
+                  <div className="p-6 text-muted-foreground text-sm">Nenhum report recebido.</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead className="text-xs font-medium text-muted-foreground">Protocolo</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">Nome</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">CPF</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">Vínculo</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">Assunto</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">WhatsApp</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">Status</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">Data</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground text-right">Ações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {accessReports.map((r: any) => (
+                          <TableRow key={r.id}>
+                            <TableCell className="font-mono text-xs">{r.protocolo || '—'}</TableCell>
+                            <TableCell className="text-sm">{r.nome_completo}</TableCell>
+                            <TableCell className="font-mono text-xs">{maskCPF(r.cpf || '')}</TableCell>
+                            <TableCell className="text-sm">{r.tipo_vinculo}</TableCell>
+                            <TableCell className="max-w-[220px] truncate text-sm">{r.assunto}</TableCell>
+                            <TableCell className="text-sm">{r.whatsapp ? maskPhone(r.whatsapp) : '—'}</TableCell>
+                            <TableCell><Badge variant="secondary" className="text-xs">{r.status}</Badge></TableCell>
+                            <TableCell className="text-sm">{new Date(r.created_at).toLocaleDateString('pt-BR')}</TableCell>
+                            <TableCell className="text-right">
+                              <Button size="sm" variant="outline" onClick={() => openReport(r)}>Analisar</Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {activeTab === 'messages' && (
+
             <>
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-foreground">Mensagens ({messages.length})</h3>
