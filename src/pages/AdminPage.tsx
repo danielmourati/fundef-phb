@@ -1467,24 +1467,32 @@ const AdminPage = () => {
           </DialogHeader>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between border-b pb-2">
-              <span className="text-muted-foreground">Total de linhas no CSV</span>
+              <span className="text-muted-foreground">Total de linhas no arquivo</span>
               <span className="font-semibold">{summaryDialog.totalLines}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Linhas vazias descartadas</span>
-              <span className="font-semibold">{summaryDialog.emptyDiscarded}</span>
+              <span className="text-muted-foreground">Linhas válidas</span>
+              <span className="font-semibold text-green-600">{summaryDialog.validRows}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Grupos de duplicatas detectados</span>
-              <span className="font-semibold">{summaryDialog.duplicateGroups}</span>
+              <span className="text-muted-foreground">Linhas com erro</span>
+              <span className="font-semibold text-red-600">{summaryDialog.errorRows}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Mantidas por seleção (1 por grupo)</span>
-              <span className="font-semibold">{summaryDialog.keptBySelection}</span>
+              <span className="text-muted-foreground">Duplicadas no arquivo</span>
+              <span className="font-semibold text-yellow-600">{summaryDialog.dupFileRows}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Duplicatas removidas</span>
-              <span className="font-semibold">{summaryDialog.dedupedRemoved}</span>
+              <span className="text-muted-foreground">Já existentes na base</span>
+              <span className="font-semibold text-orange-600">{summaryDialog.dupBaseRows}</span>
+            </div>
+            <div className="flex justify-between border-t pt-2 mt-2">
+              <span className="text-muted-foreground">Selecionadas para importar</span>
+              <span className="font-semibold">{summaryDialog.selectedRows}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Ignoradas pelo servidor</span>
+              <span className="font-semibold">{summaryDialog.skipped}</span>
             </div>
             <div className="flex justify-between border-t pt-2 mt-2">
               <span className="font-semibold text-primary">Registros importados</span>
