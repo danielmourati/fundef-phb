@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      access_reports: {
+        Row: {
+          assunto: string
+          cpf: string
+          created_at: string
+          descricao: string | null
+          email: string | null
+          id: string
+          ip_address: string | null
+          nome_completo: string
+          protocolo: string | null
+          resposta_admin: string | null
+          status: string
+          tipo_vinculo: string
+          updated_at: string
+          whatsapp: string
+        }
+        Insert: {
+          assunto: string
+          cpf: string
+          created_at?: string
+          descricao?: string | null
+          email?: string | null
+          id?: string
+          ip_address?: string | null
+          nome_completo: string
+          protocolo?: string | null
+          resposta_admin?: string | null
+          status?: string
+          tipo_vinculo: string
+          updated_at?: string
+          whatsapp: string
+        }
+        Update: {
+          assunto?: string
+          cpf?: string
+          created_at?: string
+          descricao?: string | null
+          email?: string | null
+          id?: string
+          ip_address?: string | null
+          nome_completo?: string
+          protocolo?: string | null
+          resposta_admin?: string | null
+          status?: string
+          tipo_vinculo?: string
+          updated_at?: string
+          whatsapp?: string
+        }
+        Relationships: []
+      }
       contestacoes: {
         Row: {
           created_at: string
