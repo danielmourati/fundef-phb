@@ -1511,7 +1511,14 @@ const AdminPage = () => {
         onCancel={() => { setReviewState({ open: false, items: [], validRows: [] }); toast.info('Importação cancelada.'); }}
         onConfirm={async (rows) => {
           setReviewState({ open: false, items: [], validRows: [] });
-          await runImport(rows);
+          const reviewCounts = {
+            total: reviewState.items.length,
+            valid: reviewState.items.filter(i => i.status === 'valid').length,
+            error: reviewState.items.filter(i => i.status === 'error').length,
+            dup_file: reviewState.items.filter(i => i.status === 'dup_file').length,
+            dup_base: reviewState.items.filter(i => i.status === 'dup_base').length,
+          };
+          await runImport(rows, reviewCounts);
         }}
       />
 
