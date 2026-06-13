@@ -13,8 +13,9 @@ import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, Pagi
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
   LogOut, Upload, Download, Users, AlertTriangle, Settings, Plus, Pencil, Trash2, Save,
-  LayoutDashboard, FileText, Search, Send, MessageSquare, Menu, Eye, EyeOff, Trash, Loader2,
+  LayoutDashboard, FileText, Search, Send, MessageSquare, Menu, Eye, EyeOff, Trash, Loader2, LifeBuoy,
 } from 'lucide-react';
+
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -62,15 +63,17 @@ const emptyProfessor = {
   status: 'ATIVO',
 };
 
-type ActiveTab = 'dashboard' | 'professors' | 'contestacoes' | 'messages' | 'settings';
+type ActiveTab = 'dashboard' | 'professors' | 'contestacoes' | 'access_reports' | 'messages' | 'settings';
 
 const navItems: { key: ActiveTab; label: string; icon: React.ElementType }[] = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { key: 'professors', label: 'Professores', icon: Users },
   { key: 'contestacoes', label: 'Contestações', icon: AlertTriangle },
+  { key: 'access_reports', label: 'Reports de Acesso', icon: LifeBuoy },
   { key: 'messages', label: 'Mensagens', icon: MessageSquare },
   { key: 'settings', label: 'Configurações', icon: Settings },
 ];
+
 
 const TEMPLATE_COLUMNS = [
   'nome', 'matricula', 'cpf', 'vinculo_inicio', 'vinculo_fim',
@@ -83,7 +86,13 @@ const AdminPage = () => {
   const [professors, setProfessors] = useState<Professor[]>([]);
   const [contestacoes, setContestacoes] = useState<Contestacao[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [accessReports, setAccessReports] = useState<any[]>([]);
+  const [selectedReport, setSelectedReport] = useState<any | null>(null);
+  const [reportStatus, setReportStatus] = useState('Aberto');
+  const [reportResposta, setReportResposta] = useState('');
+  const [savingReport, setSavingReport] = useState(false);
   const [loading, setLoading] = useState(true);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
@@ -153,16 +162,40 @@ const AdminPage = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const [profRes, contRes, msgRes] = await Promise.all([
+    const [profRes, contRes, msgRes, arRes] = await Promise.all([
       apiCall('GET', 'professors'),
       apiCall('GET', 'contestacoes'),
       apiCall('GET', 'messages'),
+      apiCall('GET', 'access_reports'),
     ]);
     if (profRes.data && Array.isArray(profRes.data)) setProfessors(profRes.data);
     if (contRes.data && Array.isArray(contRes.data)) setContestacoes(contRes.data);
     if (msgRes.data && Array.isArray(msgRes.data)) setMessages(msgRes.data);
+    if (arRes.data && Array.isArray(arRes.data)) setAccessReports(arRes.data);
     setLoading(false);
   };
+
+  const openReport = (r: any) => {
+    setSelectedReport(r);
+    setReportStatus(r.status || 'Aberto');
+    setReportResposta(r.resposta_admin || '');
+  };
+
+  const saveReport = async () => {
+    if (!selectedReport) return;
+    setSavingReport(true);
+    const { data, error } = await apiCall('PUT', 'update_access_report', {
+      id: selectedReport.id,
+      status: reportStatus,
+      resposta_admin: reportResposta,
+    });
+    setSavingReport(false);
+    if (error || data?.error) { toast.error(data?.error || 'Erro ao salvar.'); return; }
+    toast.success('Report atualizado!');
+    setSelectedReport(null);
+    fetchData();
+  };
+
 
   const fetchSettings = async () => {
     const { data } = await apiCall('GET', 'settings');
@@ -1044,7 +1077,58 @@ const AdminPage = () => {
           )}
 
           {/* Messages Tab */}
+          {activeTab === 'access_reports' && (
+            <Card>
+              <CardContent className="p-0">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+                  <h3 className="font-semibold text-foreground">Reports de Acesso ({accessReports.length})</h3>
+                </div>
+                {loading ? (
+                  <div className="p-6 text-muted-foreground text-sm">Carregando...</div>
+                ) : accessReports.length === 0 ? (
+                  <div className="p-6 text-muted-foreground text-sm">Nenhum report recebido.</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead className="text-xs font-medium text-muted-foreground">Protocolo</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">Nome</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">CPF</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">Vínculo</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">Assunto</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">WhatsApp</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">Status</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">Data</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground text-right">Ações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {accessReports.map((r: any) => (
+                          <TableRow key={r.id}>
+                            <TableCell className="font-mono text-xs">{r.protocolo || '—'}</TableCell>
+                            <TableCell className="text-sm">{r.nome_completo}</TableCell>
+                            <TableCell className="font-mono text-xs">{maskCPF(r.cpf || '')}</TableCell>
+                            <TableCell className="text-sm">{r.tipo_vinculo}</TableCell>
+                            <TableCell className="max-w-[220px] truncate text-sm">{r.assunto}</TableCell>
+                            <TableCell className="text-sm">{r.whatsapp ? maskPhone(r.whatsapp) : '—'}</TableCell>
+                            <TableCell><Badge variant="secondary" className="text-xs">{r.status}</Badge></TableCell>
+                            <TableCell className="text-sm">{new Date(r.created_at).toLocaleDateString('pt-BR')}</TableCell>
+                            <TableCell className="text-right">
+                              <Button size="sm" variant="outline" onClick={() => openReport(r)}>Analisar</Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {activeTab === 'messages' && (
+
             <>
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-foreground">Mensagens ({messages.length})</h3>
@@ -1522,7 +1606,90 @@ const AdminPage = () => {
         }}
       />
 
+      <Dialog open={!!selectedReport} onOpenChange={(v) => { if (!v) setSelectedReport(null); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Analisar Report de Acesso</DialogTitle>
+          </DialogHeader>
+          {selectedReport && (
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">Protocolo</p>
+                  <p className="font-mono">{selectedReport.protocolo || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Data</p>
+                  <p>{new Date(selectedReport.created_at).toLocaleString('pt-BR')}</p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-xs text-muted-foreground">Nome</p>
+                  <p className="font-medium">{selectedReport.nome_completo}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">CPF</p>
+                  <p className="font-mono">{maskCPF(selectedReport.cpf || '')}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Vínculo</p>
+                  <p>{selectedReport.tipo_vinculo}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">WhatsApp</p>
+                  <p>{selectedReport.whatsapp ? maskPhone(selectedReport.whatsapp) : '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">E-mail</p>
+                  <p className="break-all">{selectedReport.email || '—'}</p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-xs text-muted-foreground">Assunto</p>
+                  <p>{selectedReport.assunto}</p>
+                </div>
+                {selectedReport.descricao && (
+                  <div className="col-span-2">
+                    <p className="text-xs text-muted-foreground">Descrição</p>
+                    <p className="whitespace-pre-wrap">{selectedReport.descricao}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2 pt-2 border-t">
+                <Label>Status</Label>
+                <Select value={reportStatus} onValueChange={setReportStatus}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Aberto">Aberto</SelectItem>
+                    <SelectItem value="Em análise">Em análise</SelectItem>
+                    <SelectItem value="Resolvido">Resolvido</SelectItem>
+                    <SelectItem value="Descartado">Descartado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Resposta / Observações internas</Label>
+                <Textarea
+                  rows={3}
+                  value={reportResposta}
+                  onChange={(e) => setReportResposta(e.target.value)}
+                  maxLength={1000}
+                  placeholder="Anotações sobre a análise deste caso..."
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedReport(null)} disabled={savingReport}>Fechar</Button>
+            <Button onClick={saveReport} disabled={savingReport}>
+              {savingReport ? 'Salvando...' : 'Salvar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
+
   );
 };
 

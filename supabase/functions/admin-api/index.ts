@@ -320,9 +320,37 @@ if (req.method === "DELETE" && action === "delete_message") {
   return jsonResponse({ success: true });
 }
 
+// GET access reports
+if (req.method === "GET" && action === "access_reports") {
+  const statusFilter = url.searchParams.get("status");
+  let q = supabase
+    .from("access_reports")
+    .select("id, nome_completo, cpf, tipo_vinculo, whatsapp, email, assunto, descricao, status, resposta_admin, protocolo, created_at, updated_at")
+    .order("created_at", { ascending: false });
+  if (statusFilter) q = q.eq("status", statusFilter);
+  const { data, error } = await q;
+  if (error) throw error;
+  return jsonResponse(data);
+}
+
+// PUT update access report
+if (req.method === "PUT" && action === "update_access_report") {
+  const body = await req.json();
+  const { id, status, resposta_admin } = body;
+  if (!id || !status) throw new Error("ID e status obrigatórios");
+  const allowed = ["Aberto", "Em análise", "Resolvido", "Descartado"];
+  if (!allowed.includes(status)) throw new Error("Status inválido.");
+  const update: Record<string, unknown> = { status };
+  if (resposta_admin !== undefined) update.resposta_admin = resposta_admin;
+  const { error } = await supabase.from("access_reports").update(update).eq("id", id);
+  if (error) throw error;
+  return jsonResponse({ success: true });
+}
+
 return new Response(JSON.stringify({ error: "Ação não encontrada." }), {
   status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
 });
+
   } catch (e: any) {
   return new Response(JSON.stringify({ error: e.message || "Erro interno." }), {
     status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
