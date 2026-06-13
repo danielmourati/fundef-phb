@@ -39,6 +39,7 @@ const DashboardPage = () => {
   const [motivo, setMotivo] = useState('');
   const [descricao, setDescricao] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
+  const [documento, setDocumento] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
