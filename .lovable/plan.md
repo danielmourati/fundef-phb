@@ -1,42 +1,47 @@
 ## Problema
 
-Hoje:
-- O botão **Modelo CSV** gera cabeçalho `nome;matricula;cpf;vinculo_inicio;vinculo_fim;total_cotas;status` — tem `status` (que já foi removido do sistema) e está faltando `carga_horaria` e `cargo`.
-- O `handleFileImport` aceita as colunas `['nome','matricula','cpf','vinculo_inicio','vinculo_fim','carga_horaria','total_cotas','cargo']` (sem `status`).
-- O arquivo enviado (`lista_complementar.csv`) usa exatamente esse último conjunto, ou seja, **o modelo está divergente do que o importador realmente espera**.
-- Não há validação de cabeçalho: se o usuário enviar um CSV com colunas erradas, a importação segue silenciosamente e os campos viram vazios.
+Na imagem enviada, o modal "Conflitos encontrados na importação" exibe:
+- **Total: 1, Válidas: 0, Dup. base: 1**
+- Botão final: **"Importar 0 selecionada(s)"** (desabilitado)
 
-## Mudanças (`src/pages/AdminPage.tsx`)
+Causa: em `handleFileImport` (linhas 553-556 de `src/pages/AdminPage.tsx`), apenas as linhas conflitantes são passadas para o modal — as válidas são separadas em `reviewState.validRows` e mescladas só no `onConfirm`. Resultado: quando o arquivo tem **apenas 1 linha conflitante e nenhuma válida** entre as enviadas ao diálogo, o botão "Importar selecionadas" fica em 0 porque a seleção inicial só marca itens com status `valid` (linhas 42-46 de `ImportReviewDialog.tsx`) — e não há nenhum.
 
-### 1. Definir um único `TEMPLATE_COLUMNS` no topo do componente
+Além disso, o usuário não vê quais linhas foram consideradas válidas, perdendo visibilidade do que será importado.
+
+## Correção (`src/pages/AdminPage.tsx`)
+
+### 1. Passar TODAS as linhas para o modal (válidas + conflitos)
+Trocar o bloco das linhas 553-556 por:
+
 ```ts
-const TEMPLATE_COLUMNS = [
-  'nome','matricula','cpf','vinculo_inicio','vinculo_fim',
-  'carga_horaria','total_cotas','cargo'
-] as const;
+// Abre o modal mostrando todas as linhas (válidas pré-selecionadas + conflitos para revisão).
+setReviewState({ open: true, items, validRows: [] });
 ```
-Reaproveitar em três pontos (modelo, validação, parsing) — fonte única de verdade.
 
-### 2. Corrigir o botão **Modelo CSV** (linhas 830-844)
-- Trocar `headers` para `TEMPLATE_COLUMNS`.
-- Atualizar a linha-exemplo para incluir `carga_horaria` (`40`) e `cargo` (`PROFESSOR (A)`) e remover `status`.
+Agora `items` contém o array completo: válidas + duplicadas + erros. O `ImportReviewDialog` já:
+- Conta corretamente cada categoria (badges Total/Válidas/Erros/Dup.).
+- Pré-seleciona automaticamente as `valid` no `useEffect` (linhas 49-55).
+- Habilita o botão "Importar X selecionada(s)" com X ≥ 1.
 
-### 3. Validar o cabeçalho do CSV antes de processar (em `handleFileImport`, bloco `else` do CSV, após extrair `headers`)
-Lógica:
-- Normalizar os headers do arquivo (já é feito: lowercase + remover BOM).
-- Calcular:
-  - `missing = TEMPLATE_COLUMNS.filter(c => !headers.includes(c))`
-  - `extras  = headers.filter(h => h && !TEMPLATE_COLUMNS.includes(h))`
-- Se `missing.length > 0` **ou** `extras.length > 0`:
-  - Exibir `toast.error` com mensagem clara:
-    `Colunas divergentes do modelo. Faltando: [...]. Não reconhecidas: [...]. Baixe o "Modelo CSV" e ajuste o arquivo.`
-  - Abortar o `import` (return) sem abrir o modal de revisão.
-- PDF segue o caminho atual (não tem header textual a validar).
+### 2. Simplificar o `onConfirm` (linhas 1486-1490)
+Como agora `rows` já vem com TODAS as linhas selecionadas (válidas + conflitos marcados manualmente), remover a mesclagem com `validRows`:
 
-### 4. Usar `TEMPLATE_COLUMNS` em vez da constante local `ALLOWED` (linha 408)
-Apenas substituir a referência — comportamento inalterado.
+```ts
+onConfirm={async (rows) => {
+  setReviewState({ open: false, items: [], validRows: [] });
+  await runImport(rows);
+}}
+```
+
+### 3. (Opcional, mas recomendado) Ajustar título/descrição do modal
+Em `ImportReviewDialog.tsx` (linhas 105-108) o título "Conflitos encontrados na importação" fica enganoso quando há válidas. Trocar para:
+- Título: `Revisão da importação`
+- Descrição: `Linhas válidas já estão selecionadas. Marque também as conflitantes que deseja importar mesmo assim, ou desmarque o que não quiser importar.`
 
 ## Fora de escopo
-- Sem mudanças no edge function (já aceita esse conjunto de colunas).
-- Sem mudanças no `ImportReviewDialog`.
-- Sem mudanças no schema do banco.
+- Sem mudança no edge function.
+- Sem mudança na lógica de validação/dedup (apenas no fluxo de exibição).
+- Sem mudança no schema.
+
+## Resultado esperado para o arquivo enviado
+Modal abre com: **Total: 8, Válidas: 7, Dup. base: 1**, 7 linhas pré-marcadas, botão **"Importar 7 selecionada(s)"** habilitado. Usuário pode opcionalmente marcar a duplicada para forçar importação.
