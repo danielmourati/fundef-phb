@@ -120,12 +120,14 @@ const AdminPage = () => {
   const [summaryDialog, setSummaryDialog] = useState<{
     open: boolean;
     totalLines: number;
-    emptyDiscarded: number;
-    duplicateGroups: number;
-    keptBySelection: number;
-    dedupedRemoved: number;
+    validRows: number;
+    errorRows: number;
+    dupFileRows: number;
+    dupBaseRows: number;
+    selectedRows: number;
     imported: number;
-  }>({ open: false, totalLines: 0, emptyDiscarded: 0, duplicateGroups: 0, keptBySelection: 0, dedupedRemoved: 0, imported: 0 });
+    skipped: number;
+  }>({ open: false, totalLines: 0, validRows: 0, errorRows: 0, dupFileRows: 0, dupBaseRows: 0, selectedRows: 0, imported: 0, skipped: 0 });
   const [reviewState, setReviewState] = useState<{ open: boolean; items: ReviewItem[]; validRows: Record<string, string>[] }>({ open: false, items: [], validRows: [] });
 
   const authHeaders = { Authorization: `Bearer ${token}` };
