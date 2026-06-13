@@ -1482,9 +1482,8 @@ const AdminPage = () => {
         items={reviewState.items}
         onCancel={() => { setReviewState({ open: false, items: [], validRows: [] }); toast.info('Importação cancelada.'); }}
         onConfirm={async (rows) => {
-          const allRows = [...reviewState.validRows, ...rows];
           setReviewState({ open: false, items: [], validRows: [] });
-          await runImport(allRows);
+          await runImport(rows);
         }}
       />
 
