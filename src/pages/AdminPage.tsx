@@ -354,7 +354,7 @@ const AdminPage = () => {
     return rows;
   };
 
-  const runImport = async (rows: Record<string, string>[]) => {
+  const runImport = async (rows: Record<string, string>[], reviewCounts?: { total: number; valid: number; error: number; dup_file: number; dup_base: number }) => {
     if (rows.length === 0) { toast.error('Nenhuma linha selecionada.'); return; }
     setImporting(true);
     setImportProgress({ current: 0, total: rows.length });
@@ -373,6 +373,17 @@ const AdminPage = () => {
         skipped += data?.skipped || 0;
         setImportProgress({ current: Math.min(i + chunk.length, rows.length), total: rows.length });
       }
+      setSummaryDialog({
+        open: true,
+        totalLines: reviewCounts?.total || rows.length,
+        validRows: reviewCounts?.valid || rows.length,
+        errorRows: reviewCounts?.error || 0,
+        dupFileRows: reviewCounts?.dup_file || 0,
+        dupBaseRows: reviewCounts?.dup_base || 0,
+        selectedRows: rows.length,
+        imported,
+        skipped,
+      });
       toast.success(`${imported} professor(es) importado(s)!${skipped > 0 ? ` (${skipped} ignorada(s) pelo servidor)` : ''}`);
       fetchData();
     } catch (err: any) {
