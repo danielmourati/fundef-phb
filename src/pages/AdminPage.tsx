@@ -162,16 +162,40 @@ const AdminPage = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const [profRes, contRes, msgRes] = await Promise.all([
+    const [profRes, contRes, msgRes, arRes] = await Promise.all([
       apiCall('GET', 'professors'),
       apiCall('GET', 'contestacoes'),
       apiCall('GET', 'messages'),
+      apiCall('GET', 'access_reports'),
     ]);
     if (profRes.data && Array.isArray(profRes.data)) setProfessors(profRes.data);
     if (contRes.data && Array.isArray(contRes.data)) setContestacoes(contRes.data);
     if (msgRes.data && Array.isArray(msgRes.data)) setMessages(msgRes.data);
+    if (arRes.data && Array.isArray(arRes.data)) setAccessReports(arRes.data);
     setLoading(false);
   };
+
+  const openReport = (r: any) => {
+    setSelectedReport(r);
+    setReportStatus(r.status || 'Aberto');
+    setReportResposta(r.resposta_admin || '');
+  };
+
+  const saveReport = async () => {
+    if (!selectedReport) return;
+    setSavingReport(true);
+    const { data, error } = await apiCall('PUT', 'update_access_report', {
+      id: selectedReport.id,
+      status: reportStatus,
+      resposta_admin: reportResposta,
+    });
+    setSavingReport(false);
+    if (error || data?.error) { toast.error(data?.error || 'Erro ao salvar.'); return; }
+    toast.success('Report atualizado!');
+    setSelectedReport(null);
+    fetchData();
+  };
+
 
   const fetchSettings = async () => {
     const { data } = await apiCall('GET', 'settings');
