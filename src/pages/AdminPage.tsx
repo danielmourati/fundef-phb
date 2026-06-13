@@ -1606,7 +1606,90 @@ const AdminPage = () => {
         }}
       />
 
+      <Dialog open={!!selectedReport} onOpenChange={(v) => { if (!v) setSelectedReport(null); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Analisar Report de Acesso</DialogTitle>
+          </DialogHeader>
+          {selectedReport && (
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">Protocolo</p>
+                  <p className="font-mono">{selectedReport.protocolo || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Data</p>
+                  <p>{new Date(selectedReport.created_at).toLocaleString('pt-BR')}</p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-xs text-muted-foreground">Nome</p>
+                  <p className="font-medium">{selectedReport.nome_completo}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">CPF</p>
+                  <p className="font-mono">{maskCPF(selectedReport.cpf || '')}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Vínculo</p>
+                  <p>{selectedReport.tipo_vinculo}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">WhatsApp</p>
+                  <p>{selectedReport.whatsapp ? maskPhone(selectedReport.whatsapp) : '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">E-mail</p>
+                  <p className="break-all">{selectedReport.email || '—'}</p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-xs text-muted-foreground">Assunto</p>
+                  <p>{selectedReport.assunto}</p>
+                </div>
+                {selectedReport.descricao && (
+                  <div className="col-span-2">
+                    <p className="text-xs text-muted-foreground">Descrição</p>
+                    <p className="whitespace-pre-wrap">{selectedReport.descricao}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2 pt-2 border-t">
+                <Label>Status</Label>
+                <Select value={reportStatus} onValueChange={setReportStatus}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Aberto">Aberto</SelectItem>
+                    <SelectItem value="Em análise">Em análise</SelectItem>
+                    <SelectItem value="Resolvido">Resolvido</SelectItem>
+                    <SelectItem value="Descartado">Descartado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Resposta / Observações internas</Label>
+                <Textarea
+                  rows={3}
+                  value={reportResposta}
+                  onChange={(e) => setReportResposta(e.target.value)}
+                  maxLength={1000}
+                  placeholder="Anotações sobre a análise deste caso..."
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedReport(null)} disabled={savingReport}>Fechar</Button>
+            <Button onClick={saveReport} disabled={savingReport}>
+              {savingReport ? 'Salvando...' : 'Salvar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
+
   );
 };
 
