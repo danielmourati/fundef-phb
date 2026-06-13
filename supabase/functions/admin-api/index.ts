@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
     if (req.method === "GET" && action === "contestacoes") {
       const { data, error } = await supabase
         .from("contestacoes")
-        .select("id, motivo, descricao, whatsapp, status, created_at, professor_id, protocolo, resposta")
+        .select("id, motivo, descricao, whatsapp, status, created_at, professor_id, protocolo, resposta, documento_path, documento_nome")
         .order("created_at", { ascending: false });
       if (error) throw error;
 
@@ -76,10 +76,22 @@ Deno.serve(async (req) => {
         .in("id", profIds);
 
       const profMap = new Map((profs || []).map(p => [p.id, p]));
-      const enriched = (data || []).map(c => ({
+      const enrichedBase = (data || []).map(c => ({
         ...c,
         professors: profMap.get(c.professor_id) || null,
       }));
+      // Attach signed URLs for documento_path
+      const enriched = [];
+      for (const c of enrichedBase) {
+        if (c.documento_path) {
+          const { data: signed } = await supabase.storage
+            .from("contestacao-documentos")
+            .createSignedUrl(c.documento_path, 600);
+          enriched.push({ ...c, documento_url: signed?.signedUrl || null });
+        } else {
+          enriched.push({ ...c, documento_url: null });
+        }
+      }
       return jsonResponse(enriched);
     }
 
