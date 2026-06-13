@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
-import { LogOut, User, AlertTriangle, Bell, Check, FileText, Lock, CheckCircle2, Circle } from 'lucide-react';
+import { LogOut, User, AlertTriangle, Bell, Check, FileText, Lock, CheckCircle2, Circle, Download, Paperclip } from 'lucide-react';
 import { toast } from 'sonner';
 import { maskPhone } from '@/lib/masks';
 
