@@ -172,8 +172,10 @@ const LoginPage = () => {
         </footer>
       </div>
 
+      <AccessReportDialog open={reportOpen} onOpenChange={setReportOpen} />
     </div>
   );
 };
+
 
 export default LoginPage;
