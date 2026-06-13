@@ -398,6 +398,31 @@ const DashboardPage = () => {
               </CardContent>
             </Card>
 
+            <Card className="border-primary/20 bg-primary/5">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-start gap-2">
+                  <FileText className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold">Antes de contestar: baixe o Anexo II</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Para contestar seus dados é obrigatório enviar o <strong>Requerimento de Complementação e/ou Retificação de Dados</strong> (Anexo II do Edital de Chamamento Público Nº 01/2026), preenchido e assinado.
+                    </p>
+                  </div>
+                </div>
+                <a
+                  href="/anexo-ii-requerimento.pdf"
+                  download
+                  className="inline-flex items-center justify-center gap-2 w-full h-9 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  Baixar Formulário (Anexo II)
+                </a>
+                <p className="text-[11px] text-muted-foreground">
+                  Depois de preencher, clique em <strong>Contestar Dados</strong> abaixo e anexe o documento no formulário.
+                </p>
+              </CardContent>
+            </Card>
+
             <div className="space-y-2">
               <Button
                 onClick={() => setSheetOpen(true)}
