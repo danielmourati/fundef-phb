@@ -567,6 +567,33 @@ const DashboardPage = () => {
                 required
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="documento">Anexo II preenchido (PDF) *</Label>
+              <div className="flex items-center gap-2">
+                <a
+                  href="/anexo-ii-requerimento.pdf"
+                  download
+                  className="inline-flex items-center gap-1 text-xs text-primary underline shrink-0"
+                >
+                  <Download className="w-3 h-3" /> Baixar modelo
+                </a>
+              </div>
+              <Input
+                id="documento"
+                type="file"
+                accept="application/pdf"
+                onChange={(e) => setDocumento(e.target.files?.[0] || null)}
+                required
+              />
+              {documento && (
+                <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  <Paperclip className="w-3 h-3" /> {documento.name} ({(documento.size / 1024 / 1024).toFixed(2)} MB)
+                </p>
+              )}
+              <p className="text-[11px] text-muted-foreground">
+                Envie o Anexo II preenchido e assinado em PDF (máx. 10 MB).
+              </p>
+            </div>
             <Button type="submit" disabled={submitting} className="w-full">
               {submitting ? 'Enviando...' : 'Enviar Contestação'}
             </Button>
