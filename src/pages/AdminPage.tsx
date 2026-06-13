@@ -550,10 +550,8 @@ const AdminPage = () => {
         return;
       }
 
-      // Abre o modal de revisão mostrando apenas conflitos. O envio ocorre via onConfirm -> runImport.
-      const validRows = items.filter(it => it.status === 'valid' && !it.reason).map(it => it.data);
-      const conflictItems = items.filter(it => it.status !== 'valid' || it.reason);
-      setReviewState({ open: true, items: conflictItems, validRows });
+      // Abre o modal mostrando todas as linhas (válidas pré-selecionadas + conflitos para revisão).
+      setReviewState({ open: true, items, validRows: [] });
     } catch (err: any) {
       toast.error(`Erro ao processar arquivo: ${err?.message || err}`);
     } finally {
@@ -1484,9 +1482,8 @@ const AdminPage = () => {
         items={reviewState.items}
         onCancel={() => { setReviewState({ open: false, items: [], validRows: [] }); toast.info('Importação cancelada.'); }}
         onConfirm={async (rows) => {
-          const allRows = [...reviewState.validRows, ...rows];
           setReviewState({ open: false, items: [], validRows: [] });
-          await runImport(allRows);
+          await runImport(rows);
         }}
       />
 
