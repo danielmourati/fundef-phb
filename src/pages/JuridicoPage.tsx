@@ -31,6 +31,8 @@ interface Contestacao {
   protocolo: string | null;
   resposta: string | null;
   professor: { id: string; nome: string; matricula: string; cpf: string } | null;
+  documento_url?: string | null;
+  documento_nome?: string | null;
 }
 
 const statusOptions = ['Aberta', 'Pendente', 'Deferido', 'Indeferido'];
@@ -393,6 +395,22 @@ const JuridicoPage = () => {
               <div>
                 <p className="text-muted-foreground text-xs mb-1">Descrição</p>
                 <p className="text-sm bg-muted/50 rounded p-3">{selectedContest.descricao}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs mb-1">Anexo II (Requerimento)</p>
+                {selectedContest.documento_url ? (
+                  <a
+                    href={selectedContest.documento_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-sm text-primary underline"
+                  >
+                    <Download className="w-4 h-4" />
+                    Baixar {selectedContest.documento_nome || 'documento'}
+                  </a>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Sem documento anexado.</p>
+                )}
               </div>
               <div className="border-t pt-4 space-y-3">
                 <div className="space-y-2">

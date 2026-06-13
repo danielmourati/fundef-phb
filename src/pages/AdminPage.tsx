@@ -46,6 +46,8 @@ interface Contestacao {
   status: string;
   created_at: string;
   professors: { nome: string; matricula: string } | null;
+  documento_url?: string | null;
+  documento_nome?: string | null;
 }
 
 interface Message {
@@ -1052,6 +1054,7 @@ const AdminPage = () => {
                           <TableHead className="text-xs font-medium text-muted-foreground">Motivo</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground">Descrição</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground">WhatsApp</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">Anexo II</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground">Status</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground">Data</TableHead>
                         </TableRow>
@@ -1064,6 +1067,13 @@ const AdminPage = () => {
                             <TableCell className="text-sm">{c.motivo}</TableCell>
                             <TableCell className="max-w-[200px] truncate text-sm">{c.descricao}</TableCell>
                             <TableCell className="text-sm">{c.whatsapp ? maskPhone(c.whatsapp) : '—'}</TableCell>
+                            <TableCell className="text-sm">
+                              {c.documento_url ? (
+                                <a href={c.documento_url} target="_blank" rel="noopener noreferrer" className="text-primary underline inline-flex items-center gap-1">
+                                  <Download className="w-3.5 h-3.5" /> Baixar
+                                </a>
+                              ) : '—'}
+                            </TableCell>
                             <TableCell><Badge variant="secondary" className="text-xs">{c.status}</Badge></TableCell>
                             <TableCell className="text-sm">{new Date(c.created_at).toLocaleDateString('pt-BR')}</TableCell>
                           </TableRow>

@@ -69,6 +69,8 @@ export type Database = {
         Row: {
           created_at: string
           descricao: string
+          documento_nome: string | null
+          documento_path: string | null
           id: string
           motivo: string
           professor_id: string
@@ -81,6 +83,8 @@ export type Database = {
         Insert: {
           created_at?: string
           descricao: string
+          documento_nome?: string | null
+          documento_path?: string | null
           id?: string
           motivo: string
           professor_id: string
@@ -93,6 +97,8 @@ export type Database = {
         Update: {
           created_at?: string
           descricao?: string
+          documento_nome?: string | null
+          documento_path?: string | null
           id?: string
           motivo?: string
           professor_id?: string

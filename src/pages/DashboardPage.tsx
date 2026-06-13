@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
-import { LogOut, User, AlertTriangle, Bell, Check, FileText, Lock, CheckCircle2, Circle } from 'lucide-react';
+import { LogOut, User, AlertTriangle, Bell, Check, FileText, Lock, CheckCircle2, Circle, Download, Paperclip } from 'lucide-react';
 import { toast } from 'sonner';
 import { maskPhone } from '@/lib/masks';
 
@@ -39,6 +39,7 @@ const DashboardPage = () => {
   const [motivo, setMotivo] = useState('');
   const [descricao, setDescricao] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
+  const [documento, setDocumento] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -112,11 +113,39 @@ const DashboardPage = () => {
       toast.error('Preencha todos os campos obrigatórios.');
       return;
     }
+    if (!documento) {
+      toast.error('Anexe o Anexo II preenchido (PDF).');
+      return;
+    }
+    if (documento.type !== 'application/pdf') {
+      toast.error('O documento deve estar em formato PDF.');
+      return;
+    }
+    if (documento.size > 10 * 1024 * 1024) {
+      toast.error('O documento deve ter no máximo 10 MB.');
+      return;
+    }
     setSubmitting(true);
 
     try {
+      // Read file as base64
+      const documento_base64: string = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          // strip data:...;base64, prefix
+          resolve(result.includes(',') ? result.split(',')[1] : result);
+        };
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(documento);
+      });
+
       const { data, error } = await supabase.functions.invoke('professor-api?action=create_contestacao', {
-        body: { motivo, descricao, whatsapp },
+        body: {
+          motivo, descricao, whatsapp,
+          documento_base64,
+          documento_nome: documento.name,
+        },
         headers: authHeaders,
       });
 
@@ -127,6 +156,7 @@ const DashboardPage = () => {
         setMotivo('');
         setDescricao('');
         setWhatsapp('');
+        setDocumento(null);
         setSheetOpen(false);
         fetchContestacoes();
       }
@@ -368,6 +398,31 @@ const DashboardPage = () => {
               </CardContent>
             </Card>
 
+            <Card className="border-primary/20 bg-primary/5">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-start gap-2">
+                  <FileText className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold">Antes de contestar: baixe o Anexo II</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Para contestar seus dados é obrigatório enviar o <strong>Requerimento de Complementação e/ou Retificação de Dados</strong> (Anexo II do Edital de Chamamento Público Nº 01/2026), preenchido e assinado.
+                    </p>
+                  </div>
+                </div>
+                <a
+                  href="/anexo-ii-requerimento.pdf"
+                  download
+                  className="inline-flex items-center justify-center gap-2 w-full h-9 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  Baixar Formulário (Anexo II)
+                </a>
+                <p className="text-[11px] text-muted-foreground">
+                  Depois de preencher, clique em <strong>Contestar Dados</strong> abaixo e anexe o documento no formulário.
+                </p>
+              </CardContent>
+            </Card>
+
             <div className="space-y-2">
               <Button
                 onClick={() => setSheetOpen(true)}
@@ -511,6 +566,33 @@ const DashboardPage = () => {
                 maxLength={15}
                 required
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="documento">Anexo II preenchido (PDF) *</Label>
+              <div className="flex items-center gap-2">
+                <a
+                  href="/anexo-ii-requerimento.pdf"
+                  download
+                  className="inline-flex items-center gap-1 text-xs text-primary underline shrink-0"
+                >
+                  <Download className="w-3 h-3" /> Baixar modelo
+                </a>
+              </div>
+              <Input
+                id="documento"
+                type="file"
+                accept="application/pdf"
+                onChange={(e) => setDocumento(e.target.files?.[0] || null)}
+                required
+              />
+              {documento && (
+                <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  <Paperclip className="w-3 h-3" /> {documento.name} ({(documento.size / 1024 / 1024).toFixed(2)} MB)
+                </p>
+              )}
+              <p className="text-[11px] text-muted-foreground">
+                Envie o Anexo II preenchido e assinado em PDF (máx. 10 MB).
+              </p>
             </div>
             <Button type="submit" disabled={submitting} className="w-full">
               {submitting ? 'Enviando...' : 'Enviar Contestação'}
