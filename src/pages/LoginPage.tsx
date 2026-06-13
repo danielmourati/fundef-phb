@@ -9,14 +9,18 @@ import loginImage from '@/assets/login-education.jpg';
 import logoSeduc from '@/assets/logo-seduc-azul.png';
 import { toast } from '@/hooks/use-toast';
 
+import AccessReportDialog from '@/components/AccessReportDialog';
+
 const LoginPage = () => {
   const [cpf, setCpf] = useState('');
   const [senha, setSenha] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
