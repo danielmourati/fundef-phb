@@ -285,7 +285,7 @@ Deno.serve(async (req) => {
       }
       const { data, error } = await supabase
         .from("contestacoes")
-        .select("id, motivo, descricao, whatsapp, status, created_at, professor_id, protocolo, resposta")
+        .select("id, motivo, descricao, whatsapp, status, created_at, professor_id, protocolo, resposta, documento_path, documento_nome")
         .order("created_at", { ascending: false });
       if (error) throw error;
 
@@ -296,7 +296,8 @@ Deno.serve(async (req) => {
         .in("id", profIds);
 
       const profMap = new Map((profs || []).map(p => [p.id, p]));
-      const enriched = (data || []).map(c => ({
+      const withUrls = await attachDocumentUrls(data || []);
+      const enriched = withUrls.map(c => ({
         ...c,
         professor: profMap.get(c.professor_id) || null,
       }));
