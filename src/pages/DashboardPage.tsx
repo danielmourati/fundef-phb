@@ -113,11 +113,39 @@ const DashboardPage = () => {
       toast.error('Preencha todos os campos obrigatórios.');
       return;
     }
+    if (!documento) {
+      toast.error('Anexe o Anexo II preenchido (PDF).');
+      return;
+    }
+    if (documento.type !== 'application/pdf') {
+      toast.error('O documento deve estar em formato PDF.');
+      return;
+    }
+    if (documento.size > 10 * 1024 * 1024) {
+      toast.error('O documento deve ter no máximo 10 MB.');
+      return;
+    }
     setSubmitting(true);
 
     try {
+      // Read file as base64
+      const documento_base64: string = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          // strip data:...;base64, prefix
+          resolve(result.includes(',') ? result.split(',')[1] : result);
+        };
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(documento);
+      });
+
       const { data, error } = await supabase.functions.invoke('professor-api?action=create_contestacao', {
-        body: { motivo, descricao, whatsapp },
+        body: {
+          motivo, descricao, whatsapp,
+          documento_base64,
+          documento_nome: documento.name,
+        },
         headers: authHeaders,
       });
 
@@ -128,6 +156,7 @@ const DashboardPage = () => {
         setMotivo('');
         setDescricao('');
         setWhatsapp('');
+        setDocumento(null);
         setSheetOpen(false);
         fetchContestacoes();
       }
