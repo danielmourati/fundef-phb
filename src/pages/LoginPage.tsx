@@ -72,8 +72,9 @@ const LoginPage = () => {
             <img
               src={logoSeduc}
               alt="SEDUC Parnaíba"
-              className="h-12 object-contain"
+              className="h-16 w-auto max-w-full object-contain"
             />
+
             <div className="text-center">
               <h1 className="text-2xl font-bold text-foreground">Bem-vindo(a) 👋</h1>
               <p className="text-muted-foreground mt-1">Informe seus dados para acessar o sistema</p>
