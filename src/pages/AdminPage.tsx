@@ -63,15 +63,17 @@ const emptyProfessor = {
   status: 'ATIVO',
 };
 
-type ActiveTab = 'dashboard' | 'professors' | 'contestacoes' | 'messages' | 'settings';
+type ActiveTab = 'dashboard' | 'professors' | 'contestacoes' | 'access_reports' | 'messages' | 'settings';
 
 const navItems: { key: ActiveTab; label: string; icon: React.ElementType }[] = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { key: 'professors', label: 'Professores', icon: Users },
   { key: 'contestacoes', label: 'Contestações', icon: AlertTriangle },
+  { key: 'access_reports', label: 'Reports de Acesso', icon: LifeBuoy },
   { key: 'messages', label: 'Mensagens', icon: MessageSquare },
   { key: 'settings', label: 'Configurações', icon: Settings },
 ];
+
 
 const TEMPLATE_COLUMNS = [
   'nome', 'matricula', 'cpf', 'vinculo_inicio', 'vinculo_fim',
