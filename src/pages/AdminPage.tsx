@@ -86,7 +86,13 @@ const AdminPage = () => {
   const [professors, setProfessors] = useState<Professor[]>([]);
   const [contestacoes, setContestacoes] = useState<Contestacao[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [accessReports, setAccessReports] = useState<any[]>([]);
+  const [selectedReport, setSelectedReport] = useState<any | null>(null);
+  const [reportStatus, setReportStatus] = useState('Aberto');
+  const [reportResposta, setReportResposta] = useState('');
+  const [savingReport, setSavingReport] = useState(false);
   const [loading, setLoading] = useState(true);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
