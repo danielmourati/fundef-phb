@@ -13,8 +13,20 @@ import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, Pagi
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
   LogOut, Upload, Download, Users, AlertTriangle, Settings, Plus, Pencil, Trash2, Save,
-  LayoutDashboard, FileText, Search, Send, MessageSquare, Menu, Eye, EyeOff, Trash, Loader2, LifeBuoy,
+  LayoutDashboard, FileText, Search, Send, MessageSquare, Menu, Eye, EyeOff, Trash, Loader2, LifeBuoy, MessageCircle,
 } from 'lucide-react';
+
+const buildWhatsappUrl = (phone: string | null | undefined, nome?: string, protocolo?: string | null) => {
+  if (!phone) return null;
+  let digits = phone.replace(/\D/g, '');
+  if (!digits) return null;
+  if (!digits.startsWith('55')) digits = '55' + digits;
+  const firstName = (nome || '').trim().split(' ')[0] || '';
+  const saudacao = firstName ? `Olá, ${firstName}!` : 'Olá!';
+  const ref = protocolo ? ` referente ao protocolo ${protocolo}` : '';
+  const msg = `${saudacao} Sou da SEDUC Parnaíba e estou entrando em contato sobre o seu report de acesso ao sistema de Precatórios do FUNDEF${ref}.`;
+  return `https://wa.me/${digits}?text=${encodeURIComponent(msg)}`;
+};
 
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
