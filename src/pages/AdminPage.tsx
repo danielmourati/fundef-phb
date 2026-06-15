@@ -1673,7 +1673,19 @@ const AdminPage = () => {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">WhatsApp</p>
-                  <p>{selectedReport.whatsapp ? maskPhone(selectedReport.whatsapp) : '—'}</p>
+                  {selectedReport.whatsapp ? (
+                    <div className="flex items-center gap-2">
+                      <p>{maskPhone(selectedReport.whatsapp)}</p>
+                      <a
+                        href={buildWhatsappUrl(selectedReport.whatsapp, selectedReport.nome_completo, selectedReport.protocolo) || '#'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#25D366] text-white text-xs hover:opacity-90 transition"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
+                      </a>
+                    </div>
+                  ) : <p>—</p>}
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">E-mail</p>
