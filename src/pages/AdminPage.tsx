@@ -13,8 +13,20 @@ import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, Pagi
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
   LogOut, Upload, Download, Users, AlertTriangle, Settings, Plus, Pencil, Trash2, Save,
-  LayoutDashboard, FileText, Search, Send, MessageSquare, Menu, Eye, EyeOff, Trash, Loader2, LifeBuoy,
+  LayoutDashboard, FileText, Search, Send, MessageSquare, Menu, Eye, EyeOff, Trash, Loader2, LifeBuoy, MessageCircle,
 } from 'lucide-react';
+
+const buildWhatsappUrl = (phone: string | null | undefined, nome?: string, protocolo?: string | null) => {
+  if (!phone) return null;
+  let digits = phone.replace(/\D/g, '');
+  if (!digits) return null;
+  if (!digits.startsWith('55')) digits = '55' + digits;
+  const firstName = (nome || '').trim().split(' ')[0] || '';
+  const saudacao = firstName ? `Olá, ${firstName}!` : 'Olá!';
+  const ref = protocolo ? ` referente ao protocolo ${protocolo}` : '';
+  const msg = `${saudacao} Sou da SEDUC Parnaíba e estou entrando em contato sobre o seu report de acesso ao sistema de Precatórios do FUNDEF${ref}.`;
+  return `https://wa.me/${digits}?text=${encodeURIComponent(msg)}`;
+};
 
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -1121,7 +1133,22 @@ const AdminPage = () => {
                             <TableCell className="font-mono text-xs">{maskCPF(r.cpf || '')}</TableCell>
                             <TableCell className="text-sm">{r.tipo_vinculo}</TableCell>
                             <TableCell className="max-w-[220px] truncate text-sm">{r.assunto}</TableCell>
-                            <TableCell className="text-sm">{r.whatsapp ? maskPhone(r.whatsapp) : '—'}</TableCell>
+                            <TableCell className="text-sm">
+                              {r.whatsapp ? (
+                                <div className="flex items-center gap-2">
+                                  <span>{maskPhone(r.whatsapp)}</span>
+                                  <a
+                                    href={buildWhatsappUrl(r.whatsapp, r.nome_completo, r.protocolo) || '#'}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title="Abrir conversa no WhatsApp"
+                                    className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-[#25D366] text-white hover:opacity-90 transition"
+                                  >
+                                    <MessageCircle className="w-4 h-4" />
+                                  </a>
+                                </div>
+                              ) : '—'}
+                            </TableCell>
                             <TableCell><Badge variant="secondary" className="text-xs">{r.status}</Badge></TableCell>
                             <TableCell className="text-sm">{new Date(r.created_at).toLocaleDateString('pt-BR')}</TableCell>
                             <TableCell className="text-right">
@@ -1646,7 +1673,19 @@ const AdminPage = () => {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">WhatsApp</p>
-                  <p>{selectedReport.whatsapp ? maskPhone(selectedReport.whatsapp) : '—'}</p>
+                  {selectedReport.whatsapp ? (
+                    <div className="flex items-center gap-2">
+                      <p>{maskPhone(selectedReport.whatsapp)}</p>
+                      <a
+                        href={buildWhatsappUrl(selectedReport.whatsapp, selectedReport.nome_completo, selectedReport.protocolo) || '#'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#25D366] text-white text-xs hover:opacity-90 transition"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
+                      </a>
+                    </div>
+                  ) : <p>—</p>}
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">E-mail</p>
