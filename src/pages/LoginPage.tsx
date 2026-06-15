@@ -107,7 +107,7 @@ const LoginPage = () => {
                 value={cpf}
                 onChange={(e) => setCpf(e.target.value)}
                 required
-                className="h-12 rounded-lg"
+                className="h-11 rounded-lg"
                 inputMode="numeric"
               />
             </div>
