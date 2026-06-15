@@ -123,7 +123,7 @@ const LoginPage = () => {
                   value={senha}
                   onChange={(e) => setSenha(e.target.value)}
                   required
-                  className="h-12 rounded-lg pr-10"
+                  className="h-11 rounded-lg pr-10"
                 />
                 <button
                   type="button"
