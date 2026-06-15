@@ -1133,7 +1133,22 @@ const AdminPage = () => {
                             <TableCell className="font-mono text-xs">{maskCPF(r.cpf || '')}</TableCell>
                             <TableCell className="text-sm">{r.tipo_vinculo}</TableCell>
                             <TableCell className="max-w-[220px] truncate text-sm">{r.assunto}</TableCell>
-                            <TableCell className="text-sm">{r.whatsapp ? maskPhone(r.whatsapp) : '—'}</TableCell>
+                            <TableCell className="text-sm">
+                              {r.whatsapp ? (
+                                <div className="flex items-center gap-2">
+                                  <span>{maskPhone(r.whatsapp)}</span>
+                                  <a
+                                    href={buildWhatsappUrl(r.whatsapp, r.nome_completo, r.protocolo) || '#'}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title="Abrir conversa no WhatsApp"
+                                    className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-[#25D366] text-white hover:opacity-90 transition"
+                                  >
+                                    <MessageCircle className="w-4 h-4" />
+                                  </a>
+                                </div>
+                              ) : '—'}
+                            </TableCell>
                             <TableCell><Badge variant="secondary" className="text-xs">{r.status}</Badge></TableCell>
                             <TableCell className="text-sm">{new Date(r.created_at).toLocaleDateString('pt-BR')}</TableCell>
                             <TableCell className="text-right">
