@@ -1,29 +1,35 @@
-Objetivo
---------
-Exibir um modal informativo antes das telas públicas (home e login) orientando o usuário de que, no primeiro acesso, deve usar o CPF (somente números) tanto no campo "CPF" quanto no campo "Senha", e que a alteração de senha será exigida logo após a autenticação.
+Ajustar a coluna do formulário de login (lado direito) para que todo o conteúdo caiba sem corte no viewport de desktop padrão (1366x768, zoom 100%), eliminando a barra de rolagem e o corte do logo.
 
-Escopo
-------
-- Apenas frontend/componente de UI; sem alterações no banco, auth ou fluxo de negócio.
-- O modal deve aparecer na landing (Index) e na tela de login (LoginPage) para usuários não autenticados.
-- O modal não deve reaparecer a cada carregamento: guardar no localStorage a informação de que o usuário já viu o aviso.
+### Problema
+A coluna direita contém logo, título, divisor, formulário, botão de reportar e footer. O conjunto excede a altura disponível em telas de 768 px, fazendo o logo ficar cortado pela metade quando o formulário é centralizado verticalmente.
 
-Implementação
--------------
-1. Criar o componente `src/components/FirstAccessInfoDialog.tsx` usando `AlertDialog` (já existente no projeto) e ícone `Info` do lucide-react.
-   - Título: "Primeiro acesso".
-   - Corpo: texto explicativo sobre uso do CPF no login e na senha, e sobre a troca obrigatória de senha após o login.
-   - Botão único de ação: "Entendi".
-   - Estado interno de aberto/fechado baseado em uma chave no localStorage (`fundef_first_access_seen`).
+### Alterações propostas em `src/pages/LoginPage.tsx`
 
-2. Inserir `<FirstAccessInfoDialog />` em `src/pages/LoginPage.tsx` abaixo dos demais dialogs.
+1. **Logo**
+   - Reduzir altura de `h-16` (64 px) para `h-12` (48 px).
+   - Manter `w-auto max-w-full object-contain` para preservar proporção.
 
-3. Inserir `<FirstAccessInfoDialog />` em `src/pages/Index.tsx`, renderizando-o condicionalmente apenas quando `!professor` (para não atrapalhar usuários já logados que serão redirecionados).
+2. **Título e subtítulo**
+   - Reduzir título de `text-2xl` para `text-xl`.
+   - Reduzir margem do subtítulo (`mt-1` mantido, mas com menos espaço no `space-y` pai).
 
-4. Reaproveitar os tokens de design existentes (`bg-primary`, `text-primary-foreground`, etc.) sem criar novas classes ad-hoc.
+3. **Espaçamento vertical**
+   - Reduzir `space-y-8` entre logo/divisor/formulário para `space-y-6`.
+   - Reduzir `space-y-5` dentro do formulário para `space-y-4`.
 
-Validação
----------
-- Verificar no preview que o modal aparece ao acessar `/login` e `/` sem sessão ativa.
-- Confirmar que o texto exibido corresponde às orientações de primeiro acesso.
-- Confirmar que o modal fecha ao clicar em "Entendi" e não reaparece ao recarregar a página (localStorage).
+4. **Inputs e botão**
+   - Reduzir altura dos inputs de `h-12` (48 px) para `h-11` (44 px).
+   - Reduzir altura do botão principal para `h-11`.
+
+5. **Footer**
+   - Reduzir `mt-12` para `mt-8`.
+
+6. **Layout vertical**
+   - Manter `justify-start lg:justify-center` (já ajustado) e `overflow-y-auto` como fallback, mas a meta é que o conteúdo não precise rolar em 768 px.
+
+### Validação
+- Verificar via screenshot do preview em 1366x768 que o logo aparece completo e não há barra de rolagem visível na coluna direita.
+- Testar em 1024x768 para garantir que, se ainda precisar rolar, o conteúdo comece no topo e não fique cortado.
+
+### Arquivos alterados
+- `src/pages/LoginPage.tsx`

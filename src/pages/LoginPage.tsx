@@ -70,18 +70,18 @@ const LoginPage = () => {
 
       {/* Right side - Form */}
       <div className="flex-1 flex flex-col items-center justify-start lg:justify-center px-6 py-8 lg:px-16 lg:py-12 h-full overflow-y-auto">
-        <div className="w-full max-w-md space-y-8">
+        <div className="w-full max-w-md space-y-6">
           {/* Logo */}
-          <div className="flex flex-col items-center space-y-4">
+          <div className="flex flex-col items-center space-y-3">
             <img
               src={logoSeduc}
               alt="SEDUC Parnaíba"
-              className="h-16 w-auto max-w-full object-contain"
+              className="h-12 w-auto max-w-full object-contain"
             />
 
             <div className="text-center">
-              <h1 className="text-2xl font-bold text-foreground">Bem-vindo(a) 👋</h1>
-              <p className="text-muted-foreground mt-1">Informe seus dados para acessar o sistema</p>
+              <h1 className="text-xl font-bold text-foreground">Bem-vindo(a) 👋</h1>
+              <p className="text-sm text-muted-foreground mt-1">Informe seus dados para acessar o sistema</p>
             </div>
           </div>
 
