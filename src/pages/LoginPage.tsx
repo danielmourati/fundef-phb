@@ -70,18 +70,18 @@ const LoginPage = () => {
 
       {/* Right side - Form */}
       <div className="flex-1 flex flex-col items-center justify-start lg:justify-center px-6 py-8 lg:px-16 lg:py-12 h-full overflow-y-auto">
-        <div className="w-full max-w-md space-y-8">
+        <div className="w-full max-w-md space-y-6">
           {/* Logo */}
-          <div className="flex flex-col items-center space-y-4">
+          <div className="flex flex-col items-center space-y-3">
             <img
               src={logoSeduc}
               alt="SEDUC Parnaíba"
-              className="h-16 w-auto max-w-full object-contain"
+              className="h-12 w-auto max-w-full object-contain"
             />
 
             <div className="text-center">
-              <h1 className="text-2xl font-bold text-foreground">Bem-vindo(a) 👋</h1>
-              <p className="text-muted-foreground mt-1">Informe seus dados para acessar o sistema</p>
+              <h1 className="text-xl font-bold text-foreground">Bem-vindo(a) 👋</h1>
+              <p className="text-sm text-muted-foreground mt-1">Informe seus dados para acessar o sistema</p>
             </div>
           </div>
 
@@ -96,7 +96,7 @@ const LoginPage = () => {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="cpf" className="text-sm font-medium">
                 CPF <span className="text-destructive">*</span>
@@ -107,7 +107,7 @@ const LoginPage = () => {
                 value={cpf}
                 onChange={(e) => setCpf(e.target.value)}
                 required
-                className="h-12 rounded-lg"
+                className="h-11 rounded-lg"
                 inputMode="numeric"
               />
             </div>
@@ -123,7 +123,7 @@ const LoginPage = () => {
                   value={senha}
                   onChange={(e) => setSenha(e.target.value)}
                   required
-                  className="h-12 rounded-lg pr-10"
+                  className="h-11 rounded-lg pr-10"
                 />
                 <button
                   type="button"
@@ -144,7 +144,7 @@ const LoginPage = () => {
 
             <Button
               type="submit"
-              className="w-full h-12 rounded-lg text-base font-semibold"
+              className="w-full h-11 rounded-lg text-base font-semibold"
               disabled={isLoading}
             >
               {isLoading ? 'Entrando...' : 'Entrar'}
@@ -168,7 +168,7 @@ const LoginPage = () => {
           </p>
         </div>
 
-        <footer className="mt-12 text-center text-xs text-muted-foreground">
+        <footer className="mt-8 text-center text-xs text-muted-foreground">
           Desenvolvido pelo Núcleo de Tecnologia e Dados - SEDUC Parnaíba
         </footer>
       </div>
