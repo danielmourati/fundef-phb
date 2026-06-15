@@ -96,7 +96,7 @@ const LoginPage = () => {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="cpf" className="text-sm font-medium">
                 CPF <span className="text-destructive">*</span>
