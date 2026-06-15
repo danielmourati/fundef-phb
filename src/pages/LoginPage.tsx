@@ -10,6 +10,7 @@ import logoSeduc from '@/assets/logo-seduc-azul.png';
 import { toast } from '@/hooks/use-toast';
 
 import AccessReportDialog from '@/components/AccessReportDialog';
+import FirstAccessInfoDialog from '@/components/FirstAccessInfoDialog';
 
 const LoginPage = () => {
   const [cpf, setCpf] = useState('');
@@ -173,6 +174,7 @@ const LoginPage = () => {
       </div>
 
       <AccessReportDialog open={reportOpen} onOpenChange={setReportOpen} />
+      <FirstAccessInfoDialog />
     </div>
   );
 };

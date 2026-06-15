@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import FirstAccessInfoDialog from '@/components/FirstAccessInfoDialog';
 
 const Index = () => {
   const { professor, loading } = useAuth();
@@ -18,6 +19,7 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center">
       <p className="text-muted-foreground">Carregando...</p>
+      {!loading && !professor && <FirstAccessInfoDialog />}
     </div>
   );
 };
