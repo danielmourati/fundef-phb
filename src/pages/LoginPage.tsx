@@ -69,7 +69,7 @@ const LoginPage = () => {
       </div>
 
       {/* Right side - Form */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 lg:px-16 h-full overflow-y-auto">
+      <div className="flex-1 flex flex-col items-center justify-start lg:justify-center px-6 py-8 lg:px-16 lg:py-12 h-full overflow-y-auto">
         <div className="w-full max-w-md space-y-8">
           {/* Logo */}
           <div className="flex flex-col items-center space-y-4">
