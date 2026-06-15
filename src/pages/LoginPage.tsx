@@ -49,7 +49,7 @@ const LoginPage = () => {
 
 
   return (
-    <div className="h-screen overflow-hidden flex flex-col lg:flex-row bg-background">
+    <div className="min-h-screen lg:h-screen overflow-hidden flex flex-col lg:flex-row bg-background">
       {/* Left side - Image */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden h-full">
         <img
