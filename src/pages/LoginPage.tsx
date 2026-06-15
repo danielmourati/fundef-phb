@@ -144,7 +144,7 @@ const LoginPage = () => {
 
             <Button
               type="submit"
-              className="w-full h-12 rounded-lg text-base font-semibold"
+              className="w-full h-11 rounded-lg text-base font-semibold"
               disabled={isLoading}
             >
               {isLoading ? 'Entrando...' : 'Entrar'}
