@@ -168,7 +168,7 @@ const LoginPage = () => {
           </p>
         </div>
 
-        <footer className="mt-12 text-center text-xs text-muted-foreground">
+        <footer className="mt-8 text-center text-xs text-muted-foreground">
           Desenvolvido pelo Núcleo de Tecnologia e Dados - SEDUC Parnaíba
         </footer>
       </div>
