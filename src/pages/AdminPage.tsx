@@ -867,7 +867,7 @@ const AdminPage = () => {
               </div>
               <div className="leading-tight">
                 <p className="text-sm font-semibold text-foreground">{professor?.nome || 'Administrador'}</p>
-                <p className="text-xs text-muted-foreground">Administrador</p>
+                <p className="text-xs text-muted-foreground">{professor?.email || professor?.matricula || 'Administrador'}</p>
               </div>
             </div>
           </div>
