@@ -111,7 +111,10 @@ const AdminPage = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20;
+  const [itemsPerPage, setItemsPerPage] = useState<number>(50);
+  const [totalProfs, setTotalProfs] = useState(0);
+  const [profsLoading, setProfsLoading] = useState(false);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProf, setEditingProf] = useState<any>(null);
