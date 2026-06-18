@@ -115,6 +115,7 @@ const AdminPage = () => {
   const [totalProfs, setTotalProfs] = useState(0);
   const [profsLoading, setProfsLoading] = useState(false);
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [profsRefreshTick, setProfsRefreshTick] = useState(0);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProf, setEditingProf] = useState<any>(null);
