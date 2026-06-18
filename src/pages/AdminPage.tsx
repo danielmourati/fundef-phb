@@ -500,8 +500,11 @@ const AdminPage = () => {
       // ===== Validação client-side com classificação por linha =====
       // Chave única = cpf + matrícula (permite 2º vínculo: mesmo CPF, matrícula diferente)
       const ALLOWED = TEMPLATE_COLUMNS;
+      // Carrega TODOS os professores da base para checagem de duplicidade
+      const { data: allProfsData } = await apiCall('GET', 'professors_all');
+      const allProfs: Professor[] = Array.isArray(allProfsData) ? allProfsData : [];
       const existingByCpf = new Map<string, Set<string>>();
-      professors.forEach(p => {
+      allProfs.forEach(p => {
         const c = (p.cpf || '').replace(/\D/g, '');
         if (!c) return;
         const m = (p.matricula || '').trim();
@@ -509,7 +512,7 @@ const AdminPage = () => {
         existingByCpf.get(c)!.add(m);
       });
       const existingMatToCpf = new Map<string, string>();
-      professors.forEach(p => {
+      allProfs.forEach(p => {
         const m = (p.matricula || '').trim();
         const c = (p.cpf || '').replace(/\D/g, '');
         if (m) existingMatToCpf.set(m, c);
