@@ -1013,11 +1013,28 @@ const AdminPage = () => {
                       </Table>
                     </div>
                     {/* Paginação */}
-                    {filteredProfs.length > itemsPerPage && (
-                      <div className="flex flex-col sm:flex-row items-center sm:justify-between gap-3 px-4 sm:px-6 py-4 border-t border-border">
-                        <p className="text-xs text-muted-foreground whitespace-nowrap order-2 sm:order-1">
-                          Mostrando {((currentPage - 1) * itemsPerPage) + 1}–{Math.min(currentPage * itemsPerPage, filteredProfs.length)} de {filteredProfs.length}
+                    <div className="flex flex-col sm:flex-row items-center sm:justify-between gap-3 px-4 sm:px-6 py-4 border-t border-border">
+                      <div className="flex items-center gap-3 order-2 sm:order-1">
+                        <p className="text-xs text-muted-foreground whitespace-nowrap">
+                          Mostrando {showingFrom}–{showingTo} de {totalProfs}
                         </p>
+                        <Select value={String(itemsPerPage)} onValueChange={(v) => setItemsPerPage(parseInt(v, 10))}>
+                          <SelectTrigger className="h-8 w-[110px] text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="25">25 / página</SelectItem>
+                            <SelectItem value="50">50 / página</SelectItem>
+                            <SelectItem value="100">100 / página</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {profsLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+                      </div>
+                      {totalPages > 1 && (
+                      <Pagination className="order-1 sm:order-2 mx-0 sm:justify-end w-auto">
+                        <PaginationContent className="flex-wrap justify-center">
+                          <PaginationItem>
+                            <PaginationPrevious
                         <Pagination className="order-1 sm:order-2 mx-0 sm:justify-end w-auto">
                           <PaginationContent className="flex-wrap justify-center">
                             <PaginationItem>
