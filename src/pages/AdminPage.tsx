@@ -137,6 +137,14 @@ const AdminPage = () => {
   const [msgScheduled, setMsgScheduled] = useState('');
   const [sendingMsg, setSendingMsg] = useState(false);
   const [msgDialogOpen, setMsgDialogOpen] = useState(false);
+  const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
+  const [msgTargetType, setMsgTargetType] = useState<'all' | 'role' | 'users'>('all');
+  const [msgTargetRoles, setMsgTargetRoles] = useState<string[]>([]);
+  const [msgTargetCargos, setMsgTargetCargos] = useState<string[]>([]);
+  const [msgTargetUsers, setMsgTargetUsers] = useState<ProfLookup[]>([]);
+  const [cargosList, setCargosList] = useState<string[]>([]);
+  const [userSearch, setUserSearch] = useState('');
+  const [userResults, setUserResults] = useState<ProfLookup[]>([]);
   const [showModalPassword, setShowModalPassword] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
