@@ -163,6 +163,62 @@ Deno.serve(async (req) => {
       return jsonResponse(data);
     }
 
+    // GET professors_lookup (for "specific users" picker)
+    if (req.method === "GET" && action === "professors_lookup") {
+      const q = (url.searchParams.get("q") || "").trim();
+      const limit = Math.min(50, parseInt(url.searchParams.get("limit") || "20", 10) || 20);
+      let query = supabase
+        .from("professors")
+        .select("id, nome, matricula, cargo, role")
+        .order("nome")
+        .limit(limit);
+      if (q) {
+        const digits = q.replace(/\D/g, "");
+        const ors = [`nome.ilike.%${q}%`, `matricula.ilike.%${q}%`];
+        if (digits) ors.push(`cpf.ilike.%${digits}%`);
+        query = query.or(ors.join(","));
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return jsonResponse(data || []);
+    }
+
+    // GET cargos_distinct
+    if (req.method === "GET" && action === "cargos_distinct") {
+      const set = new Set<string>();
+      let from = 0;
+      const chunk = 1000;
+      while (true) {
+        const { data, error } = await supabase
+          .from("professors")
+          .select("cargo")
+          .not("cargo", "is", null)
+          .range(from, from + chunk - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        for (const r of data) {
+          const c = (r as any).cargo;
+          if (c && String(c).trim()) set.add(String(c).trim());
+        }
+        if (data.length < chunk) break;
+        from += chunk;
+      }
+      return jsonResponse([...set].sort());
+    }
+
+    // GET professors_by_ids (resolve chips on edit)
+    if (req.method === "GET" && action === "professors_by_ids") {
+      const ids = (url.searchParams.get("ids") || "").split(",").map(s => s.trim()).filter(Boolean);
+      if (ids.length === 0) return jsonResponse([]);
+      const { data, error } = await supabase
+        .from("professors")
+        .select("id, nome, matricula, cargo, role")
+        .in("id", ids);
+      if (error) throw error;
+      return jsonResponse(data || []);
+    }
+
+
     // POST professor (create)
     if (req.method === "POST" && action === "create_professor") {
       const body = await req.json();
