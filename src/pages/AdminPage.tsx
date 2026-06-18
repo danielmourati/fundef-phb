@@ -179,17 +179,32 @@ const AdminPage = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const [profRes, contRes, msgRes, arRes] = await Promise.all([
-      apiCall('GET', 'professors'),
+    const [contRes, msgRes, arRes, statsRes] = await Promise.all([
       apiCall('GET', 'contestacoes'),
       apiCall('GET', 'messages'),
       apiCall('GET', 'access_reports'),
+      apiCall('GET', 'professors_stats'),
     ]);
-    if (profRes.data && Array.isArray(profRes.data)) setProfessors(profRes.data);
     if (contRes.data && Array.isArray(contRes.data)) setContestacoes(contRes.data);
     if (msgRes.data && Array.isArray(msgRes.data)) setMessages(msgRes.data);
     if (arRes.data && Array.isArray(arRes.data)) setAccessReports(arRes.data);
+    if (statsRes.data && typeof statsRes.data.total === 'number') setTotalProfs(statsRes.data.total);
     setLoading(false);
+  };
+
+  const fetchProfessorsPage = async () => {
+    setProfsLoading(true);
+    const params = new URLSearchParams({
+      page: String(currentPage),
+      pageSize: String(itemsPerPage),
+    });
+    if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim());
+    const { data, error } = await apiCall('GET', `professors&${params.toString()}`);
+    if (!error && data && Array.isArray(data.rows)) {
+      setProfessors(data.rows);
+      setTotalProfs(data.total || 0);
+    }
+    setProfsLoading(false);
   };
 
   const openReport = (r: any) => {
