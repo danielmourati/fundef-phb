@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 interface Professor {
   id: string;
   nome: string;
+  email?: string | null;
   cpf: string;
   matricula: string;
   vinculo_inicio: string | null;

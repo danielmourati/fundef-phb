@@ -75,6 +75,7 @@ Deno.serve(async (req) => {
         professor = {
           id: u.data.id,
           nome: u.data.role === "admin" ? "Administrador" : "Jurídico",
+          email: u.data.email,
           cpf: "",
           matricula: u.data.email,
           data_nascimento: null,
