@@ -906,7 +906,7 @@ const AdminPage = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredProfs.slice(0, 5).map(p => (
+                        {professors.slice(0, 5).map(p => (
                           <TableRow key={p.id}>
                             <TableCell className="font-mono text-sm">{p.matricula}</TableCell>
                             <TableCell className="text-sm">{p.nome}</TableCell>
