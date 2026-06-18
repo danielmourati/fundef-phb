@@ -1079,8 +1079,9 @@ const AdminPage = () => {
                             </PaginationItem>
                           </PaginationContent>
                         </Pagination>
-                      </div>
-                    )}
+                      )}
+                    </div>
+
                   </>
                 )}
               </CardContent>
