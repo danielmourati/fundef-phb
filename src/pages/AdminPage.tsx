@@ -694,28 +694,109 @@ const AdminPage = () => {
     else toast.success('Configurações salvas!');
   };
 
+  const resetMsgForm = () => {
+    setEditingMsgId(null);
+    setMsgTitle('');
+    setMsgContent('');
+    setMsgScheduled('');
+    setMsgTargetType('all');
+    setMsgTargetRoles([]);
+    setMsgTargetCargos([]);
+    setMsgTargetUsers([]);
+    setUserSearch('');
+    setUserResults([]);
+  };
+
+  const openNewMessage = async () => {
+    resetMsgForm();
+    setMsgDialogOpen(true);
+    if (cargosList.length === 0) {
+      const { data } = await apiCall('GET', 'cargos_distinct');
+      if (Array.isArray(data)) setCargosList(data);
+    }
+  };
+
+  const openEditMessage = async (m: Message) => {
+    resetMsgForm();
+    setEditingMsgId(m.id);
+    setMsgTitle(m.title);
+    setMsgContent(m.content);
+    // datetime-local needs "YYYY-MM-DDTHH:mm"
+    if (m.scheduled_at) {
+      const d = new Date(m.scheduled_at);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      setMsgScheduled(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+    }
+    setMsgTargetType((m.target_type as any) || 'all');
+    setMsgTargetRoles(m.target_roles || []);
+    setMsgTargetCargos(m.target_cargos || []);
+    if (m.target_user_ids && m.target_user_ids.length > 0) {
+      const { data } = await apiCall('GET', `professors_by_ids&ids=${m.target_user_ids.join(',')}`);
+      if (Array.isArray(data)) setMsgTargetUsers(data);
+    }
+    if (cargosList.length === 0) {
+      const { data } = await apiCall('GET', 'cargos_distinct');
+      if (Array.isArray(data)) setCargosList(data);
+    }
+    setMsgDialogOpen(true);
+  };
+
   const handleSendMessage = async () => {
     if (!msgTitle || !msgContent) {
       toast.error('Título e conteúdo são obrigatórios.');
       return;
     }
+    if (msgTargetType === 'role' && msgTargetRoles.length === 0 && msgTargetCargos.length === 0) {
+      toast.error('Selecione pelo menos um cargo ou função.');
+      return;
+    }
+    if (msgTargetType === 'users' && msgTargetUsers.length === 0) {
+      toast.error('Selecione pelo menos um usuário.');
+      return;
+    }
     setSendingMsg(true);
-    const { data, error } = await apiCall('POST', 'create_message', {
+    const payload = {
+      id: editingMsgId,
       title: msgTitle,
       content: msgContent,
       scheduled_at: msgScheduled || null,
-    });
+      target_type: msgTargetType,
+      target_roles: msgTargetType === 'role' ? msgTargetRoles : [],
+      target_cargos: msgTargetType === 'role' ? msgTargetCargos : [],
+      target_user_ids: msgTargetType === 'users' ? msgTargetUsers.map(u => u.id) : [],
+    };
+    const { data, error } = editingMsgId
+      ? await apiCall('PUT', 'update_message', payload)
+      : await apiCall('POST', 'create_message', payload);
     setSendingMsg(false);
     if (error || data?.error) {
-      toast.error(data?.error || 'Erro ao enviar.');
+      toast.error(data?.error || 'Erro ao salvar.');
       return;
     }
-    toast.success(msgScheduled ? 'Mensagem programada!' : 'Mensagem enviada!');
-    setMsgTitle('');
-    setMsgContent('');
-    setMsgScheduled('');
+    toast.success(editingMsgId ? 'Mensagem atualizada!' : (msgScheduled ? 'Mensagem programada!' : 'Mensagem enviada!'));
+    resetMsgForm();
     setMsgDialogOpen(false);
     fetchData();
+  };
+
+  const handleResendMessage = async (id: string) => {
+    if (!confirm('Reenviar esta mensagem agora? As leituras serão resetadas e aparecerá como não lida para os destinatários.')) return;
+    const { data, error } = await apiCall('POST', `resend_message&id=${id}`);
+    if (error || data?.error) toast.error(data?.error || 'Erro ao reenviar.');
+    else { toast.success('Mensagem reenviada!'); fetchData(); }
+  };
+
+  const handleDuplicateMessage = async (id: string) => {
+    const { data, error } = await apiCall('POST', `duplicate_message&id=${id}`);
+    if (error || data?.error) { toast.error(data?.error || 'Erro ao duplicar.'); return; }
+    toast.success('Cópia criada como rascunho.');
+    await fetchData();
+    // open edit dialog for the new copy after fetching fresh list
+    setTimeout(async () => {
+      const { data: msgs } = await apiCall('GET', 'messages');
+      const copy = Array.isArray(msgs) ? msgs.find((m: any) => m.id === data.id) : null;
+      if (copy) openEditMessage(copy);
+    }, 100);
   };
 
   const handleDeleteMessage = async (id: string) => {
@@ -727,6 +808,19 @@ const AdminPage = () => {
     if (error || data?.error) toast.error(data?.error || 'Erro ao excluir.');
     else { toast.success('Mensagem excluída!'); fetchData(); }
   };
+
+  // Debounced user lookup for "specific users" picker
+  useEffect(() => {
+    if (msgTargetType !== 'users' || !msgDialogOpen) return;
+    const t = setTimeout(async () => {
+      const q = userSearch.trim();
+      const { data } = await apiCall('GET', `professors_lookup&q=${encodeURIComponent(q)}&limit=20`);
+      if (Array.isArray(data)) setUserResults(data);
+    }, 250);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userSearch, msgTargetType, msgDialogOpen]);
+
 
   // Debounce search input (300ms) and reset to page 1 when search changes
   useEffect(() => {
