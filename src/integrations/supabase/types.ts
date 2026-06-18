@@ -192,6 +192,10 @@ export type Database = {
           id: string
           scheduled_at: string | null
           sent: boolean
+          target_cargos: string[]
+          target_roles: string[]
+          target_type: string
+          target_user_ids: string[]
           title: string
           updated_at: string
         }
@@ -202,6 +206,10 @@ export type Database = {
           id?: string
           scheduled_at?: string | null
           sent?: boolean
+          target_cargos?: string[]
+          target_roles?: string[]
+          target_type?: string
+          target_user_ids?: string[]
           title: string
           updated_at?: string
         }
@@ -212,6 +220,10 @@ export type Database = {
           id?: string
           scheduled_at?: string | null
           sent?: boolean
+          target_cargos?: string[]
+          target_roles?: string[]
+          target_type?: string
+          target_user_ids?: string[]
           title?: string
           updated_at?: string
         }

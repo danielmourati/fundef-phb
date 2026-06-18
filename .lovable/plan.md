@@ -1,43 +1,55 @@
-## Problem
+## Objetivo
+Permitir, na aba **Mensagens** do `/admin`:
+- Editar mensagens **programadas** (título, conteúdo, data/hora, destinatários).
+- **Reenviar agora** uma mensagem já enviada (resetando leituras).
+- **Duplicar** uma mensagem como nova (rascunho/programada).
+- Selecionar **destinatários** ao criar/editar: Todos, por Cargo (role + cargo livre) ou Usuários específicos (busca por nome/matrícula).
 
-The Professores tab in `/admin` shows only 1000 of 1117 records. Cause: the edge function `admin-api` (action `professors`) fetches the full table in one PostgREST call. PostgREST caps responses at 1000 rows even when `.range(0, 49999)` is passed, so the client receives 1000 rows and paginates them locally (`itemsPerPage = 20` → 50 pages of 20 = "1000"). The dashboard counter and CSV exports inherit the same truncation.
+## Banco (migration)
+Adicionar à tabela `messages`:
+- `target_type text not null default 'all'` — valores: `all` | `role` | `users`.
+- `target_roles text[] not null default '{}'` — ex.: `{professor,juridico}`.
+- `target_cargos text[] not null default '{}'` — cargos livres opcionais (ex.: `PROFESSOR I`).
+- `target_user_ids uuid[] not null default '{}'` — quando `target_type = 'users'`.
 
-## Fix — server-side pagination, real count, search
+Nenhuma alteração em RLS/grants (mantém acesso só via edge functions).
 
-### 1. Edge function `supabase/functions/admin-api/index.ts`
-Replace the single fetch for `action=professors` with a paginated query:
-- Accept query params: `page` (1-based), `pageSize` (25/50/100, default 50), `search` (string), `status` (optional).
-- Run `supabase.from('professors').select('<fields>', { count: 'exact' }).range(start, end)`.
-- When `search` is present, apply `.or('nome.ilike.%q%,cpf.ilike.%q%,matricula.ilike.%q%,cargo.ilike.%q%')` (digits-only variant for cpf).
-- Order by `nome`.
-- Return `{ rows, total, page, pageSize }`.
-- Add a separate lightweight `action=professors_stats` returning just `count: 'exact', head: true` for the dashboard "Total Professores" card, so the number is always accurate.
-- For CSV export and bulk operations that need all rows, add `action=professors_all` that loops `.range()` in chunks of 1000 server-side until exhausted (used only on explicit user action, not on page load).
+## Backend — `supabase/functions/admin-api/index.ts`
+- `GET messages`: já existe, retornar também os novos campos de segmentação.
+- `POST create_message`: aceitar `target_type`, `target_roles`, `target_cargos`, `target_user_ids` e persistir.
+- **Novo** `PUT update_message`: edita `title`, `content`, `scheduled_at`, e campos de segmentação. **Só permitido** se a mensagem ainda **não foi enviada** (`sent = false`). Recalcula `sent` se `scheduled_at` for limpo.
+- **Novo** `POST resend_message?id=...`: marca `sent=true`, atualiza `created_at = now()`, **apaga `message_reads` da mensagem** (reset de leituras) para reaparecer como não lida.
+- **Novo** `POST duplicate_message?id=...`: copia a mensagem em uma nova linha como `sent=false` (rascunho/programada) preservando segmentação; cliente abre o diálogo de edição em seguida.
+- **Novo** `GET professors_lookup?q=...&limit=20`: retorna `[{id, nome, matricula, cargo, role}]` para o autocomplete do seletor de usuários específicos (server-side, reaproveitando o filtro `.or()` já usado em `professors`).
+- **Novo** `GET cargos_distinct`: lista cargos distintos para o seletor de cargos.
 
-### 2. `src/pages/AdminPage.tsx`
-- Replace local `professors` array + client slice with server-driven state:
-  - `professors` (current page rows), `totalProfs` (number), `currentPage`, `itemsPerPage` (25/50/100, default 50), `searchQuery` (debounced 300ms), `pageLoading` (boolean).
-- New `fetchProfessorsPage()` calls `apiCall('GET', 'professors&page=..&pageSize=..&search=..')`. Triggered by `useEffect` on page / pageSize / debounced search change.
-- Remove `const itemsPerPage = 20` constant; add a Select (25 / 50 / 100) next to the search input. Changing pageSize resets to page 1.
-- `totalPages = Math.ceil(totalProfs / itemsPerPage)`. "Next" disabled only when `currentPage >= totalPages`.
-- Footer text: `Mostrando {start}–{end} de {totalProfs}` where `end = Math.min(currentPage * itemsPerPage, totalProfs)`.
-- Show a small loading state (spinner / skeleton row) over the table body when `pageLoading` is true; keep previous rows visible to avoid flicker.
-- Dashboard "Total Professores" card reads from `professors_stats` (or from `totalProfs` of an initial unfiltered page 1 fetch).
-- CSV export buttons that currently iterate `professors` switch to calling `professors_all` once, then build the CSV from the full result.
-- "Dashboard preview" list (`filteredProfs.slice(0,5)`) uses the current page's rows — acceptable since it's just a preview.
+## Backend — `supabase/functions/professor-api/index.ts`
+Atualizar o `GET messages` para entregar apenas mensagens cujo público inclua o professor:
+- `target_type='all'` → sempre incluir.
+- `target_type='role'` → incluir se `professor.role` ∈ `target_roles` **ou** `professor.cargo` ∈ `target_cargos`.
+- `target_type='users'` → incluir se `professor.id` ∈ `target_user_ids`.
+- Mensagens pessoais (`created_by = user.sub`) continuam visíveis como hoje.
 
-### 3. Other tables
-Only the Professores table currently exceeds 1000 rows. Contestações / Mensagens / Reports stay as-is. If `access_reports` later grows past 1000, the same pattern can be applied; not in scope now.
+## Frontend — `src/pages/AdminPage.tsx` (aba Mensagens)
+Diálogo único reaproveitado para **Nova** e **Editar**:
+- Campos: Título, Conteúdo, Data/hora (datetime-local) e bloco **Destinatários**:
+  - Radio: `Todos` | `Por cargo` | `Usuários específicos`.
+  - `Por cargo`: checkboxes para `professor`, `admin`, `juridico` + multi-select de cargos (carregado de `cargos_distinct`).
+  - `Usuários específicos`: campo de busca com debounce chamando `professors_lookup`, chips dos selecionados.
+- Botões por mensagem na lista:
+  - **Editar** (lápis) — habilitado **somente** quando `sent=false` (programada). Abre o diálogo preenchido.
+  - **Reenviar agora** (ícone Send) — confirma e chama `resend_message` (reseta leituras).
+  - **Duplicar** (ícone Copy) — chama `duplicate_message` e abre o diálogo de edição da cópia.
+  - **Excluir** (mantido).
+- Badge extra com resumo do público (ex.: “Todos”, “Cargo: Professor”, “3 usuários”).
+- Toasts e refresh da lista após cada ação.
 
-## Out of scope
-- No schema changes.
-- No change to login, auth, security model, RLS, or other tabs.
-- No visual redesign — only the new page-size selector + search input behavior.
+## Detalhes técnicos
+- Verificar `sent=false` no backend antes de aceitar `update_message` (defesa em profundidade, além do botão estar oculto no frontend).
+- `resend_message` executa `DELETE FROM message_reads WHERE message_id = $1` via service_role.
+- Não modificar `src/integrations/supabase/client.ts` nem `types.ts` manualmente — após a migration, os tipos são regenerados.
+- Deploy das duas edge functions (`admin-api`, `professor-api`) após as edições.
 
-## Acceptance
-- All 1117 records reachable via Next until the last page.
-- Footer reads e.g. `Mostrando 1101–1117 de 1117` on the final page.
-- Changing page size to 25 / 50 / 100 reflows pagination and total pages correctly.
-- Search filters server-side and resets to page 1.
-- Dashboard "Total Professores" shows 1117.
-- CSV export contains all 1117 rows.
+## Fora de escopo
+- Agendamento real via cron (envio diferido já é simulado pelo flag `sent`/`scheduled_at` atual; mantemos o comportamento existente).
+- Notificações push/e-mail.
