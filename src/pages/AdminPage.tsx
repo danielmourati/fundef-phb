@@ -191,6 +191,7 @@ const AdminPage = () => {
     if (arRes.data && Array.isArray(arRes.data)) setAccessReports(arRes.data);
     if (statsRes.data && typeof statsRes.data.total === 'number') setTotalProfs(statsRes.data.total);
     setLoading(false);
+    setProfsRefreshTick(t => t + 1);
   };
 
   const fetchProfessorsPage = async () => {
