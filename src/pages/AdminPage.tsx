@@ -69,7 +69,14 @@ interface Message {
   scheduled_at: string | null;
   sent: boolean;
   created_at: string;
+  target_type?: 'all' | 'role' | 'users' | null;
+  target_roles?: string[] | null;
+  target_cargos?: string[] | null;
+  target_user_ids?: string[] | null;
 }
+
+interface ProfLookup { id: string; nome: string; matricula: string | null; cargo: string | null; role: string }
+
 
 const emptyProfessor = {
   nome: '', cpf: '', matricula: '', senha: '', data_nascimento: '',
