@@ -709,24 +709,33 @@ const AdminPage = () => {
     else { toast.success('Mensagem excluída!'); fetchData(); }
   };
 
-  if (!professor || professor.role !== 'admin') return null;
+  // Debounce search input (300ms) and reset to page 1 when search changes
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
-  const nonAdminProfs = professors;
-  const filteredProfs = nonAdminProfs.filter(p =>
-    !searchQuery ||
-    (p.nome || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (p.matricula || '').includes(searchQuery) ||
-    (p.cpf || '').includes(searchQuery)
-  );
-
-  // Paginação
-  const totalPages = Math.max(1, Math.ceil(filteredProfs.length / itemsPerPage));
-  const paginatedProfs = filteredProfs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-
-  // Resetar página quando busca mudar
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery]);
+  }, [debouncedSearch, itemsPerPage]);
+
+  // Fetch professors page from server whenever pagination/search changes
+  useEffect(() => {
+    if (!professor || professor.role !== 'admin') return;
+    fetchProfessorsPage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [professor, currentPage, itemsPerPage, debouncedSearch, profsRefreshTick]);
+
+  const refreshProfessors = () => setProfsRefreshTick(t => t + 1);
+
+  if (!professor || professor.role !== 'admin') return null;
+
+  // Server-side pagination
+  const paginatedProfs = professors;
+  const totalPages = Math.max(1, Math.ceil(totalProfs / itemsPerPage));
+  const showingFrom = totalProfs === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
+  const showingTo = Math.min(currentPage * itemsPerPage, totalProfs);
+
   const statCards = [
     { label: 'Total Professores', value: nonAdminProfs.length, icon: Users, color: 'bg-primary/10 text-primary' },
     { label: 'Contestações', value: contestacoes.length, icon: AlertTriangle, color: 'bg-red-50 text-red-600' },
