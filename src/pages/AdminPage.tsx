@@ -111,7 +111,11 @@ const AdminPage = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20;
+  const [itemsPerPage, setItemsPerPage] = useState<number>(50);
+  const [totalProfs, setTotalProfs] = useState(0);
+  const [profsLoading, setProfsLoading] = useState(false);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [profsRefreshTick, setProfsRefreshTick] = useState(0);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProf, setEditingProf] = useState<any>(null);
@@ -176,17 +180,33 @@ const AdminPage = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const [profRes, contRes, msgRes, arRes] = await Promise.all([
-      apiCall('GET', 'professors'),
+    const [contRes, msgRes, arRes, statsRes] = await Promise.all([
       apiCall('GET', 'contestacoes'),
       apiCall('GET', 'messages'),
       apiCall('GET', 'access_reports'),
+      apiCall('GET', 'professors_stats'),
     ]);
-    if (profRes.data && Array.isArray(profRes.data)) setProfessors(profRes.data);
     if (contRes.data && Array.isArray(contRes.data)) setContestacoes(contRes.data);
     if (msgRes.data && Array.isArray(msgRes.data)) setMessages(msgRes.data);
     if (arRes.data && Array.isArray(arRes.data)) setAccessReports(arRes.data);
+    if (statsRes.data && typeof statsRes.data.total === 'number') setTotalProfs(statsRes.data.total);
     setLoading(false);
+    setProfsRefreshTick(t => t + 1);
+  };
+
+  const fetchProfessorsPage = async () => {
+    setProfsLoading(true);
+    const params = new URLSearchParams({
+      page: String(currentPage),
+      pageSize: String(itemsPerPage),
+    });
+    if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim());
+    const { data, error } = await apiCall('GET', `professors&${params.toString()}`);
+    if (!error && data && Array.isArray(data.rows)) {
+      setProfessors(data.rows);
+      setTotalProfs(data.total || 0);
+    }
+    setProfsLoading(false);
   };
 
   const openReport = (r: any) => {
@@ -480,8 +500,11 @@ const AdminPage = () => {
       // ===== Validação client-side com classificação por linha =====
       // Chave única = cpf + matrícula (permite 2º vínculo: mesmo CPF, matrícula diferente)
       const ALLOWED = TEMPLATE_COLUMNS;
+      // Carrega TODOS os professores da base para checagem de duplicidade
+      const { data: allProfsData } = await apiCall('GET', 'professors_all');
+      const allProfs: Professor[] = Array.isArray(allProfsData) ? allProfsData : [];
       const existingByCpf = new Map<string, Set<string>>();
-      professors.forEach(p => {
+      allProfs.forEach(p => {
         const c = (p.cpf || '').replace(/\D/g, '');
         if (!c) return;
         const m = (p.matricula || '').trim();
@@ -489,7 +512,7 @@ const AdminPage = () => {
         existingByCpf.get(c)!.add(m);
       });
       const existingMatToCpf = new Map<string, string>();
-      professors.forEach(p => {
+      allProfs.forEach(p => {
         const m = (p.matricula || '').trim();
         const c = (p.cpf || '').replace(/\D/g, '');
         if (m) existingMatToCpf.set(m, c);
@@ -690,26 +713,35 @@ const AdminPage = () => {
     else { toast.success('Mensagem excluída!'); fetchData(); }
   };
 
-  if (!professor || professor.role !== 'admin') return null;
+  // Debounce search input (300ms) and reset to page 1 when search changes
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
-  const nonAdminProfs = professors;
-  const filteredProfs = nonAdminProfs.filter(p =>
-    !searchQuery ||
-    (p.nome || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (p.matricula || '').includes(searchQuery) ||
-    (p.cpf || '').includes(searchQuery)
-  );
-
-  // Paginação
-  const totalPages = Math.max(1, Math.ceil(filteredProfs.length / itemsPerPage));
-  const paginatedProfs = filteredProfs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-
-  // Resetar página quando busca mudar
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery]);
+  }, [debouncedSearch, itemsPerPage]);
+
+  // Fetch professors page from server whenever pagination/search changes
+  useEffect(() => {
+    if (!professor || professor.role !== 'admin') return;
+    fetchProfessorsPage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [professor, currentPage, itemsPerPage, debouncedSearch, profsRefreshTick]);
+
+  const refreshProfessors = () => setProfsRefreshTick(t => t + 1);
+
+  if (!professor || professor.role !== 'admin') return null;
+
+  // Server-side pagination
+  const paginatedProfs = professors;
+  const totalPages = Math.max(1, Math.ceil(totalProfs / itemsPerPage));
+  const showingFrom = totalProfs === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
+  const showingTo = Math.min(currentPage * itemsPerPage, totalProfs);
+
   const statCards = [
-    { label: 'Total Professores', value: nonAdminProfs.length, icon: Users, color: 'bg-primary/10 text-primary' },
+    { label: 'Total Professores', value: totalProfs, icon: Users, color: 'bg-primary/10 text-primary' },
     { label: 'Contestações', value: contestacoes.length, icon: AlertTriangle, color: 'bg-red-50 text-red-600' },
     { label: 'Mensagens', value: messages.length, icon: MessageSquare, color: 'bg-blue-50 text-blue-600' },
   ];
@@ -878,7 +910,7 @@ const AdminPage = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredProfs.slice(0, 5).map(p => (
+                        {professors.slice(0, 5).map(p => (
                           <TableRow key={p.id}>
                             <TableCell className="font-mono text-sm">{p.matricula}</TableCell>
                             <TableCell className="text-sm">{p.nome}</TableCell>
@@ -899,7 +931,7 @@ const AdminPage = () => {
             <Card>
               <CardContent className="p-0">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-6 py-4 border-b border-border gap-4">
-                  <h3 className="font-semibold text-foreground">Professores ({filteredProfs.length})</h3>
+                  <h3 className="font-semibold text-foreground">Professores ({totalProfs})</h3>
                   <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                     <input ref={fileInputRef} type="file" accept=".csv,.pdf,application/pdf" className="hidden" onChange={handleFileImport} disabled={importing} />
                     <Button
@@ -985,11 +1017,24 @@ const AdminPage = () => {
                       </Table>
                     </div>
                     {/* Paginação */}
-                    {filteredProfs.length > itemsPerPage && (
-                      <div className="flex flex-col sm:flex-row items-center sm:justify-between gap-3 px-4 sm:px-6 py-4 border-t border-border">
-                        <p className="text-xs text-muted-foreground whitespace-nowrap order-2 sm:order-1">
-                          Mostrando {((currentPage - 1) * itemsPerPage) + 1}–{Math.min(currentPage * itemsPerPage, filteredProfs.length)} de {filteredProfs.length}
+                    <div className="flex flex-col sm:flex-row items-center sm:justify-between gap-3 px-4 sm:px-6 py-4 border-t border-border">
+                      <div className="flex items-center gap-3 order-2 sm:order-1">
+                        <p className="text-xs text-muted-foreground whitespace-nowrap">
+                          Mostrando {showingFrom}–{showingTo} de {totalProfs}
                         </p>
+                        <Select value={String(itemsPerPage)} onValueChange={(v) => setItemsPerPage(parseInt(v, 10))}>
+                          <SelectTrigger className="h-8 w-[110px] text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="25">25 / página</SelectItem>
+                            <SelectItem value="50">50 / página</SelectItem>
+                            <SelectItem value="100">100 / página</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {profsLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+                      </div>
+                      {totalPages > 1 && (
                         <Pagination className="order-1 sm:order-2 mx-0 sm:justify-end w-auto">
                           <PaginationContent className="flex-wrap justify-center">
                             <PaginationItem>
@@ -1034,8 +1079,9 @@ const AdminPage = () => {
                             </PaginationItem>
                           </PaginationContent>
                         </Pagination>
-                      </div>
-                    )}
+                      )}
+                    </div>
+
                   </>
                 )}
               </CardContent>
