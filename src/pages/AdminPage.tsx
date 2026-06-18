@@ -13,7 +13,7 @@ import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, Pagi
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
   LogOut, Upload, Download, Users, AlertTriangle, Settings, Plus, Pencil, Trash2, Save,
-  LayoutDashboard, FileText, Search, Send, MessageSquare, Menu, Eye, EyeOff, Trash, Loader2, LifeBuoy, MessageCircle,
+  LayoutDashboard, FileText, Search, Send, MessageSquare, Menu, Eye, EyeOff, Trash, Loader2, LifeBuoy, MessageCircle, User,
 } from 'lucide-react';
 
 const buildWhatsappUrl = (phone: string | null | undefined, nome?: string, protocolo?: string | null) => {
@@ -861,6 +861,15 @@ const AdminPage = () => {
                 />
               </div>
             )}
+            <div className="hidden sm:flex items-center gap-3 pl-3 border-l border-border">
+              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <User className="w-4 h-4 text-primary" />
+              </div>
+              <div className="leading-tight">
+                <p className="text-sm font-semibold text-foreground">{professor?.nome || 'Administrador'}</p>
+                <p className="text-xs text-muted-foreground">Administrador</p>
+              </div>
+            </div>
           </div>
         </header>
 
