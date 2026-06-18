@@ -13,7 +13,7 @@ import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, Pagi
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
   LogOut, Upload, Download, Users, AlertTriangle, Settings, Plus, Pencil, Trash2, Save,
-  LayoutDashboard, FileText, Search, Send, MessageSquare, Menu, Eye, EyeOff, Trash, Loader2, LifeBuoy, MessageCircle, User,
+  LayoutDashboard, FileText, Search, Send, MessageSquare, Menu, Eye, EyeOff, Trash, Loader2, LifeBuoy, MessageCircle, User, Copy, X,
 } from 'lucide-react';
 
 const buildWhatsappUrl = (phone: string | null | undefined, nome?: string, protocolo?: string | null) => {
@@ -69,7 +69,14 @@ interface Message {
   scheduled_at: string | null;
   sent: boolean;
   created_at: string;
+  target_type?: 'all' | 'role' | 'users' | null;
+  target_roles?: string[] | null;
+  target_cargos?: string[] | null;
+  target_user_ids?: string[] | null;
 }
+
+interface ProfLookup { id: string; nome: string; matricula: string | null; cargo: string | null; role: string }
+
 
 const emptyProfessor = {
   nome: '', cpf: '', matricula: '', senha: '', data_nascimento: '',
@@ -130,6 +137,14 @@ const AdminPage = () => {
   const [msgScheduled, setMsgScheduled] = useState('');
   const [sendingMsg, setSendingMsg] = useState(false);
   const [msgDialogOpen, setMsgDialogOpen] = useState(false);
+  const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
+  const [msgTargetType, setMsgTargetType] = useState<'all' | 'role' | 'users'>('all');
+  const [msgTargetRoles, setMsgTargetRoles] = useState<string[]>([]);
+  const [msgTargetCargos, setMsgTargetCargos] = useState<string[]>([]);
+  const [msgTargetUsers, setMsgTargetUsers] = useState<ProfLookup[]>([]);
+  const [cargosList, setCargosList] = useState<string[]>([]);
+  const [userSearch, setUserSearch] = useState('');
+  const [userResults, setUserResults] = useState<ProfLookup[]>([]);
   const [showModalPassword, setShowModalPassword] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
@@ -679,28 +694,109 @@ const AdminPage = () => {
     else toast.success('Configurações salvas!');
   };
 
+  const resetMsgForm = () => {
+    setEditingMsgId(null);
+    setMsgTitle('');
+    setMsgContent('');
+    setMsgScheduled('');
+    setMsgTargetType('all');
+    setMsgTargetRoles([]);
+    setMsgTargetCargos([]);
+    setMsgTargetUsers([]);
+    setUserSearch('');
+    setUserResults([]);
+  };
+
+  const openNewMessage = async () => {
+    resetMsgForm();
+    setMsgDialogOpen(true);
+    if (cargosList.length === 0) {
+      const { data } = await apiCall('GET', 'cargos_distinct');
+      if (Array.isArray(data)) setCargosList(data);
+    }
+  };
+
+  const openEditMessage = async (m: Message) => {
+    resetMsgForm();
+    setEditingMsgId(m.id);
+    setMsgTitle(m.title);
+    setMsgContent(m.content);
+    // datetime-local needs "YYYY-MM-DDTHH:mm"
+    if (m.scheduled_at) {
+      const d = new Date(m.scheduled_at);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      setMsgScheduled(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+    }
+    setMsgTargetType((m.target_type as any) || 'all');
+    setMsgTargetRoles(m.target_roles || []);
+    setMsgTargetCargos(m.target_cargos || []);
+    if (m.target_user_ids && m.target_user_ids.length > 0) {
+      const { data } = await apiCall('GET', `professors_by_ids&ids=${m.target_user_ids.join(',')}`);
+      if (Array.isArray(data)) setMsgTargetUsers(data);
+    }
+    if (cargosList.length === 0) {
+      const { data } = await apiCall('GET', 'cargos_distinct');
+      if (Array.isArray(data)) setCargosList(data);
+    }
+    setMsgDialogOpen(true);
+  };
+
   const handleSendMessage = async () => {
     if (!msgTitle || !msgContent) {
       toast.error('Título e conteúdo são obrigatórios.');
       return;
     }
+    if (msgTargetType === 'role' && msgTargetRoles.length === 0 && msgTargetCargos.length === 0) {
+      toast.error('Selecione pelo menos um cargo ou função.');
+      return;
+    }
+    if (msgTargetType === 'users' && msgTargetUsers.length === 0) {
+      toast.error('Selecione pelo menos um usuário.');
+      return;
+    }
     setSendingMsg(true);
-    const { data, error } = await apiCall('POST', 'create_message', {
+    const payload = {
+      id: editingMsgId,
       title: msgTitle,
       content: msgContent,
       scheduled_at: msgScheduled || null,
-    });
+      target_type: msgTargetType,
+      target_roles: msgTargetType === 'role' ? msgTargetRoles : [],
+      target_cargos: msgTargetType === 'role' ? msgTargetCargos : [],
+      target_user_ids: msgTargetType === 'users' ? msgTargetUsers.map(u => u.id) : [],
+    };
+    const { data, error } = editingMsgId
+      ? await apiCall('PUT', 'update_message', payload)
+      : await apiCall('POST', 'create_message', payload);
     setSendingMsg(false);
     if (error || data?.error) {
-      toast.error(data?.error || 'Erro ao enviar.');
+      toast.error(data?.error || 'Erro ao salvar.');
       return;
     }
-    toast.success(msgScheduled ? 'Mensagem programada!' : 'Mensagem enviada!');
-    setMsgTitle('');
-    setMsgContent('');
-    setMsgScheduled('');
+    toast.success(editingMsgId ? 'Mensagem atualizada!' : (msgScheduled ? 'Mensagem programada!' : 'Mensagem enviada!'));
+    resetMsgForm();
     setMsgDialogOpen(false);
     fetchData();
+  };
+
+  const handleResendMessage = async (id: string) => {
+    if (!confirm('Reenviar esta mensagem agora? As leituras serão resetadas e aparecerá como não lida para os destinatários.')) return;
+    const { data, error } = await apiCall('POST', `resend_message&id=${id}`);
+    if (error || data?.error) toast.error(data?.error || 'Erro ao reenviar.');
+    else { toast.success('Mensagem reenviada!'); fetchData(); }
+  };
+
+  const handleDuplicateMessage = async (id: string) => {
+    const { data, error } = await apiCall('POST', `duplicate_message&id=${id}`);
+    if (error || data?.error) { toast.error(data?.error || 'Erro ao duplicar.'); return; }
+    toast.success('Cópia criada como rascunho.');
+    await fetchData();
+    // open edit dialog for the new copy after fetching fresh list
+    setTimeout(async () => {
+      const { data: msgs } = await apiCall('GET', 'messages');
+      const copy = Array.isArray(msgs) ? msgs.find((m: any) => m.id === data.id) : null;
+      if (copy) openEditMessage(copy);
+    }, 100);
   };
 
   const handleDeleteMessage = async (id: string) => {
@@ -712,6 +808,19 @@ const AdminPage = () => {
     if (error || data?.error) toast.error(data?.error || 'Erro ao excluir.');
     else { toast.success('Mensagem excluída!'); fetchData(); }
   };
+
+  // Debounced user lookup for "specific users" picker
+  useEffect(() => {
+    if (msgTargetType !== 'users' || !msgDialogOpen) return;
+    const t = setTimeout(async () => {
+      const q = userSearch.trim();
+      const { data } = await apiCall('GET', `professors_lookup&q=${encodeURIComponent(q)}&limit=20`);
+      if (Array.isArray(data)) setUserResults(data);
+    }, 250);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userSearch, msgTargetType, msgDialogOpen]);
+
 
   // Debounce search input (300ms) and reset to page 1 when search changes
   useEffect(() => {
@@ -1224,7 +1333,7 @@ const AdminPage = () => {
             <>
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-foreground">Mensagens ({messages.length})</h3>
-                <Button size="sm" onClick={() => setMsgDialogOpen(true)}>
+                <Button size="sm" onClick={openNewMessage}>
                   <Plus className="w-4 h-4 mr-1.5" /> Nova Mensagem
                 </Button>
               </div>
@@ -1237,38 +1346,66 @@ const AdminPage = () => {
                 </Card>
               ) : (
                 <div className="space-y-3">
-                  {messages.map(m => (
-                    <Card key={m.id}>
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h4 className="font-semibold text-sm">{m.title}</h4>
-                              <Badge variant={m.sent ? "default" : "secondary"} className="text-[10px]">
-                                {m.sent ? 'Enviada' : 'Programada'}
-                              </Badge>
+                  {messages.map(m => {
+                    const audience = (() => {
+                      const tt = m.target_type || 'all';
+                      if (tt === 'all') return 'Todos';
+                      if (tt === 'role') {
+                        const parts: string[] = [];
+                        if (m.target_roles?.length) parts.push(...m.target_roles.map(r => r === 'professor' ? 'Professores' : r === 'admin' ? 'Admin' : r === 'juridico' ? 'Jurídico' : r));
+                        if (m.target_cargos?.length) parts.push(...m.target_cargos);
+                        return parts.join(', ') || 'Cargo';
+                      }
+                      if (tt === 'users') return `${m.target_user_ids?.length || 0} usuário(s)`;
+                      return 'Todos';
+                    })();
+                    return (
+                      <Card key={m.id}>
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                <h4 className="font-semibold text-sm">{m.title}</h4>
+                                <Badge variant={m.sent ? "default" : "secondary"} className="text-[10px]">
+                                  {m.sent ? 'Enviada' : 'Programada'}
+                                </Badge>
+                                <Badge variant="outline" className="text-[10px]">Para: {audience}</Badge>
+                              </div>
+                              <p className="text-sm text-muted-foreground line-clamp-2">{m.content}</p>
+                              <p className="text-xs text-muted-foreground mt-2">
+                                {new Date(m.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                {m.scheduled_at && ` • Programada para ${new Date(m.scheduled_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`}
+                              </p>
                             </div>
-                            <p className="text-sm text-muted-foreground line-clamp-2">{m.content}</p>
-                            <p className="text-xs text-muted-foreground mt-2">
-                              {new Date(m.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                              {m.scheduled_at && ` • Programada para ${new Date(m.scheduled_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`}
-                            </p>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {!m.sent && (
+                                <Button size="icon" variant="ghost" className="h-8 w-8" title="Editar" onClick={() => openEditMessage(m)}>
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                              )}
+                              <Button size="icon" variant="ghost" className="h-8 w-8" title="Reenviar agora" onClick={() => handleResendMessage(m.id)}>
+                                <Send className="w-4 h-4" />
+                              </Button>
+                              <Button size="icon" variant="ghost" className="h-8 w-8" title="Duplicar" onClick={() => handleDuplicateMessage(m.id)}>
+                                <Copy className="w-4 h-4" />
+                              </Button>
+                              <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" title="Excluir" onClick={() => handleDeleteMessage(m.id)}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => handleDeleteMessage(m.id)}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               )}
 
-              {/* New Message Dialog */}
-              <Dialog open={msgDialogOpen} onOpenChange={setMsgDialogOpen}>
-                <DialogContent className="max-w-lg">
+              {/* Message Dialog (create/edit) */}
+              <Dialog open={msgDialogOpen} onOpenChange={(o) => { setMsgDialogOpen(o); if (!o) resetMsgForm(); }}>
+                <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
-                    <DialogTitle>Nova Mensagem</DialogTitle>
+                    <DialogTitle>{editingMsgId ? 'Editar Mensagem' : 'Nova Mensagem'}</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4">
                     <div className="space-y-2">
@@ -1284,18 +1421,136 @@ const AdminPage = () => {
                       <Input type="datetime-local" value={msgScheduled} onChange={e => setMsgScheduled(e.target.value)} />
                       <p className="text-xs text-muted-foreground">Deixe vazio para enviar imediatamente.</p>
                     </div>
+
+                    <div className="space-y-2 border-t pt-4">
+                      <Label>Destinatários *</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {(['all', 'role', 'users'] as const).map(t => (
+                          <Button
+                            key={t}
+                            type="button"
+                            size="sm"
+                            variant={msgTargetType === t ? 'default' : 'outline'}
+                            onClick={() => setMsgTargetType(t)}
+                          >
+                            {t === 'all' ? 'Todos' : t === 'role' ? 'Por cargo' : 'Usuários específicos'}
+                          </Button>
+                        ))}
+                      </div>
+
+                      {msgTargetType === 'role' && (
+                        <div className="space-y-3 pt-2">
+                          <div>
+                            <p className="text-xs font-medium mb-1">Função</p>
+                            <div className="flex flex-wrap gap-2">
+                              {[
+                                { v: 'professor', l: 'Professores' },
+                                { v: 'admin', l: 'Admin' },
+                                { v: 'juridico', l: 'Jurídico' },
+                              ].map(r => {
+                                const active = msgTargetRoles.includes(r.v);
+                                return (
+                                  <Button
+                                    key={r.v}
+                                    type="button"
+                                    size="sm"
+                                    variant={active ? 'default' : 'outline'}
+                                    onClick={() => setMsgTargetRoles(prev => active ? prev.filter(x => x !== r.v) : [...prev, r.v])}
+                                  >
+                                    {r.l}
+                                  </Button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                          {cargosList.length > 0 && (
+                            <div>
+                              <p className="text-xs font-medium mb-1">Cargo específico (opcional)</p>
+                              <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                                {cargosList.map(c => {
+                                  const active = msgTargetCargos.includes(c);
+                                  return (
+                                    <Button
+                                      key={c}
+                                      type="button"
+                                      size="sm"
+                                      variant={active ? 'default' : 'outline'}
+                                      className="h-7 text-xs"
+                                      onClick={() => setMsgTargetCargos(prev => active ? prev.filter(x => x !== c) : [...prev, c])}
+                                    >
+                                      {c}
+                                    </Button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {msgTargetType === 'users' && (
+                        <div className="space-y-2 pt-2">
+                          <Input
+                            value={userSearch}
+                            onChange={e => setUserSearch(e.target.value)}
+                            placeholder="Buscar por nome, matrícula ou CPF..."
+                          />
+                          {userResults.length > 0 && (
+                            <div className="border rounded max-h-40 overflow-y-auto">
+                              {userResults.map(u => {
+                                const already = msgTargetUsers.some(x => x.id === u.id);
+                                return (
+                                  <button
+                                    key={u.id}
+                                    type="button"
+                                    disabled={already}
+                                    onClick={() => {
+                                      setMsgTargetUsers(prev => [...prev, u]);
+                                      setUserSearch('');
+                                      setUserResults([]);
+                                    }}
+                                    className="w-full text-left px-3 py-2 text-sm hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed border-b last:border-0"
+                                  >
+                                    <div className="font-medium">{u.nome}</div>
+                                    <div className="text-xs text-muted-foreground">{u.matricula || '—'} {u.cargo ? `• ${u.cargo}` : ''}</div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                          {msgTargetUsers.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5">
+                              {msgTargetUsers.map(u => (
+                                <Badge key={u.id} variant="secondary" className="gap-1">
+                                  {u.nome}
+                                  <button
+                                    type="button"
+                                    onClick={() => setMsgTargetUsers(prev => prev.filter(x => x.id !== u.id))}
+                                    className="ml-1 hover:text-destructive"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                          <p className="text-xs text-muted-foreground">{msgTargetUsers.length} usuário(s) selecionado(s)</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <DialogFooter>
-                    <Button variant="outline" onClick={() => setMsgDialogOpen(false)}>Cancelar</Button>
+                    <Button variant="outline" onClick={() => { setMsgDialogOpen(false); resetMsgForm(); }}>Cancelar</Button>
                     <Button onClick={handleSendMessage} disabled={sendingMsg}>
                       <Send className="w-4 h-4 mr-1.5" />
-                      {sendingMsg ? 'Enviando...' : msgScheduled ? 'Programar' : 'Enviar Agora'}
+                      {sendingMsg ? 'Salvando...' : editingMsgId ? 'Salvar' : msgScheduled ? 'Programar' : 'Enviar Agora'}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
             </>
           )}
+
 
           {activeTab === 'settings' && (
             <Card>

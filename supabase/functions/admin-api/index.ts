@@ -163,6 +163,62 @@ Deno.serve(async (req) => {
       return jsonResponse(data);
     }
 
+    // GET professors_lookup (for "specific users" picker)
+    if (req.method === "GET" && action === "professors_lookup") {
+      const q = (url.searchParams.get("q") || "").trim();
+      const limit = Math.min(50, parseInt(url.searchParams.get("limit") || "20", 10) || 20);
+      let query = supabase
+        .from("professors")
+        .select("id, nome, matricula, cargo, role")
+        .order("nome")
+        .limit(limit);
+      if (q) {
+        const digits = q.replace(/\D/g, "");
+        const ors = [`nome.ilike.%${q}%`, `matricula.ilike.%${q}%`];
+        if (digits) ors.push(`cpf.ilike.%${digits}%`);
+        query = query.or(ors.join(","));
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return jsonResponse(data || []);
+    }
+
+    // GET cargos_distinct
+    if (req.method === "GET" && action === "cargos_distinct") {
+      const set = new Set<string>();
+      let from = 0;
+      const chunk = 1000;
+      while (true) {
+        const { data, error } = await supabase
+          .from("professors")
+          .select("cargo")
+          .not("cargo", "is", null)
+          .range(from, from + chunk - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        for (const r of data) {
+          const c = (r as any).cargo;
+          if (c && String(c).trim()) set.add(String(c).trim());
+        }
+        if (data.length < chunk) break;
+        from += chunk;
+      }
+      return jsonResponse([...set].sort());
+    }
+
+    // GET professors_by_ids (resolve chips on edit)
+    if (req.method === "GET" && action === "professors_by_ids") {
+      const ids = (url.searchParams.get("ids") || "").split(",").map(s => s.trim()).filter(Boolean);
+      if (ids.length === 0) return jsonResponse([]);
+      const { data, error } = await supabase
+        .from("professors")
+        .select("id, nome, matricula, cargo, role")
+        .in("id", ids);
+      if (error) throw error;
+      return jsonResponse(data || []);
+    }
+
+
     // POST professor (create)
     if (req.method === "POST" && action === "create_professor") {
       const body = await req.json();
@@ -349,6 +405,15 @@ if (req.method === "PUT" && action === "save_settings") {
   return jsonResponse({ success: true });
 }
 
+// Helpers for message targeting
+function sanitizeTargets(body: any) {
+  const target_type = ["all", "role", "users"].includes(body?.target_type) ? body.target_type : "all";
+  const target_roles = Array.isArray(body?.target_roles) ? body.target_roles.map(String).filter(Boolean) : [];
+  const target_cargos = Array.isArray(body?.target_cargos) ? body.target_cargos.map(String).filter(Boolean) : [];
+  const target_user_ids = Array.isArray(body?.target_user_ids) ? body.target_user_ids.map(String).filter(Boolean) : [];
+  return { target_type, target_roles, target_cargos, target_user_ids };
+}
+
 // POST message (create/send)
 if (req.method === "POST" && action === "create_message") {
   const body = await req.json();
@@ -356,6 +421,7 @@ if (req.method === "POST" && action === "create_message") {
   const content = String(body.content || "").trim();
   const scheduledAt = body.scheduled_at || null;
   const sent = scheduledAt ? false : true;
+  const targets = sanitizeTargets(body);
 
   if (!title || !content) {
     return new Response(JSON.stringify({ error: "Título e conteúdo são obrigatórios." }), {
@@ -364,8 +430,9 @@ if (req.method === "POST" && action === "create_message") {
   }
 
   const { error: insertError } = await supabase.from("messages").insert({
-    title, content, created_by: null, // Broadcast message
+    title, content, created_by: null,
     scheduled_at: scheduledAt, sent,
+    ...targets,
   });
   if (insertError) {
     return new Response(JSON.stringify({ error: `Erro ao salvar mensagem: ${insertError.message}` }), {
@@ -375,10 +442,70 @@ if (req.method === "POST" && action === "create_message") {
   return jsonResponse({ success: true });
 }
 
+// PUT update message (only if not yet sent)
+if (req.method === "PUT" && action === "update_message") {
+  const body = await req.json();
+  const id = String(body.id || "");
+  if (!id) throw new Error("ID obrigatório");
+  const { data: existing } = await supabase.from("messages").select("id, sent").eq("id", id).maybeSingle();
+  if (!existing) throw new Error("Mensagem não encontrada.");
+  if (existing.sent) {
+    return new Response(JSON.stringify({ error: "Mensagem já foi enviada e não pode ser editada. Use 'Duplicar' para criar uma nova." }), {
+      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  const title = String(body.title || "").trim();
+  const content = String(body.content || "").trim();
+  if (!title || !content) throw new Error("Título e conteúdo são obrigatórios.");
+  const scheduledAt = body.scheduled_at || null;
+  const sent = scheduledAt ? false : true;
+  const targets = sanitizeTargets(body);
+  const { error } = await supabase.from("messages").update({
+    title, content, scheduled_at: scheduledAt, sent, ...targets,
+  }).eq("id", id);
+  if (error) throw error;
+  return jsonResponse({ success: true });
+}
+
+// POST resend message — mark as sent now and reset reads
+if (req.method === "POST" && action === "resend_message") {
+  const id = url.searchParams.get("id");
+  if (!id) throw new Error("ID obrigatório");
+  await supabase.from("message_reads").delete().eq("message_id", id);
+  const { error } = await supabase.from("messages").update({
+    sent: true, scheduled_at: null, created_at: new Date().toISOString(),
+  }).eq("id", id);
+  if (error) throw error;
+  return jsonResponse({ success: true });
+}
+
+// POST duplicate message — creates a draft (scheduled or unsent) copy
+if (req.method === "POST" && action === "duplicate_message") {
+  const id = url.searchParams.get("id");
+  if (!id) throw new Error("ID obrigatório");
+  const { data: src, error: e1 } = await supabase.from("messages").select("*").eq("id", id).maybeSingle();
+  if (e1) throw e1;
+  if (!src) throw new Error("Mensagem não encontrada.");
+  const { data: inserted, error } = await supabase.from("messages").insert({
+    title: `${src.title} (cópia)`,
+    content: src.content,
+    created_by: null,
+    scheduled_at: null,
+    sent: false,
+    target_type: src.target_type || "all",
+    target_roles: src.target_roles || [],
+    target_cargos: src.target_cargos || [],
+    target_user_ids: src.target_user_ids || [],
+  }).select("id").single();
+  if (error) throw error;
+  return jsonResponse({ success: true, id: inserted.id });
+}
+
 // DELETE message
 if (req.method === "DELETE" && action === "delete_message") {
   const id = url.searchParams.get("id");
   if (!id) throw new Error("ID obrigatório");
+  await supabase.from("message_reads").delete().eq("message_id", id);
   const { error } = await supabase.from("messages").delete().eq("id", id);
   if (error) throw error;
   return jsonResponse({ success: true });
