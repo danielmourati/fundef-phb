@@ -1031,10 +1031,6 @@ const AdminPage = () => {
                         {profsLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
                       </div>
                       {totalPages > 1 && (
-                      <Pagination className="order-1 sm:order-2 mx-0 sm:justify-end w-auto">
-                        <PaginationContent className="flex-wrap justify-center">
-                          <PaginationItem>
-                            <PaginationPrevious
                         <Pagination className="order-1 sm:order-2 mx-0 sm:justify-end w-auto">
                           <PaginationContent className="flex-wrap justify-center">
                             <PaginationItem>
