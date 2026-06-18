@@ -50,15 +50,67 @@ Deno.serve(async (req) => {
   const action = url.searchParams.get("action");
 
   try {
-    // GET professors
+    // GET professors (paginated, server-side)
     if (req.method === "GET" && action === "professors") {
-      const { data, error } = await supabase
+      const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10) || 1);
+      const rawSize = parseInt(url.searchParams.get("pageSize") || "50", 10) || 50;
+      const pageSize = [25, 50, 100].includes(rawSize) ? rawSize : 50;
+      const search = (url.searchParams.get("search") || "").trim();
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+
+      let q = supabase
         .from("professors")
-        .select("id, matricula, nome, cpf, data_nascimento, vinculo_inicio, vinculo_fim, carga_horaria, total_cotas, cargo, status, role")
+        .select(
+          "id, matricula, nome, cpf, data_nascimento, vinculo_inicio, vinculo_fim, carga_horaria, total_cotas, cargo, status, role",
+          { count: "exact" },
+        )
         .order("nome")
-        .range(0, 49999);
+        .range(from, to);
+
+      if (search) {
+        const digits = search.replace(/\D/g, "");
+        const ors = [
+          `nome.ilike.%${search}%`,
+          `matricula.ilike.%${search}%`,
+          `cargo.ilike.%${search}%`,
+        ];
+        if (digits) ors.push(`cpf.ilike.%${digits}%`);
+        q = q.or(ors.join(","));
+      }
+
+      const { data, error, count } = await q;
       if (error) throw error;
-      return jsonResponse(data);
+      return jsonResponse({ rows: data || [], total: count || 0, page, pageSize });
+    }
+
+    // GET professors stats (count only)
+    if (req.method === "GET" && action === "professors_stats") {
+      const { count, error } = await supabase
+        .from("professors")
+        .select("id", { count: "exact", head: true });
+      if (error) throw error;
+      return jsonResponse({ total: count || 0 });
+    }
+
+    // GET all professors (chunked, for export / bulk ops)
+    if (req.method === "GET" && action === "professors_all") {
+      const all: any[] = [];
+      const chunk = 1000;
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from("professors")
+          .select("id, matricula, nome, cpf, data_nascimento, vinculo_inicio, vinculo_fim, carga_horaria, total_cotas, cargo, status, role")
+          .order("nome")
+          .range(from, from + chunk - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        all.push(...data);
+        if (data.length < chunk) break;
+        from += chunk;
+      }
+      return jsonResponse(all);
     }
 
     // GET contestacoes
