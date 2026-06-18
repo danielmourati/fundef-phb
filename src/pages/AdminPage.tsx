@@ -1333,7 +1333,7 @@ const AdminPage = () => {
             <>
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-foreground">Mensagens ({messages.length})</h3>
-                <Button size="sm" onClick={() => setMsgDialogOpen(true)}>
+                <Button size="sm" onClick={openNewMessage}>
                   <Plus className="w-4 h-4 mr-1.5" /> Nova Mensagem
                 </Button>
               </div>
@@ -1346,38 +1346,66 @@ const AdminPage = () => {
                 </Card>
               ) : (
                 <div className="space-y-3">
-                  {messages.map(m => (
-                    <Card key={m.id}>
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h4 className="font-semibold text-sm">{m.title}</h4>
-                              <Badge variant={m.sent ? "default" : "secondary"} className="text-[10px]">
-                                {m.sent ? 'Enviada' : 'Programada'}
-                              </Badge>
+                  {messages.map(m => {
+                    const audience = (() => {
+                      const tt = m.target_type || 'all';
+                      if (tt === 'all') return 'Todos';
+                      if (tt === 'role') {
+                        const parts: string[] = [];
+                        if (m.target_roles?.length) parts.push(...m.target_roles.map(r => r === 'professor' ? 'Professores' : r === 'admin' ? 'Admin' : r === 'juridico' ? 'Jurídico' : r));
+                        if (m.target_cargos?.length) parts.push(...m.target_cargos);
+                        return parts.join(', ') || 'Cargo';
+                      }
+                      if (tt === 'users') return `${m.target_user_ids?.length || 0} usuário(s)`;
+                      return 'Todos';
+                    })();
+                    return (
+                      <Card key={m.id}>
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                <h4 className="font-semibold text-sm">{m.title}</h4>
+                                <Badge variant={m.sent ? "default" : "secondary"} className="text-[10px]">
+                                  {m.sent ? 'Enviada' : 'Programada'}
+                                </Badge>
+                                <Badge variant="outline" className="text-[10px]">Para: {audience}</Badge>
+                              </div>
+                              <p className="text-sm text-muted-foreground line-clamp-2">{m.content}</p>
+                              <p className="text-xs text-muted-foreground mt-2">
+                                {new Date(m.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                {m.scheduled_at && ` • Programada para ${new Date(m.scheduled_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`}
+                              </p>
                             </div>
-                            <p className="text-sm text-muted-foreground line-clamp-2">{m.content}</p>
-                            <p className="text-xs text-muted-foreground mt-2">
-                              {new Date(m.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                              {m.scheduled_at && ` • Programada para ${new Date(m.scheduled_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`}
-                            </p>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {!m.sent && (
+                                <Button size="icon" variant="ghost" className="h-8 w-8" title="Editar" onClick={() => openEditMessage(m)}>
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                              )}
+                              <Button size="icon" variant="ghost" className="h-8 w-8" title="Reenviar agora" onClick={() => handleResendMessage(m.id)}>
+                                <Send className="w-4 h-4" />
+                              </Button>
+                              <Button size="icon" variant="ghost" className="h-8 w-8" title="Duplicar" onClick={() => handleDuplicateMessage(m.id)}>
+                                <Copy className="w-4 h-4" />
+                              </Button>
+                              <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" title="Excluir" onClick={() => handleDeleteMessage(m.id)}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => handleDeleteMessage(m.id)}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               )}
 
-              {/* New Message Dialog */}
-              <Dialog open={msgDialogOpen} onOpenChange={setMsgDialogOpen}>
-                <DialogContent className="max-w-lg">
+              {/* Message Dialog (create/edit) */}
+              <Dialog open={msgDialogOpen} onOpenChange={(o) => { setMsgDialogOpen(o); if (!o) resetMsgForm(); }}>
+                <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
-                    <DialogTitle>Nova Mensagem</DialogTitle>
+                    <DialogTitle>{editingMsgId ? 'Editar Mensagem' : 'Nova Mensagem'}</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4">
                     <div className="space-y-2">
@@ -1393,18 +1421,136 @@ const AdminPage = () => {
                       <Input type="datetime-local" value={msgScheduled} onChange={e => setMsgScheduled(e.target.value)} />
                       <p className="text-xs text-muted-foreground">Deixe vazio para enviar imediatamente.</p>
                     </div>
+
+                    <div className="space-y-2 border-t pt-4">
+                      <Label>Destinatários *</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {(['all', 'role', 'users'] as const).map(t => (
+                          <Button
+                            key={t}
+                            type="button"
+                            size="sm"
+                            variant={msgTargetType === t ? 'default' : 'outline'}
+                            onClick={() => setMsgTargetType(t)}
+                          >
+                            {t === 'all' ? 'Todos' : t === 'role' ? 'Por cargo' : 'Usuários específicos'}
+                          </Button>
+                        ))}
+                      </div>
+
+                      {msgTargetType === 'role' && (
+                        <div className="space-y-3 pt-2">
+                          <div>
+                            <p className="text-xs font-medium mb-1">Função</p>
+                            <div className="flex flex-wrap gap-2">
+                              {[
+                                { v: 'professor', l: 'Professores' },
+                                { v: 'admin', l: 'Admin' },
+                                { v: 'juridico', l: 'Jurídico' },
+                              ].map(r => {
+                                const active = msgTargetRoles.includes(r.v);
+                                return (
+                                  <Button
+                                    key={r.v}
+                                    type="button"
+                                    size="sm"
+                                    variant={active ? 'default' : 'outline'}
+                                    onClick={() => setMsgTargetRoles(prev => active ? prev.filter(x => x !== r.v) : [...prev, r.v])}
+                                  >
+                                    {r.l}
+                                  </Button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                          {cargosList.length > 0 && (
+                            <div>
+                              <p className="text-xs font-medium mb-1">Cargo específico (opcional)</p>
+                              <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                                {cargosList.map(c => {
+                                  const active = msgTargetCargos.includes(c);
+                                  return (
+                                    <Button
+                                      key={c}
+                                      type="button"
+                                      size="sm"
+                                      variant={active ? 'default' : 'outline'}
+                                      className="h-7 text-xs"
+                                      onClick={() => setMsgTargetCargos(prev => active ? prev.filter(x => x !== c) : [...prev, c])}
+                                    >
+                                      {c}
+                                    </Button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {msgTargetType === 'users' && (
+                        <div className="space-y-2 pt-2">
+                          <Input
+                            value={userSearch}
+                            onChange={e => setUserSearch(e.target.value)}
+                            placeholder="Buscar por nome, matrícula ou CPF..."
+                          />
+                          {userResults.length > 0 && (
+                            <div className="border rounded max-h-40 overflow-y-auto">
+                              {userResults.map(u => {
+                                const already = msgTargetUsers.some(x => x.id === u.id);
+                                return (
+                                  <button
+                                    key={u.id}
+                                    type="button"
+                                    disabled={already}
+                                    onClick={() => {
+                                      setMsgTargetUsers(prev => [...prev, u]);
+                                      setUserSearch('');
+                                      setUserResults([]);
+                                    }}
+                                    className="w-full text-left px-3 py-2 text-sm hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed border-b last:border-0"
+                                  >
+                                    <div className="font-medium">{u.nome}</div>
+                                    <div className="text-xs text-muted-foreground">{u.matricula || '—'} {u.cargo ? `• ${u.cargo}` : ''}</div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                          {msgTargetUsers.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5">
+                              {msgTargetUsers.map(u => (
+                                <Badge key={u.id} variant="secondary" className="gap-1">
+                                  {u.nome}
+                                  <button
+                                    type="button"
+                                    onClick={() => setMsgTargetUsers(prev => prev.filter(x => x.id !== u.id))}
+                                    className="ml-1 hover:text-destructive"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                          <p className="text-xs text-muted-foreground">{msgTargetUsers.length} usuário(s) selecionado(s)</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <DialogFooter>
-                    <Button variant="outline" onClick={() => setMsgDialogOpen(false)}>Cancelar</Button>
+                    <Button variant="outline" onClick={() => { setMsgDialogOpen(false); resetMsgForm(); }}>Cancelar</Button>
                     <Button onClick={handleSendMessage} disabled={sendingMsg}>
                       <Send className="w-4 h-4 mr-1.5" />
-                      {sendingMsg ? 'Enviando...' : msgScheduled ? 'Programar' : 'Enviar Agora'}
+                      {sendingMsg ? 'Salvando...' : editingMsgId ? 'Salvar' : msgScheduled ? 'Programar' : 'Enviar Agora'}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
             </>
           )}
+
 
           {activeTab === 'settings' && (
             <Card>
