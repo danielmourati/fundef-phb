@@ -197,20 +197,38 @@ Deno.serve(async (req) => {
 
     // GET messages (broadcast + personal notifications for professor)
     if (req.method === "GET" && action === "messages") {
-      // Broadcast messages (created_by is null or an admin)
+      const { data: me } = await supabase
+        .from("professors")
+        .select("id, role, cargo")
+        .eq("id", user.sub)
+        .maybeSingle();
+
       const { data: broadcastMsgs, error: bErr } = await supabase
         .from("messages")
-        .select("id, title, content, created_at, created_by")
+        .select("id, title, content, created_at, created_by, target_type, target_roles, target_cargos, target_user_ids")
         .eq("sent", true)
         .order("created_at", { ascending: false });
       if (bErr) throw bErr;
 
-      // Filter: broadcast (created_by is null or not the current user) + personal (created_by = user.sub)
-      const messages = (broadcastMsgs || []).filter(m =>
-        !m.created_by || m.created_by === user.sub
-      );
+      const messages = (broadcastMsgs || []).filter((m: any) => {
+        if (m.created_by && m.created_by === user.sub) return true;
+        if (m.created_by && m.created_by !== user.sub) return false;
+        const tt = m.target_type || "all";
+        if (tt === "all") return true;
+        if (tt === "role") {
+          const roles = Array.isArray(m.target_roles) ? m.target_roles : [];
+          const cargos = Array.isArray(m.target_cargos) ? m.target_cargos : [];
+          if (me?.role && roles.includes(me.role)) return true;
+          if (me?.cargo && cargos.includes(me.cargo)) return true;
+          return false;
+        }
+        if (tt === "users") {
+          const ids = Array.isArray(m.target_user_ids) ? m.target_user_ids : [];
+          return ids.includes(user.sub);
+        }
+        return true;
+      });
 
-      // Get read status
       const messageIds = messages.map(m => m.id);
       const { data: reads } = messageIds.length > 0
         ? await supabase
