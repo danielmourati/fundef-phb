@@ -174,7 +174,7 @@ const AccessReportDialog = ({ open, onOpenChange }: Props) => {
                     Baixar Formulário – Anexo II
                   </a>
                 ) : (
-                  <a href="/anexo-iii-requerimento.pdf" download="Anexo-III-Requerimento.pdf">
+                  <a href={anexoIIIAsset.url} download="Anexo-III-Requerimento.pdf">
                     <Download className="w-4 h-4" />
                     Baixar Formulário – Anexo III
                   </a>
