@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Download, ArrowLeft, FileText, UserPlus } from 'lucide-react';
+import anexoIIIAsset from '@/assets/anexo-iii-requerimento.pdf.asset.json';
 
 interface Props {
   open: boolean;
@@ -173,7 +174,7 @@ const AccessReportDialog = ({ open, onOpenChange }: Props) => {
                     Baixar Formulário – Anexo II
                   </a>
                 ) : (
-                  <a href="/anexo-iii-requerimento.pdf" download="Anexo-III-Requerimento.pdf">
+                  <a href={anexoIIIAsset.url} download="Anexo-III-Requerimento.pdf">
                     <Download className="w-4 h-4" />
                     Baixar Formulário – Anexo III
                   </a>
