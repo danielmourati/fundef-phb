@@ -1,55 +1,70 @@
+# Refatorar Modal "Reportar Problema de Acesso"
+
 ## Objetivo
-Permitir, na aba **Mensagens** do `/admin`:
-- Editar mensagens **programadas** (título, conteúdo, data/hora, destinatários).
-- **Reenviar agora** uma mensagem já enviada (resetando leituras).
-- **Duplicar** uma mensagem como nova (rascunho/programada).
-- Selecionar **destinatários** ao criar/editar: Todos, por Cargo (role + cargo livre) ou Usuários específicos (busca por nome/matrícula).
+Transformar o modal atual de relatório de problema em um modal com duas opções distintas: **Anexo II** (dados incorretos/incompletos) e **Anexo III** (nome não consta na lista), cada uma com instruções específicas e botão de download do formulário correspondente.
 
-## Banco (migration)
-Adicionar à tabela `messages`:
-- `target_type text not null default 'all'` — valores: `all` | `role` | `users`.
-- `target_roles text[] not null default '{}'` — ex.: `{professor,juridico}`.
-- `target_cargos text[] not null default '{}'` — cargos livres opcionais (ex.: `PROFESSOR I`).
-- `target_user_ids uuid[] not null default '{}'` — quando `target_type = 'users'`.
+---
 
-Nenhuma alteração em RLS/grants (mantém acesso só via edge functions).
+## Pré-requisito
+⚠️ **Upload do PDF do Anexo III necessário.** O usuário deve fazer upload do arquivo `anexo-iii-requerimento.pdf` para que eu o coloque em `public/anexo-iii-requerimento.pdf`. Sem isso, o botão de download do Anexo III ficará como placeholder.
 
-## Backend — `supabase/functions/admin-api/index.ts`
-- `GET messages`: já existe, retornar também os novos campos de segmentação.
-- `POST create_message`: aceitar `target_type`, `target_roles`, `target_cargos`, `target_user_ids` e persistir.
-- **Novo** `PUT update_message`: edita `title`, `content`, `scheduled_at`, e campos de segmentação. **Só permitido** se a mensagem ainda **não foi enviada** (`sent = false`). Recalcula `sent` se `scheduled_at` for limpo.
-- **Novo** `POST resend_message?id=...`: marca `sent=true`, atualiza `created_at = now()`, **apaga `message_reads` da mensagem** (reset de leituras) para reaparecer como não lida.
-- **Novo** `POST duplicate_message?id=...`: copia a mensagem em uma nova linha como `sent=false` (rascunho/programada) preservando segmentação; cliente abre o diálogo de edição em seguida.
-- **Novo** `GET professors_lookup?q=...&limit=20`: retorna `[{id, nome, matricula, cargo, role}]` para o autocomplete do seletor de usuários específicos (server-side, reaproveitando o filtro `.or()` já usado em `professors`).
-- **Novo** `GET cargos_distinct`: lista cargos distintos para o seletor de cargos.
+---
 
-## Backend — `supabase/functions/professor-api/index.ts`
-Atualizar o `GET messages` para entregar apenas mensagens cujo público inclua o professor:
-- `target_type='all'` → sempre incluir.
-- `target_type='role'` → incluir se `professor.role` ∈ `target_roles` **ou** `professor.cargo` ∈ `target_cargos`.
-- `target_type='users'` → incluir se `professor.id` ∈ `target_user_ids`.
-- Mensagens pessoais (`created_by = user.sub`) continuam visíveis como hoje.
+## Implementação
 
-## Frontend — `src/pages/AdminPage.tsx` (aba Mensagens)
-Diálogo único reaproveitado para **Nova** e **Editar**:
-- Campos: Título, Conteúdo, Data/hora (datetime-local) e bloco **Destinatários**:
-  - Radio: `Todos` | `Por cargo` | `Usuários específicos`.
-  - `Por cargo`: checkboxes para `professor`, `admin`, `juridico` + multi-select de cargos (carregado de `cargos_distinct`).
-  - `Usuários específicos`: campo de busca com debounce chamando `professors_lookup`, chips dos selecionados.
-- Botões por mensagem na lista:
-  - **Editar** (lápis) — habilitado **somente** quando `sent=false` (programada). Abre o diálogo preenchido.
-  - **Reenviar agora** (ícone Send) — confirma e chama `resend_message` (reseta leituras).
-  - **Duplicar** (ícone Copy) — chama `duplicate_message` e abre o diálogo de edição da cópia.
-  - **Excluir** (mantido).
-- Badge extra com resumo do público (ex.: “Todos”, “Cargo: Professor”, “3 usuários”).
-- Toasts e refresh da lista após cada ação.
+### 1. Atualizar `src/components/AccessReportDialog.tsx`
 
-## Detalhes técnicos
-- Verificar `sent=false` no backend antes de aceitar `update_message` (defesa em profundidade, além do botão estar oculto no frontend).
-- `resend_message` executa `DELETE FROM message_reads WHERE message_id = $1` via service_role.
-- Não modificar `src/integrations/supabase/client.ts` nem `types.ts` manualmente — após a migration, os tipos são regenerados.
-- Deploy das duas edge functions (`admin-api`, `professor-api`) após as edições.
+Substituir o conteúdo único atual por uma interface com **seleção de opção**:
 
-## Fora de escopo
-- Agendamento real via cron (envio diferido já é simulado pelo flag `sent`/`scheduled_at` atual; mantemos o comportamento existente).
-- Notificações push/e-mail.
+```text
++--------------------------------------------------+
+|  Reportar Problema de Acesso                [X]  |
++--------------------------------------------------+
+|                                                    |
+|  [ O ] Seus dados estão incorretos ou           |
+|        incompletos                                |
+|                                                    |
+|  [ O ] Você trabalhou no período contemplado,   |
+|        mas seu nome não aparece na lista          |
++--------------------------------------------------+
+```
+
+**Ao selecionar a Opção 1 (Anexo II):**
+- Texto explicativo sobre o Requerimento de Complementação e/ou Retificação de Dados
+- Seção "Como enviar" com passos 1-4
+- Seção "Após o envio" com instrução de aguardar
+- Botão **"↓ BAIXAR FORMULÁRIO – ANEXO II"** (link para `/anexo-ii-requerimento.pdf`)
+
+**Ao selecionar a Opção 2 (Anexo III):**
+- Texto explicativo sobre o Requerimento de Inclusão de Interessado não constante na Lista Preliminar
+- Seção "Documentos exigidos" com lista de bullets:
+  - RG e CPF
+  - Número do PIS/PASEP/NIT
+  - Comprovante de residência
+  - Dados bancários do Banco do Brasil (agência e conta)
+  - Certidão de casamento (se houver)
+  - Documentos que comprovem o vínculo de trabalho no período de julho de 2001 a dezembro de 2006
+- Seção "Como enviar" com passos 1-4
+- Seção "Após o envio" com instrução de aguardar
+- Botão **"↓ BAIXAR FORMULÁRIO – ANEXO III"** (link para `/anexo-iii-requerimento.pdf`)
+
+### 2. Adicionar PDF do Anexo III
+
+Copiar o arquivo PDF do Anexo III enviado pelo usuário para `public/anexo-iii-requerimento.pdf`.
+
+### 3. Estilos
+
+- Usar o design system existente do projeto (navy blue `#1d4ed8`, tipografia do projeto)
+- Radio buttons estilizados para seleção da opção
+- Layout com scroll interno (`max-h-[90vh] overflow-y-auto`)
+- Botão primário para download, outline para fechar
+
+---
+
+## Fora do escopo
+- Geração do PDF do Anexo III (o usuário fornecerá o arquivo)
+- Alterações na página de login (apenas o conteúdo do modal muda)
+
+## Arquivos alterados
+- `src/components/AccessReportDialog.tsx`
+- `public/anexo-iii-requerimento.pdf` (novo)
