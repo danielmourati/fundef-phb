@@ -75,6 +75,21 @@ const AccessReportDialog = ({ open, onOpenChange }: Props) => {
             </p>
 
             <div>
+              <p className="font-semibold mb-2">Documentos exigidos:</p>
+              <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                <li>RG e CPF;</li>
+                <li>Número do PIS/PASEP/NIT;</li>
+                <li>Comprovante de residência;</li>
+                <li>Dados bancários do Banco do Brasil (agência e conta);</li>
+                <li>Certidão de casamento (se houver);</li>
+                <li>
+                  Documentos que comprovem o vínculo de trabalho no período de julho de 2001 a
+                  dezembro de 2006.
+                </li>
+              </ul>
+            </div>
+
+            <div>
               <p className="font-semibold mb-2">Como enviar:</p>
               <ol className="list-decimal list-inside space-y-1.5 text-muted-foreground">
                 <li>Baixe e preencha o formulário abaixo (Anexo II).</li>
