@@ -109,20 +109,43 @@ const LoginPage = () => {
           </div>
 
           {/* Tipo de vínculo */}
-          <Tabs value={tipo ?? ''} onValueChange={(v) => { setTipo(v as 'efetivo' | 'contratado'); setError(''); }} className="w-full">
-            <TabsList className="grid grid-cols-2 w-full h-11 rounded-lg">
-              <TabsTrigger value="efetivo" className="rounded-md">Professor Efetivo</TabsTrigger>
-              <TabsTrigger value="contratado" className="rounded-md">Professor Contratado</TabsTrigger>
-            </TabsList>
-          </Tabs>
-          {!tipo && (
-            <p className="text-xs text-muted-foreground text-center -mt-2">
-              Selecione o tipo de vínculo para continuar.
-            </p>
-          )}
+          <div className="space-y-2">
+            {!tipo && (
+              <div className="flex items-center justify-center gap-2 text-sm font-semibold text-primary animate-pulse">
+                <span>Passo 1 · Escolha seu tipo de vínculo</span>
+                <ArrowDown className="w-4 h-4" />
+              </div>
+            )}
+            <div className="relative">
+              {!tipo && (
+                <>
+                  <MousePointerClick className="absolute -left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-primary animate-bounce hidden sm:block" />
+                  <MousePointerClick className="absolute -right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-primary animate-bounce hidden sm:block" style={{ animationDelay: '150ms' }} />
+                </>
+              )}
+              <Tabs value={tipo ?? ''} onValueChange={(v) => { setTipo(v as 'efetivo' | 'contratado'); setError(''); }} className="w-full">
+                <TabsList className={`grid grid-cols-2 w-full h-11 rounded-lg transition-all duration-300 ${!tipo ? 'ring-2 ring-primary/60 ring-offset-2 ring-offset-background animate-pulse' : ''}`}>
+                  <TabsTrigger ref={firstTabRef} value="efetivo" className="rounded-md">Professor Efetivo</TabsTrigger>
+                  <TabsTrigger value="contratado" className="rounded-md">Professor Contratado</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+            {!tipo && (
+              <p className="flex items-center justify-center gap-1.5 text-xs text-primary font-medium">
+                <Info className="w-3.5 h-3.5" />
+                Selecione o tipo de vínculo para continuar.
+              </p>
+            )}
+          </div>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
+            {tipo && (
+              <div className="text-xs font-semibold text-primary/80 uppercase tracking-wide">
+                Passo 2 · Informe CPF e senha
+              </div>
+            )}
+
 
             <div className="space-y-2">
               <Label htmlFor="cpf" className="text-sm font-medium">
