@@ -99,8 +99,17 @@ const LoginPage = () => {
             </div>
           </div>
 
+          {/* Tipo de vínculo */}
+          <Tabs value={tipo} onValueChange={(v) => setTipo(v as 'efetivo' | 'contratado')} className="w-full">
+            <TabsList className="grid grid-cols-2 w-full h-11 rounded-lg">
+              <TabsTrigger value="efetivo" className="rounded-md">Professor Efetivo</TabsTrigger>
+              <TabsTrigger value="contratado" className="rounded-md">Professor Contratado</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
+
             <div className="space-y-2">
               <Label htmlFor="cpf" className="text-sm font-medium">
                 CPF <span className="text-destructive">*</span>
