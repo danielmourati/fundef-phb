@@ -215,16 +215,16 @@ Deno.serve(async (req) => {
     );
     const sessionId = crypto.randomUUID();
     const signToken = async (sub: string, role: string, mat: string) => {
-      const payload = { sub, role, mat, sid: sessionId, exp: Date.now() + 8 * 60 * 60 * 1000 };
+      const payload = { sub, role, mat, sid: sessionId, tipo: sourceTipo, exp: Date.now() + 8 * 60 * 60 * 1000 };
       const payloadStr = JSON.stringify(payload);
       const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(payloadStr));
       const sigHex = Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, "0")).join("");
       return btoa(payloadStr) + "." + sigHex;
     };
 
-    // Para professor: buscar TODAS as matrículas vinculadas ao mesmo CPF
+    // Para professor efetivo: buscar TODAS as matrículas vinculadas ao mesmo CPF
     let matriculas: Array<any> = [];
-    if (professor.role === "professor" && professor.cpf) {
+    if (sourceTipo === "efetivo" && professor.role === "professor" && professor.cpf) {
       const all = await supabase
         .from("professors")
         .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, carga_horaria, total_cotas, cargo, role, status")
@@ -237,14 +237,26 @@ Deno.serve(async (req) => {
       })));
     }
 
+    // Para contratado: anexar os períodos trabalhados do contratado logado
+    let periodos: Array<{ inicio: string; fim: string; ordem: number }> = [];
+    if (sourceTipo === "contratado") {
+      const { data: pers } = await supabase
+        .from("contratado_periodos")
+        .select("inicio, fim, ordem")
+        .eq("contratado_id", professor.id)
+        .order("ordem", { ascending: true });
+      periodos = pers || [];
+    }
+
     const token = await signToken(professor.id, professor.role, professor.matricula);
 
-    // Return professor data (without sensitive fields) + token + matriculas
+    // Return professor data (without sensitive fields) + token + matriculas + periodos + tipo
     const { senha_hash: _, ...safeProf } = professor;
     return new Response(
-      JSON.stringify({ professor: safeProf, token, matriculas, requires_password_change }),
+      JSON.stringify({ professor: { ...safeProf, tipo: sourceTipo, periodos }, token, matriculas, requires_password_change, tipo: sourceTipo }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
+
   } catch (e) {
     return new Response(
       JSON.stringify({ error: "Erro interno do servidor." }),
