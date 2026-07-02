@@ -1559,6 +1559,10 @@ const AdminPage = () => {
           )}
 
 
+          {activeTab === 'contratados' && token && (
+            <ContratadosView token={token} search={searchQuery} onCountChange={setTotalContratados} />
+          )}
+
           {activeTab === 'settings' && (
             <Card>
               <CardContent className="p-6 space-y-6">
