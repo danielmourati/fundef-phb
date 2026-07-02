@@ -352,51 +352,86 @@ const DashboardPage = () => {
         {/* Dados Section */}
         {activeSection === 'dados' && (
           <>
-            <Card className="overflow-hidden">
-              <CardContent className="p-0">
-                <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-3">
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Matrícula</p>
-                    <p className="text-2xl font-bold tracking-tight">{professor.matricula}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Total de Cotas</p>
-                    <p className="text-2xl font-bold tracking-tight">
-                      {professor.total_cotas ?? '—'}
-                      {professor.total_cotas != null && <span className="text-sm font-medium text-muted-foreground ml-1">cotas</span>}
-                    </p>
-                  </div>
-                </div>
+            {(() => {
+              const isContratado = professor.tipo === 'contratado';
+              const periodos = (professor as any).periodos as { inicio: string; fim: string }[] | undefined;
+              return (
+                <Card className="overflow-hidden">
+                  <CardContent className="p-0">
+                    <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Matrícula</p>
+                        <p className="text-2xl font-bold tracking-tight">{professor.matricula}</p>
+                        {isContratado && (
+                          <Badge className="mt-1 text-[10px] bg-primary/10 text-primary border-primary/30">
+                            {(professor as any).vinculo || 'Contratado'}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Total de Cotas</p>
+                        <p className="text-2xl font-bold tracking-tight">
+                          {professor.total_cotas ?? '—'}
+                          {professor.total_cotas != null && <span className="text-sm font-medium text-muted-foreground ml-1">cotas</span>}
+                        </p>
+                      </div>
+                    </div>
 
+                    <div className="border-t mx-5" />
 
-                <div className="border-t mx-5" />
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-4 px-5 py-4">
+                      <div>
+                        <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Cargo</p>
+                        <p className="font-bold text-sm">{(professor as any).cargo || '—'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Carga Horária</p>
+                        <p className="font-medium text-sm">{(professor as any).carga_horaria ? `${(professor as any).carga_horaria}H` : '—'}</p>
+                      </div>
+                      {!isContratado && (
+                        <>
+                          <div>
+                            <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Data de Admissão</p>
+                            <p className="font-medium text-sm">{formatDate(professor.vinculo_inicio)}</p>
+                          </div>
+                          <div>
+                            <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Data da Aposentadoria</p>
+                            <p className="font-medium text-sm">{formatDate(professor.vinculo_fim)}</p>
+                          </div>
+                        </>
+                      )}
+                      <div className={isContratado ? 'col-span-2' : ''}>
+                        <p className="text-[11px] text-muted-foreground uppercase tracking-wider">CPF</p>
+                        <p className="font-medium text-sm">{formatCpf(professor.cpf)}</p>
+                      </div>
+                    </div>
 
-                <div className="grid grid-cols-2 gap-x-6 gap-y-4 px-5 py-4">
-                  <div>
-                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Cargo</p>
-                    <p className="font-bold text-sm">{(professor as any).cargo || '—'}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Carga Horária</p>
-                    <p className="font-medium text-sm">{(professor as any).carga_horaria ? `${(professor as any).carga_horaria}H` : '—'}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Data de Admissão</p>
-                    <p className="font-medium text-sm">{formatDate(professor.vinculo_inicio)}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Data da Aposentadoria</p>
-                    <p className="font-medium text-sm">{formatDate(professor.vinculo_fim)}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider">CPF</p>
-                    <p className="font-medium text-sm">{formatCpf(professor.cpf)}</p>
-                  </div>
-                </div>
-
-
-              </CardContent>
-            </Card>
+                    {isContratado && (
+                      <>
+                        <div className="border-t mx-5" />
+                        <div className="px-5 py-4">
+                          <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-2">Períodos Trabalhados</p>
+                          {periodos && periodos.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {periodos.map((p, i) => (
+                                <span
+                                  key={i}
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium border border-primary/20"
+                                >
+                                  📅 {p.inicio} → {p.fim}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-muted-foreground">Nenhum período registrado.</p>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })()}
 
             <Card className="border-primary/20 bg-primary/5">
               <CardContent className="p-4 space-y-3">
