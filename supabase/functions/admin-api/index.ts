@@ -282,7 +282,7 @@ Deno.serve(async (req) => {
         // Períodos vindos como "MM/AAAA a MM/AAAA; MM/AAAA a MM/AAAA" ou já parseados
         const periodosStr = String(r.periodos || r.periodo_trabalhado || r.periodo || "").trim();
         if (periodosStr) {
-          const parts = periodosStr.split(/[;\n]/).map(s => s.trim()).filter(Boolean);
+          const parts = periodosStr.split(/[;|\n]/).map(s => s.trim()).filter(Boolean);
           for (const p of parts) {
             const m = p.match(/(\d{2}\/\d{4})\s*(?:a|até|-|→)\s*(\d{2}\/\d{4})/i);
             if (m) g.periodos.push({ inicio: m[1], fim: m[2] });

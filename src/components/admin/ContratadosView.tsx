@@ -182,7 +182,7 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
 
   const downloadTemplate = () => {
     const example = [
-      ['ADAILSON GALENO OLIVEIRA', '2828', '16742552840', '07/2005 a 10/2005; 01/2006 a 07/2006', '20', '11', 'PROFESSOR(A) EJA', 'Contratado'],
+      ['ADAILSON GALENO OLIVEIRA', '2828', '16742552840', '07/2005 a 10/2005 | 01/2006 a 07/2006', '20', '11', 'PROFESSOR(A) EJA', 'Contratado'],
       ['AILCE DOS SANTOS MEIRELES', '25922', '74976427315', '08/2005 a 12/2006', '20', '17', 'PROFESSOR(A) EJA', 'Contratado'],
     ];
     const csv = [[...TEMPLATE_COLUMNS].join(';'), ...example.map(r => r.join(';'))].join('\n');
