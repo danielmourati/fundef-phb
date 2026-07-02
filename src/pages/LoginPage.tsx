@@ -29,6 +29,7 @@ const LoginPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    if (!tipo) { setError('Selecione o tipo de vínculo.'); return; }
     setIsLoading(true);
 
     const result = await login(cpf, senha, tipo);
