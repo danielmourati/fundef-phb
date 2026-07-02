@@ -11,6 +11,8 @@ import { toast } from '@/hooks/use-toast';
 
 import AccessReportDialog from '@/components/AccessReportDialog';
 import FirstAccessInfoDialog from '@/components/FirstAccessInfoDialog';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 
 const LoginPage = () => {
   const [cpf, setCpf] = useState('');
