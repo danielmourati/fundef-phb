@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertCircle, MessageCircle, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, MessageCircle, Eye, EyeOff, ArrowDown, MousePointerClick, Info } from 'lucide-react';
 import loginImage from '@/assets/login-education.jpg';
 import logoSeduc from '@/assets/logo-seduc-azul.png';
 import { toast } from '@/hooks/use-toast';
@@ -22,8 +22,16 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const firstTabRef = useRef<HTMLButtonElement | null>(null);
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!tipo && firstTabRef.current) {
+      firstTabRef.current.focus({ preventScroll: true });
+    }
+  }, [tipo]);
+
 
 
   const handleSubmit = async (e: React.FormEvent) => {
