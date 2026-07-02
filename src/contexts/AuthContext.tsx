@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+interface Periodo { inicio: string; fim: string; ordem?: number }
+
 interface Professor {
   id: string;
   nome: string;
@@ -15,6 +17,9 @@ interface Professor {
   role: string;
   status?: string | null;
   vinculo_status?: string | null;
+  tipo?: 'efetivo' | 'contratado' | 'admin' | null;
+  vinculo?: string | null;
+  periodos?: Periodo[];
 }
 
 interface MatriculaItem extends Professor {
@@ -28,9 +33,10 @@ interface AuthContextType {
   matriculas: MatriculaItem[];
   requiresPasswordChange: boolean;
   setMatriculaAtiva: (id: string) => void;
-  login: (identificador: string, senha: string) => Promise<{ success: boolean; error?: string }>;
+  login: (identificador: string, senha: string, tipo?: 'efetivo' | 'contratado') => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
 }
+
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -85,15 +91,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ professor: prof, token: tk, matriculas: mats, requiresPasswordChange: reqPwdChange }));
   };
 
-  const login = async (identificador: string, senha: string) => {
+  const login = async (identificador: string, senha: string, tipo?: 'efetivo' | 'contratado') => {
     try {
       const { data, error } = await supabase.functions.invoke('custom-login', {
-        body: { identificador, senha },
+        body: { identificador, senha, tipo },
       });
 
       if (error || !data?.professor) {
         return { success: false, error: data?.error || 'CPF ou senha incorretos.' };
       }
+
 
       const matsRaw: MatriculaItem[] = data.matriculas || [];
       const mats = normalizeMats(matsRaw);

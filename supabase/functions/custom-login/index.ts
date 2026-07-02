@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
 
     // Parse and validate input
     const body = await req.json();
-    const tipo = String(body.tipo || "").trim().toLowerCase(); // "admin" ou vazio
+    const tipoRaw = String(body.tipo || "").trim().toLowerCase(); // "admin" | "efetivo" | "contratado" | ""
     const rawId = String(body.identificador || body.email || body.cpf || body.matricula || "").trim();
     const senha = String(body.senha || "").trim();
 
@@ -62,9 +62,12 @@ Deno.serve(async (req) => {
     let professor: any = null;
     let fetchErr: any = null;
     let requires_password_change = false;
+    // Tabela de origem do login (para incluir na claim do token)
+    let sourceTipo: "efetivo" | "contratado" | "admin" = "efetivo";
 
-    if (tipo === "admin" || rawId.includes("@")) {
+    if (tipoRaw === "admin" || rawId.includes("@")) {
       // Login por e-mail (admin/jurídico) na tabela users
+      sourceTipo = "admin";
       const email = rawId.toLowerCase();
       const u = await supabase
         .from("users")
@@ -87,8 +90,46 @@ Deno.serve(async (req) => {
         };
       }
       fetchErr = u.error;
+    } else if (tipoRaw === "contratado") {
+      // Login professor contratado por CPF na tabela contratados (+ períodos)
+      sourceTipo = "contratado";
+      const identificador = rawId.replace(/\D/g, "") || rawId;
+      const r = await supabase
+        .from("contratados")
+        .select("id, nome, cpf, matricula, data_nascimento, carga_horaria, total_cotas, cargo, vinculo, role, status, senha_hash")
+        .eq("cpf", identificador)
+        .order("matricula", { ascending: true });
+      let candidates = r.data || [];
+      fetchErr = r.error;
+      if (candidates.length === 0) {
+        const fb = await supabase
+          .from("contratados")
+          .select("id, nome, cpf, matricula, data_nascimento, carga_horaria, total_cotas, cargo, vinculo, role, status, senha_hash")
+          .eq("matricula", identificador);
+        candidates = fb.data || [];
+        fetchErr = fb.error;
+      }
+      for (const c of candidates) {
+        let ok = false;
+        if (c.senha_hash) {
+          const { data } = await supabase.rpc("verify_password", {
+            plain_password: senha,
+            hashed_password: c.senha_hash,
+          });
+          ok = !!data;
+        }
+        if (!ok && (passwordMatchesBirthDate(senha, c.data_nascimento) || onlyDigits(senha) === onlyDigits(c.cpf))) {
+          ok = true;
+        }
+        if (ok) {
+          professor = { ...c, vinculo_inicio: null, vinculo_fim: null };
+          if (onlyDigits(senha) === onlyDigits(c.cpf)) requires_password_change = true;
+          break;
+        }
+      }
     } else {
-      // Login professor por CPF (com fallback matrícula). Pode haver múltiplas linhas
+      // Login professor efetivo por CPF na tabela professors (comportamento atual)
+      sourceTipo = "efetivo";
       const identificador = rawId.replace(/\D/g, "") || rawId;
       const r = await supabase
         .from("professors")
@@ -129,6 +170,7 @@ Deno.serve(async (req) => {
         }
       }
     }
+
 
     if (fetchErr || !professor) {
       await supabase.from("login_attempts").insert({ ip_address: ip, matricula: rawId, success: false });
@@ -173,16 +215,16 @@ Deno.serve(async (req) => {
     );
     const sessionId = crypto.randomUUID();
     const signToken = async (sub: string, role: string, mat: string) => {
-      const payload = { sub, role, mat, sid: sessionId, exp: Date.now() + 8 * 60 * 60 * 1000 };
+      const payload = { sub, role, mat, sid: sessionId, tipo: sourceTipo, exp: Date.now() + 8 * 60 * 60 * 1000 };
       const payloadStr = JSON.stringify(payload);
       const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(payloadStr));
       const sigHex = Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, "0")).join("");
       return btoa(payloadStr) + "." + sigHex;
     };
 
-    // Para professor: buscar TODAS as matrículas vinculadas ao mesmo CPF
+    // Para professor efetivo: buscar TODAS as matrículas vinculadas ao mesmo CPF
     let matriculas: Array<any> = [];
-    if (professor.role === "professor" && professor.cpf) {
+    if (sourceTipo === "efetivo" && professor.role === "professor" && professor.cpf) {
       const all = await supabase
         .from("professors")
         .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, carga_horaria, total_cotas, cargo, role, status")
@@ -195,14 +237,26 @@ Deno.serve(async (req) => {
       })));
     }
 
+    // Para contratado: anexar os períodos trabalhados do contratado logado
+    let periodos: Array<{ inicio: string; fim: string; ordem: number }> = [];
+    if (sourceTipo === "contratado") {
+      const { data: pers } = await supabase
+        .from("contratado_periodos")
+        .select("inicio, fim, ordem")
+        .eq("contratado_id", professor.id)
+        .order("ordem", { ascending: true });
+      periodos = pers || [];
+    }
+
     const token = await signToken(professor.id, professor.role, professor.matricula);
 
-    // Return professor data (without sensitive fields) + token + matriculas
+    // Return professor data (without sensitive fields) + token + matriculas + periodos + tipo
     const { senha_hash: _, ...safeProf } = professor;
     return new Response(
-      JSON.stringify({ professor: safeProf, token, matriculas, requires_password_change }),
+      JSON.stringify({ professor: { ...safeProf, tipo: sourceTipo, periodos }, token, matriculas, requires_password_change, tipo: sourceTipo }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
+
   } catch (e) {
     return new Response(
       JSON.stringify({ error: "Erro interno do servidor." }),

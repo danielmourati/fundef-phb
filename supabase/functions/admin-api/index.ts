@@ -86,12 +86,276 @@ Deno.serve(async (req) => {
 
     // GET professors stats (count only)
     if (req.method === "GET" && action === "professors_stats") {
-      const { count, error } = await supabase
-        .from("professors")
-        .select("id", { count: "exact", head: true });
+      const [pRes, cRes] = await Promise.all([
+        supabase.from("professors").select("id", { count: "exact", head: true }),
+        supabase.from("contratados").select("id", { count: "exact", head: true }),
+      ]);
+      if (pRes.error) throw pRes.error;
+      return jsonResponse({ total: pRes.count || 0, totalContratados: cRes.count || 0 });
+    }
+
+    // ============================================================
+    // ==================== CONTRATADOS ===========================
+    // ============================================================
+
+    // GET contratados (paginated)
+    if (req.method === "GET" && action === "contratados") {
+      const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10) || 1);
+      const rawSize = parseInt(url.searchParams.get("pageSize") || "50", 10) || 50;
+      const pageSize = [25, 50, 100].includes(rawSize) ? rawSize : 50;
+      const search = (url.searchParams.get("search") || "").trim();
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+
+      let q = supabase
+        .from("contratados")
+        .select("id, nome, cpf, matricula, data_nascimento, carga_horaria, total_cotas, cargo, vinculo, status, role", { count: "exact" })
+        .order("nome")
+        .range(from, to);
+
+      if (search) {
+        const digits = search.replace(/\D/g, "");
+        const ors = [
+          `nome.ilike.%${search}%`,
+          `matricula.ilike.%${search}%`,
+          `cargo.ilike.%${search}%`,
+        ];
+        if (digits) ors.push(`cpf.ilike.%${digits}%`);
+        q = q.or(ors.join(","));
+      }
+
+      const { data, error, count } = await q;
+      if (error) throw error;
+
+      // Anexa períodos de cada contratado
+      const ids = (data || []).map((r: any) => r.id);
+      const periodosByContratado: Record<string, any[]> = {};
+      if (ids.length > 0) {
+        const { data: pers } = await supabase
+          .from("contratado_periodos")
+          .select("id, contratado_id, inicio, fim, ordem")
+          .in("contratado_id", ids)
+          .order("ordem", { ascending: true });
+        for (const p of pers || []) {
+          (periodosByContratado[p.contratado_id] ||= []).push(p);
+        }
+      }
+      const rows = (data || []).map((r: any) => ({ ...r, periodos: periodosByContratado[r.id] || [] }));
+      return jsonResponse({ rows, total: count || 0, page, pageSize });
+    }
+
+    // GET contratados stats
+    if (req.method === "GET" && action === "contratados_stats") {
+      const { count, error } = await supabase.from("contratados").select("id", { count: "exact", head: true });
       if (error) throw error;
       return jsonResponse({ total: count || 0 });
     }
+
+    // GET all contratados (chunked, for import dedup)
+    if (req.method === "GET" && action === "contratados_all") {
+      const all: any[] = [];
+      const chunk = 1000;
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from("contratados")
+          .select("id, cpf, matricula")
+          .order("nome")
+          .range(from, from + chunk - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        all.push(...data);
+        if (data.length < chunk) break;
+        from += chunk;
+      }
+      return jsonResponse(all);
+    }
+
+    // POST create contratado
+    if (req.method === "POST" && action === "create_contratado") {
+      const body = await req.json();
+      const cpf = String(body.cpf || "").replace(/\D/g, "");
+      if (!body.nome || !cpf) throw new Error("Nome e CPF são obrigatórios.");
+      const senha = body.senha || cpf;
+      const { data: hashData } = await supabase.rpc("hash_password", { plain_password: senha });
+      const { data: inserted, error } = await supabase.from("contratados").insert({
+        nome: String(body.nome).trim(),
+        cpf,
+        matricula: body.matricula || null,
+        data_nascimento: body.data_nascimento || null,
+        carga_horaria: Number(body.carga_horaria) || 20,
+        total_cotas: Number(body.total_cotas) || 0,
+        cargo: body.cargo || "PROFESSOR(A) EJA",
+        vinculo: body.vinculo || "Contratado",
+        status: (body.status || "ATIVO").toUpperCase(),
+        senha_hash: hashData,
+        role: "professor",
+      }).select("id").single();
+      if (error) throw error;
+      const periodos = Array.isArray(body.periodos) ? body.periodos : [];
+      const perRows = periodos
+        .filter((p: any) => p && p.inicio && p.fim)
+        .map((p: any, i: number) => ({
+          contratado_id: inserted.id,
+          inicio: String(p.inicio).trim(),
+          fim: String(p.fim).trim(),
+          ordem: i,
+        }));
+      if (perRows.length > 0) {
+        const { error: pe } = await supabase.from("contratado_periodos").insert(perRows);
+        if (pe) throw pe;
+      }
+      return jsonResponse({ success: true, id: inserted.id });
+    }
+
+    // PUT update contratado
+    if (req.method === "PUT" && action === "update_contratado") {
+      const body = await req.json();
+      const id = body.id;
+      if (!id) throw new Error("ID obrigatório.");
+      const cpf = String(body.cpf || "").replace(/\D/g, "");
+      const update: Record<string, unknown> = {
+        nome: body.nome, cpf, matricula: body.matricula || null,
+        data_nascimento: body.data_nascimento || null,
+        carga_horaria: Number(body.carga_horaria) || 20,
+        total_cotas: Number(body.total_cotas) || 0,
+        cargo: body.cargo || "PROFESSOR(A) EJA",
+        vinculo: body.vinculo || "Contratado",
+        status: (body.status || "ATIVO").toUpperCase(),
+      };
+      if (body.senha && body.senha !== "***") {
+        const { data: hashData } = await supabase.rpc("hash_password", { plain_password: body.senha });
+        update.senha_hash = hashData;
+      }
+      const { error } = await supabase.from("contratados").update(update).eq("id", id);
+      if (error) throw error;
+      // Substitui períodos
+      await supabase.from("contratado_periodos").delete().eq("contratado_id", id);
+      const periodos = Array.isArray(body.periodos) ? body.periodos : [];
+      const perRows = periodos
+        .filter((p: any) => p && p.inicio && p.fim)
+        .map((p: any, i: number) => ({
+          contratado_id: id, inicio: String(p.inicio).trim(), fim: String(p.fim).trim(), ordem: i,
+        }));
+      if (perRows.length > 0) {
+        const { error: pe } = await supabase.from("contratado_periodos").insert(perRows);
+        if (pe) throw pe;
+      }
+      return jsonResponse({ success: true });
+    }
+
+    // DELETE contratado
+    if (req.method === "DELETE" && action === "delete_contratado") {
+      const id = url.searchParams.get("id");
+      if (!id) throw new Error("ID obrigatório.");
+      const { error } = await supabase.from("contratados").delete().eq("id", id);
+      if (error) throw error;
+      return jsonResponse({ success: true });
+    }
+
+    // POST import contratados
+    if (req.method === "POST" && action === "import_contratados") {
+      const body = await req.json();
+      const rows = Array.isArray(body.rows) ? body.rows : [];
+      // Agrupa por CPF: mesmo CPF gera 1 contratado com múltiplos períodos
+      const groups = new Map<string, { data: any; periodos: Array<{ inicio: string; fim: string }> }>();
+      for (const r of rows) {
+        const cpf = String(r.cpf || "").replace(/\D/g, "");
+        if (!cpf || cpf.length !== 11) continue;
+        if (!groups.has(cpf)) {
+          groups.set(cpf, {
+            data: {
+              nome: String(r.nome || "").trim(),
+              cpf,
+              matricula: (r.matricula || "").toString().trim() || null,
+              data_nascimento: r.data_nascimento || null,
+              carga_horaria: parseInt(String(r.carga_horaria || "").replace(/\D/g, "")) || 20,
+              total_cotas: parseInt(r.total_cotas) || 0,
+              cargo: (r.cargo && String(r.cargo).trim()) || "PROFESSOR(A) EJA",
+              vinculo: r.vinculo || "Contratado",
+              status: (r.status || "ATIVO").toString().toUpperCase(),
+            },
+            periodos: [],
+          });
+        }
+        const g = groups.get(cpf)!;
+        // Períodos vindos como "MM/AAAA a MM/AAAA; MM/AAAA a MM/AAAA" ou já parseados
+        const periodosStr = String(r.periodos || r.periodo_trabalhado || r.periodo || "").trim();
+        if (periodosStr) {
+          const parts = periodosStr.split(/[;\n]/).map(s => s.trim()).filter(Boolean);
+          for (const p of parts) {
+            const m = p.match(/(\d{2}\/\d{4})\s*(?:a|até|-|→)\s*(\d{2}\/\d{4})/i);
+            if (m) g.periodos.push({ inicio: m[1], fim: m[2] });
+          }
+        }
+        // Aceita também array de períodos já estruturado
+        if (Array.isArray(r.periodos_parsed)) {
+          for (const p of r.periodos_parsed) {
+            if (p?.inicio && p?.fim) g.periodos.push({ inicio: p.inicio, fim: p.fim });
+          }
+        }
+      }
+
+      // Filtra já existentes (por CPF)
+      const cpfs = [...groups.keys()];
+      let skipped = 0;
+      if (cpfs.length === 0) return jsonResponse({ success: true, count: 0, skipped: 0 });
+      const { data: existing } = await supabase.from("contratados").select("cpf").in("cpf", cpfs);
+      const existSet = new Set((existing || []).map((r: any) => r.cpf));
+      const toInsert: any[] = [];
+      const orderedGroups: Array<{ cpf: string; periodos: Array<{ inicio: string; fim: string }> }> = [];
+      for (const [cpf, g] of groups) {
+        if (existSet.has(cpf)) { skipped++; continue; }
+        const { data: hashData } = await supabase.rpc("hash_password", { plain_password: cpf });
+        toInsert.push({ ...g.data, senha_hash: hashData, role: "professor" });
+        orderedGroups.push({ cpf, periodos: g.periodos });
+      }
+      if (toInsert.length === 0) return jsonResponse({ success: true, count: 0, skipped });
+      const { data: inserted, error } = await supabase.from("contratados").insert(toInsert).select("id, cpf");
+      if (error) throw error;
+      const idByCpf = new Map((inserted || []).map((r: any) => [r.cpf, r.id]));
+      const periodoRows: any[] = [];
+      for (const g of orderedGroups) {
+        const id = idByCpf.get(g.cpf);
+        if (!id) continue;
+        g.periodos.forEach((p, i) => periodoRows.push({ contratado_id: id, inicio: p.inicio, fim: p.fim, ordem: i }));
+      }
+      if (periodoRows.length > 0) {
+        const { error: pe } = await supabase.from("contratado_periodos").insert(periodoRows);
+        if (pe) throw pe;
+      }
+      return jsonResponse({ success: true, count: inserted?.length || 0, skipped });
+    }
+
+    // POST clear contratados (requires admin password)
+    if ((req.method === "DELETE" || req.method === "POST") && action === "delete_all_contratados") {
+      let cbody: { password?: string } = {};
+      try { cbody = await req.json(); } catch { /* allow empty */ }
+      const password = String(cbody.password || "");
+      if (!password) throw new Error("Senha de administrador obrigatória.");
+      let { data: adminRow } = await supabase
+        .from("users").select("id, role, senha_hash").eq("id", user.sub).maybeSingle();
+      if (!adminRow) {
+        const { data: pa } = await supabase
+          .from("professors").select("id, role, senha_hash").eq("id", user.sub).maybeSingle();
+        adminRow = pa;
+      }
+      if (!adminRow || adminRow.role !== "admin" || !adminRow.senha_hash) {
+        throw new Error("Administrador não encontrado.");
+      }
+      const { data: pwOk } = await supabase.rpc("verify_password", {
+        plain_password: password, hashed_password: adminRow.senha_hash,
+      });
+      if (!pwOk) return new Response(JSON.stringify({ error: "Senha incorreta." }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+      const { error } = await supabase.from("contratados").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      if (error) throw error;
+      return jsonResponse({ success: true });
+    }
+
+    // ============================================================
+
 
     // GET all professors (chunked, for export / bulk ops)
     if (req.method === "GET" && action === "professors_all") {

@@ -11,8 +11,11 @@ import { toast } from '@/hooks/use-toast';
 
 import AccessReportDialog from '@/components/AccessReportDialog';
 import FirstAccessInfoDialog from '@/components/FirstAccessInfoDialog';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 
 const LoginPage = () => {
+  const [tipo, setTipo] = useState<'efetivo' | 'contratado'>('efetivo');
   const [cpf, setCpf] = useState('');
   const [senha, setSenha] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -28,8 +31,9 @@ const LoginPage = () => {
     setError('');
     setIsLoading(true);
 
-    const result = await login(cpf, senha);
+    const result = await login(cpf, senha, tipo);
     setIsLoading(false);
+
 
     if (result.success) {
       const stored = localStorage.getItem('fundef_session');
@@ -95,8 +99,17 @@ const LoginPage = () => {
             </div>
           </div>
 
+          {/* Tipo de vínculo */}
+          <Tabs value={tipo} onValueChange={(v) => setTipo(v as 'efetivo' | 'contratado')} className="w-full">
+            <TabsList className="grid grid-cols-2 w-full h-11 rounded-lg">
+              <TabsTrigger value="efetivo" className="rounded-md">Professor Efetivo</TabsTrigger>
+              <TabsTrigger value="contratado" className="rounded-md">Professor Contratado</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
+
             <div className="space-y-2">
               <Label htmlFor="cpf" className="text-sm font-medium">
                 CPF <span className="text-destructive">*</span>

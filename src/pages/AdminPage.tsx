@@ -34,6 +34,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { maskCPF, unmaskCPF, isValidCPF, maskDate, isValidDate, maskPhone, STATUS_OPTIONS, statusBadgeClass, statusRowClass, normalizeStatus } from '@/lib/masks';
 import { ImportReviewDialog, type ReviewItem } from '@/components/ImportReviewDialog';
+import ContratadosView from '@/components/admin/ContratadosView';
+import { UserPlus } from 'lucide-react';
 
 interface Professor {
   id: string;
@@ -84,16 +86,18 @@ const emptyProfessor = {
   status: 'ATIVO',
 };
 
-type ActiveTab = 'dashboard' | 'professors' | 'contestacoes' | 'access_reports' | 'messages' | 'settings';
+type ActiveTab = 'dashboard' | 'professors' | 'contratados' | 'contestacoes' | 'access_reports' | 'messages' | 'settings';
 
 const navItems: { key: ActiveTab; label: string; icon: React.ElementType }[] = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { key: 'professors', label: 'Professores', icon: Users },
+  { key: 'contratados', label: 'Contratados', icon: UserPlus },
   { key: 'contestacoes', label: 'Contestações', icon: AlertTriangle },
   { key: 'access_reports', label: 'Reports de Acesso', icon: LifeBuoy },
   { key: 'messages', label: 'Mensagens', icon: MessageSquare },
   { key: 'settings', label: 'Configurações', icon: Settings },
 ];
+
 
 
 const TEMPLATE_COLUMNS = [
@@ -120,6 +124,7 @@ const AdminPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState<number>(50);
   const [totalProfs, setTotalProfs] = useState(0);
+  const [totalContratados, setTotalContratados] = useState(0);
   const [profsLoading, setProfsLoading] = useState(false);
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [profsRefreshTick, setProfsRefreshTick] = useState(0);
@@ -205,6 +210,7 @@ const AdminPage = () => {
     if (msgRes.data && Array.isArray(msgRes.data)) setMessages(msgRes.data);
     if (arRes.data && Array.isArray(arRes.data)) setAccessReports(arRes.data);
     if (statsRes.data && typeof statsRes.data.total === 'number') setTotalProfs(statsRes.data.total);
+    if (statsRes.data && typeof statsRes.data.totalContratados === 'number') setTotalContratados(statsRes.data.totalContratados);
     setLoading(false);
     setProfsRefreshTick(t => t + 1);
   };
@@ -850,7 +856,8 @@ const AdminPage = () => {
   const showingTo = Math.min(currentPage * itemsPerPage, totalProfs);
 
   const statCards = [
-    { label: 'Total Professores', value: totalProfs, icon: Users, color: 'bg-primary/10 text-primary' },
+    { label: 'Total Efetivos', value: totalProfs, icon: Users, color: 'bg-primary/10 text-primary' },
+    { label: 'Total Contratados', value: totalContratados, icon: UserPlus, color: 'bg-purple-50 text-purple-600' },
     { label: 'Contestações', value: contestacoes.length, icon: AlertTriangle, color: 'bg-red-50 text-red-600' },
     { label: 'Mensagens', value: messages.length, icon: MessageSquare, color: 'bg-blue-50 text-blue-600' },
   ];
@@ -959,7 +966,7 @@ const AdminPage = () => {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {(activeTab === 'professors' || activeTab === 'dashboard') && (
+            {(activeTab === 'professors' || activeTab === 'contratados' || activeTab === 'dashboard') && (
               <div className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -1551,6 +1558,10 @@ const AdminPage = () => {
             </>
           )}
 
+
+          {activeTab === 'contratados' && token && (
+            <ContratadosView token={token} search={searchQuery} onCountChange={setTotalContratados} />
+          )}
 
           {activeTab === 'settings' && (
             <Card>
