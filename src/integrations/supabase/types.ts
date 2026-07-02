@@ -67,13 +67,14 @@ export type Database = {
       }
       contestacoes: {
         Row: {
+          contratado_id: string | null
           created_at: string
           descricao: string
           documento_nome: string | null
           documento_path: string | null
           id: string
           motivo: string
-          professor_id: string
+          professor_id: string | null
           protocolo: string | null
           resposta: string | null
           status: string
@@ -81,13 +82,14 @@ export type Database = {
           whatsapp: string | null
         }
         Insert: {
+          contratado_id?: string | null
           created_at?: string
           descricao: string
           documento_nome?: string | null
           documento_path?: string | null
           id?: string
           motivo: string
-          professor_id: string
+          professor_id?: string | null
           protocolo?: string | null
           resposta?: string | null
           status?: string
@@ -95,13 +97,14 @@ export type Database = {
           whatsapp?: string | null
         }
         Update: {
+          contratado_id?: string | null
           created_at?: string
           descricao?: string
           documento_nome?: string | null
           documento_path?: string | null
           id?: string
           motivo?: string
-          professor_id?: string
+          professor_id?: string | null
           protocolo?: string | null
           resposta?: string | null
           status?: string
@@ -109,6 +112,13 @@ export type Database = {
           whatsapp?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "contestacoes_contratado_id_fkey"
+            columns: ["contratado_id"]
+            isOneToOne: false
+            referencedRelation: "contratados"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "contestacoes_professor_id_fkey"
             columns: ["professor_id"]
@@ -239,24 +249,34 @@ export type Database = {
       }
       message_reads: {
         Row: {
+          contratado_id: string | null
           id: string
           message_id: string
-          professor_id: string
+          professor_id: string | null
           read_at: string
         }
         Insert: {
+          contratado_id?: string | null
           id?: string
           message_id: string
-          professor_id: string
+          professor_id?: string | null
           read_at?: string
         }
         Update: {
+          contratado_id?: string | null
           id?: string
           message_id?: string
-          professor_id?: string
+          professor_id?: string | null
           read_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "message_reads_contratado_id_fkey"
+            columns: ["contratado_id"]
+            isOneToOne: false
+            referencedRelation: "contratados"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "message_reads_message_id_fkey"
             columns: ["message_id"]
