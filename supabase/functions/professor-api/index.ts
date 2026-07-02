@@ -6,7 +6,7 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-async function verifyToken(authHeader: string | null): Promise<{ sub: string; role: string } | null> {
+async function verifyToken(authHeader: string | null): Promise<{ sub: string; role: string; tipo: string } | null> {
   if (!authHeader?.startsWith("Bearer ")) return null;
   const token = authHeader.slice(7);
   const dotIdx = token.lastIndexOf(".");
@@ -25,7 +25,7 @@ async function verifyToken(authHeader: string | null): Promise<{ sub: string; ro
     if (!valid) return null;
     const payload = JSON.parse(payloadStr);
     if (payload.exp < Date.now()) return null;
-    return { sub: payload.sub, role: payload.role };
+    return { sub: payload.sub, role: payload.role, tipo: payload.tipo || "efetivo" };
   } catch {
     return null;
   }
@@ -99,9 +99,27 @@ Deno.serve(async (req) => {
   }
 
 
+  const isContratado = user.tipo === "contratado";
+  const ownerField = isContratado ? "contratado_id" : "professor_id";
+  const ownerTable = isContratado ? "contratados" : "professors";
+
   try {
     // GET my profile
     if (req.method === "GET" && action === "profile") {
+      if (isContratado) {
+        const { data, error } = await supabase
+          .from("contratados")
+          .select("id, nome, cpf, matricula, data_nascimento, carga_horaria, total_cotas, cargo, vinculo, role, status")
+          .eq("id", user.sub)
+          .single();
+        if (error) throw error;
+        const { data: pers } = await supabase
+          .from("contratado_periodos")
+          .select("inicio, fim, ordem")
+          .eq("contratado_id", user.sub)
+          .order("ordem", { ascending: true });
+        return jsonResponse({ ...data, periodos: pers || [], tipo: "contratado" });
+      }
       const { data, error } = await supabase
         .from("professors")
         .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, role")
@@ -116,7 +134,7 @@ Deno.serve(async (req) => {
       const { data, error } = await supabase
         .from("contestacoes")
         .select("id, motivo, descricao, whatsapp, status, created_at, protocolo, resposta, documento_path, documento_nome")
-        .eq("professor_id", user.sub)
+        .eq(ownerField, user.sub)
         .order("created_at", { ascending: false });
       if (error) throw error;
       const withUrls = await attachDocumentUrls(data || []);
@@ -174,11 +192,14 @@ Deno.serve(async (req) => {
         });
       }
 
-      const { data: inserted, error } = await supabase.from("contestacoes").insert({
-        professor_id: user.sub,
+      const insertPayload: Record<string, unknown> = {
         motivo, descricao, whatsapp,
         documento_nome,
-      }).select("id, protocolo").single();
+      };
+      insertPayload[ownerField] = user.sub;
+
+      const { data: inserted, error } = await supabase.from("contestacoes").insert(insertPayload)
+        .select("id, protocolo").single();
       if (error) throw error;
 
       const path = `${user.sub}/${inserted.id}.pdf`;
@@ -198,7 +219,7 @@ Deno.serve(async (req) => {
     // GET messages (broadcast + personal notifications for professor)
     if (req.method === "GET" && action === "messages") {
       const { data: me } = await supabase
-        .from("professors")
+        .from(ownerTable)
         .select("id, role, cargo")
         .eq("id", user.sub)
         .maybeSingle();
@@ -234,7 +255,7 @@ Deno.serve(async (req) => {
         ? await supabase
             .from("message_reads")
             .select("message_id")
-            .eq("professor_id", user.sub)
+            .eq(ownerField, user.sub)
             .in("message_id", messageIds)
         : { data: [] };
 
@@ -255,10 +276,11 @@ Deno.serve(async (req) => {
       const messageId = body.message_id;
       if (!messageId) throw new Error("message_id obrigatório");
 
-      await supabase.from("message_reads").upsert({
-        message_id: messageId,
-        professor_id: user.sub,
-      }, { onConflict: "message_id,professor_id" });
+      const readPayload: Record<string, unknown> = { message_id: messageId };
+      readPayload[ownerField] = user.sub;
+      await supabase.from("message_reads").upsert(readPayload, {
+        onConflict: isContratado ? "message_id,contratado_id" : "message_id,professor_id",
+      });
       return jsonResponse({ success: true });
     }
 
@@ -270,24 +292,24 @@ Deno.serve(async (req) => {
          throw new Error("Senha inválida.");
       }
 
-      // First get the user's CPF
+      // First get the user's CPF from the correct table
       const { data: prof } = await supabase
-        .from("professors")
+        .from(ownerTable)
         .select("cpf")
         .eq("id", user.sub)
         .single();
-      
-      if (!prof?.cpf) throw new Error("Professor não encontrado.");
+
+      if (!prof?.cpf) throw new Error("Usuário não encontrado.");
 
       // Hash the new password
       const { data: hashData } = await supabase.rpc("hash_password", { plain_password: newPassword });
 
-      // Update all records with the same CPF
+      // Update all records with the same CPF in the same table
       const { error } = await supabase
-        .from("professors")
+        .from(ownerTable)
         .update({ senha_hash: hashData })
         .eq("cpf", prof.cpf);
-      
+
       if (error) throw error;
       return jsonResponse({ success: true });
     }
@@ -303,21 +325,28 @@ Deno.serve(async (req) => {
       }
       const { data, error } = await supabase
         .from("contestacoes")
-        .select("id, motivo, descricao, whatsapp, status, created_at, professor_id, protocolo, resposta, documento_path, documento_nome")
+        .select("id, motivo, descricao, whatsapp, status, created_at, professor_id, contratado_id, protocolo, resposta, documento_path, documento_nome")
         .order("created_at", { ascending: false });
       if (error) throw error;
 
-      const profIds = [...new Set((data || []).map(c => c.professor_id))];
-      const { data: profs } = await supabase
-        .from("professors")
-        .select("id, nome, matricula, cpf")
-        .in("id", profIds);
+      const profIds = [...new Set((data || []).map(c => c.professor_id).filter(Boolean))];
+      const contIds = [...new Set((data || []).map(c => c.contratado_id).filter(Boolean))];
 
-      const profMap = new Map((profs || []).map(p => [p.id, p]));
+      const [{ data: profs }, { data: conts }] = await Promise.all([
+        profIds.length
+          ? supabase.from("professors").select("id, nome, matricula, cpf").in("id", profIds)
+          : Promise.resolve({ data: [] as any[] }),
+        contIds.length
+          ? supabase.from("contratados").select("id, nome, matricula, cpf").in("id", contIds)
+          : Promise.resolve({ data: [] as any[] }),
+      ]);
+
+      const profMap = new Map((profs || []).map(p => [p.id, { ...p, tipo: "efetivo" as const }]));
+      const contMap = new Map((conts || []).map(p => [p.id, { ...p, tipo: "contratado" as const }]));
       const withUrls = await attachDocumentUrls(data || []);
       const enriched = withUrls.map(c => ({
         ...c,
-        professor: profMap.get(c.professor_id) || null,
+        professor: c.professor_id ? profMap.get(c.professor_id) : contMap.get(c.contratado_id!),
       }));
       return jsonResponse(enriched);
     }
@@ -333,10 +362,10 @@ Deno.serve(async (req) => {
       const { id, status, resposta } = body;
       if (!id || !status) throw new Error("ID e status obrigatórios");
       
-      // Get contestacao to find professor_id and protocolo
+      // Get contestacao to find owner and protocolo
       const { data: contest, error: fetchErr } = await supabase
         .from("contestacoes")
-        .select("professor_id, protocolo, status")
+        .select("professor_id, contratado_id, protocolo, status")
         .eq("id", id)
         .single();
       if (fetchErr || !contest) throw new Error("Contestação não encontrada.");
@@ -358,12 +387,12 @@ Deno.serve(async (req) => {
         const msgTitle = `Contestação ${contest.protocolo || ''} — ${statusLabel[status] || status}`;
         const msgContent = `Sua contestação (${contest.protocolo || 'sem protocolo'}) teve o status atualizado para: ${status}.${resposta ? '\n\nParecer: ' + resposta : ''}`;
 
-        // Insert as a personal message (created_by = professor so only they see it via their messages query)
+        // Insert as a personal message (created_by = owner id so only they see it via their messages query)
         await supabase.from("messages").insert({
           title: msgTitle,
           content: msgContent,
           sent: true,
-          created_by: contest.professor_id,
+          created_by: contest.professor_id || contest.contratado_id,
         });
       }
 
