@@ -15,6 +15,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 
 const LoginPage = () => {
+  const [tipo, setTipo] = useState<'efetivo' | 'contratado'>('efetivo');
   const [cpf, setCpf] = useState('');
   const [senha, setSenha] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -30,8 +31,9 @@ const LoginPage = () => {
     setError('');
     setIsLoading(true);
 
-    const result = await login(cpf, senha);
+    const result = await login(cpf, senha, tipo);
     setIsLoading(false);
+
 
     if (result.success) {
       const stored = localStorage.getItem('fundef_session');
