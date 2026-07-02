@@ -325,21 +325,28 @@ Deno.serve(async (req) => {
       }
       const { data, error } = await supabase
         .from("contestacoes")
-        .select("id, motivo, descricao, whatsapp, status, created_at, professor_id, protocolo, resposta, documento_path, documento_nome")
+        .select("id, motivo, descricao, whatsapp, status, created_at, professor_id, contratado_id, protocolo, resposta, documento_path, documento_nome")
         .order("created_at", { ascending: false });
       if (error) throw error;
 
-      const profIds = [...new Set((data || []).map(c => c.professor_id))];
-      const { data: profs } = await supabase
-        .from("professors")
-        .select("id, nome, matricula, cpf")
-        .in("id", profIds);
+      const profIds = [...new Set((data || []).map(c => c.professor_id).filter(Boolean))];
+      const contIds = [...new Set((data || []).map(c => c.contratado_id).filter(Boolean))];
 
-      const profMap = new Map((profs || []).map(p => [p.id, p]));
+      const [{ data: profs }, { data: conts }] = await Promise.all([
+        profIds.length
+          ? supabase.from("professors").select("id, nome, matricula, cpf").in("id", profIds)
+          : Promise.resolve({ data: [] as any[] }),
+        contIds.length
+          ? supabase.from("contratados").select("id, nome, matricula, cpf").in("id", contIds)
+          : Promise.resolve({ data: [] as any[] }),
+      ]);
+
+      const profMap = new Map((profs || []).map(p => [p.id, { ...p, tipo: "efetivo" as const }]));
+      const contMap = new Map((conts || []).map(p => [p.id, { ...p, tipo: "contratado" as const }]));
       const withUrls = await attachDocumentUrls(data || []);
       const enriched = withUrls.map(c => ({
         ...c,
-        professor: profMap.get(c.professor_id) || null,
+        professor: c.professor_id ? profMap.get(c.professor_id) : contMap.get(c.contratado_id!),
       }));
       return jsonResponse(enriched);
     }
@@ -355,10 +362,10 @@ Deno.serve(async (req) => {
       const { id, status, resposta } = body;
       if (!id || !status) throw new Error("ID e status obrigatórios");
       
-      // Get contestacao to find professor_id and protocolo
+      // Get contestacao to find owner and protocolo
       const { data: contest, error: fetchErr } = await supabase
         .from("contestacoes")
-        .select("professor_id, protocolo, status")
+        .select("professor_id, contratado_id, protocolo, status")
         .eq("id", id)
         .single();
       if (fetchErr || !contest) throw new Error("Contestação não encontrada.");
@@ -380,12 +387,12 @@ Deno.serve(async (req) => {
         const msgTitle = `Contestação ${contest.protocolo || ''} — ${statusLabel[status] || status}`;
         const msgContent = `Sua contestação (${contest.protocolo || 'sem protocolo'}) teve o status atualizado para: ${status}.${resposta ? '\n\nParecer: ' + resposta : ''}`;
 
-        // Insert as a personal message (created_by = professor so only they see it via their messages query)
+        // Insert as a personal message (created_by = owner id so only they see it via their messages query)
         await supabase.from("messages").insert({
           title: msgTitle,
           content: msgContent,
           sent: true,
-          created_by: contest.professor_id,
+          created_by: contest.professor_id || contest.contratado_id,
         });
       }
 
