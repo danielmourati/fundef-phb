@@ -151,9 +151,28 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
     const lines = text.split('\n').map(l => l.replace(/\r$/, '')).filter(l => l.trim());
     if (lines.length < 2) return [];
     const sep = lines[0].includes(';') ? ';' : ',';
-    const headers = lines[0].split(sep).map(h => h.trim().toLowerCase().replace(/^\ufeff/, ''));
+    // Proper CSV split honoring double-quoted fields (so "a;b" stays as one cell).
+    const splitLine = (line: string): string[] => {
+      const out: string[] = [];
+      let cur = '';
+      let inQ = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
+          else inQ = !inQ;
+        } else if (ch === sep && !inQ) {
+          out.push(cur.trim()); cur = '';
+        } else {
+          cur += ch;
+        }
+      }
+      out.push(cur.trim());
+      return out;
+    };
+    const headers = splitLine(lines[0]).map(h => h.toLowerCase().replace(/^\ufeff/, ''));
     return lines.slice(1).map(line => {
-      const values = line.split(sep).map(v => v.trim());
+      const values = splitLine(line);
       const obj: Record<string, string> = {};
       headers.forEach((h, i) => { obj[h] = values[i] || ''; });
       return obj;
