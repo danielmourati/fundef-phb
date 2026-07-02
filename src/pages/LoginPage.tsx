@@ -101,12 +101,17 @@ const LoginPage = () => {
           </div>
 
           {/* Tipo de vínculo */}
-          <Tabs value={tipo} onValueChange={(v) => setTipo(v as 'efetivo' | 'contratado')} className="w-full">
+          <Tabs value={tipo ?? ''} onValueChange={(v) => { setTipo(v as 'efetivo' | 'contratado'); setError(''); }} className="w-full">
             <TabsList className="grid grid-cols-2 w-full h-11 rounded-lg">
               <TabsTrigger value="efetivo" className="rounded-md">Professor Efetivo</TabsTrigger>
               <TabsTrigger value="contratado" className="rounded-md">Professor Contratado</TabsTrigger>
             </TabsList>
           </Tabs>
+          {!tipo && (
+            <p className="text-xs text-muted-foreground text-center -mt-2">
+              Selecione o tipo de vínculo para continuar.
+            </p>
+          )}
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -117,10 +122,11 @@ const LoginPage = () => {
               </Label>
               <Input
                 id="cpf"
-                placeholder="Digite seu CPF (somente números)"
+                placeholder={tipo ? 'Digite seu CPF (somente números)' : 'Selecione o tipo de vínculo acima'}
                 value={cpf}
                 onChange={(e) => setCpf(e.target.value)}
                 required
+                disabled={!tipo}
                 className="h-11 rounded-lg"
                 inputMode="numeric"
               />
@@ -133,16 +139,18 @@ const LoginPage = () => {
                 <Input
                   id="senha"
                   type={showPassword ? "text" : "password"}
-                  placeholder="Digite sua senha"
+                  placeholder={tipo ? 'Digite sua senha' : 'Selecione o tipo de vínculo acima'}
                   value={senha}
                   onChange={(e) => setSenha(e.target.value)}
                   required
+                  disabled={!tipo}
                   className="h-11 rounded-lg pr-10"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  disabled={!tipo}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground disabled:opacity-50"
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
@@ -159,7 +167,7 @@ const LoginPage = () => {
             <Button
               type="submit"
               className="w-full h-11 rounded-lg text-base font-semibold"
-              disabled={isLoading}
+              disabled={isLoading || !tipo}
             >
               {isLoading ? 'Entrando...' : 'Entrar'}
             </Button>
