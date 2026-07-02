@@ -1,26 +1,36 @@
 ## Objetivo
 
-Obrigar a escolha explícita do tipo de vínculo (Efetivo ou Contratado) antes que o usuário digite CPF/senha, evitando login no tipo errado por padrão.
+Deixar o toggle de vínculo (Efetivo/Contratado) impossível de ignorar para o professor leigo, com pista visual automática enquanto nada estiver selecionado.
 
 ## Mudanças em `src/pages/LoginPage.tsx`
 
-1. **Estado inicial sem seleção**: `tipo` passa de `'efetivo' | 'contratado'` para `'efetivo' | 'contratado' | null`, começando em `null`. Nenhuma aba fica pré-selecionada.
-2. **Aba visual sem default**: `Tabs` recebe `value={tipo ?? ''}`. Ambos os `TabsTrigger` aparecem inativos até o clique.
-3. **Bloqueio dos campos**: enquanto `tipo === null`:
-   - `Input` de CPF e senha ficam `disabled`, com `placeholder` adaptado ("Selecione o tipo de vínculo acima").
-   - Botão **Entrar** fica `disabled`.
-   - Mostrar uma linha discreta abaixo das abas: "Selecione o tipo de vínculo para continuar." (some após seleção).
-4. **Guarda no submit**: `handleSubmit` valida `if (!tipo) { setError('Selecione o tipo de vínculo.'); return; }` antes de chamar `login`.
-5. **Reset ao trocar tipo**: ao alternar entre Efetivo/Contratado depois de já ter digitado, limpar `error` (mantém CPF/senha para não frustrar).
+Aplicar todas as pistas apenas enquanto `tipo === null`. Some assim que o usuário clica.
+
+1. **Rótulo explícito acima das abas** (novo):
+   - Texto: **"Passo 1 · Escolha seu tipo de vínculo"** com uma seta (`ArrowDown` do lucide) apontando para as abas.
+   - Cor `text-primary`, peso semibold, centralizado.
+
+2. **Halo animado nas abas (`TabsList`)**:
+   - Wrapper com `ring-2 ring-primary/60 ring-offset-2 animate-pulse rounded-lg` enquanto `!tipo`. Ao selecionar, ring some suavemente (transition).
+
+3. **Setas pulsantes convergindo para as duas abas**:
+   - Ícones `MousePointerClick` (lucide) discretos, um em cada extremidade da `TabsList`, com `animate-bounce` sutil. Removidos após seleção.
+
+4. **Frase de apoio já existente** ("Selecione o tipo de vínculo para continuar") ganha ícone `Info` e cor `text-primary` (hoje é `muted-foreground`).
+
+5. **Foco automático (acessibilidade)**:
+   - `useEffect` que dá `focus()` no primeiro `TabsTrigger` no mount quando `!tipo`, então usuários de teclado/leitor de tela também percebem.
+
+6. **Passo 2 implícito**: quando `tipo` estiver preenchido, aparece um pequeno rótulo **"Passo 2 · Informe CPF e senha"** acima do campo CPF, reforçando o fluxo.
 
 ## O que NÃO muda
 
-- `AuthContext.login`, edge functions, roteamento pós-login e visual geral da página.
-- Fluxos administrativos e de dashboard.
+- Lógica de login, validação e roteamento.
+- Estrutura de `AuthContext`, edge functions, backend.
+- Layout geral da página (imagem lateral, logo, footer).
 
 ## Validação
 
-1. Abrir `/login`: nenhuma aba destacada, campos desabilitados, botão desabilitado.
-2. Clicar em "Professor Efetivo" ou "Professor Contratado": campos habilitam, aba fica ativa.
-3. Tentar submit sem escolher (via teclado): mensagem "Selecione o tipo de vínculo."
-4. Login normal continua funcionando para ambos os tipos.
+1. Abrir `/login` sem interagir: ver rótulo "Passo 1", halo pulsante nas abas, setas piscando, mensagem em azul.
+2. Selecionar qualquer aba: todas as pistas somem; aparece "Passo 2" acima do CPF; campos e botão habilitam.
+3. Testar navegação por teclado: `Tab` inicial cai direto no primeiro toggle.
