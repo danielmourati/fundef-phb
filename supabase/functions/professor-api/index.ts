@@ -6,7 +6,7 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-async function verifyToken(authHeader: string | null): Promise<{ sub: string; role: string } | null> {
+async function verifyToken(authHeader: string | null): Promise<{ sub: string; role: string; tipo: string } | null> {
   if (!authHeader?.startsWith("Bearer ")) return null;
   const token = authHeader.slice(7);
   const dotIdx = token.lastIndexOf(".");
@@ -25,7 +25,7 @@ async function verifyToken(authHeader: string | null): Promise<{ sub: string; ro
     if (!valid) return null;
     const payload = JSON.parse(payloadStr);
     if (payload.exp < Date.now()) return null;
-    return { sub: payload.sub, role: payload.role };
+    return { sub: payload.sub, role: payload.role, tipo: payload.tipo || "efetivo" };
   } catch {
     return null;
   }
