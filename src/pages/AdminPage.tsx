@@ -210,6 +210,7 @@ const AdminPage = () => {
     if (msgRes.data && Array.isArray(msgRes.data)) setMessages(msgRes.data);
     if (arRes.data && Array.isArray(arRes.data)) setAccessReports(arRes.data);
     if (statsRes.data && typeof statsRes.data.total === 'number') setTotalProfs(statsRes.data.total);
+    if (statsRes.data && typeof statsRes.data.totalContratados === 'number') setTotalContratados(statsRes.data.totalContratados);
     setLoading(false);
     setProfsRefreshTick(t => t + 1);
   };
