@@ -91,15 +91,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ professor: prof, token: tk, matriculas: mats, requiresPasswordChange: reqPwdChange }));
   };
 
-  const login = async (identificador: string, senha: string) => {
+  const login = async (identificador: string, senha: string, tipo?: 'efetivo' | 'contratado') => {
     try {
       const { data, error } = await supabase.functions.invoke('custom-login', {
-        body: { identificador, senha },
+        body: { identificador, senha, tipo },
       });
 
       if (error || !data?.professor) {
         return { success: false, error: data?.error || 'CPF ou senha incorretos.' };
       }
+
 
       const matsRaw: MatriculaItem[] = data.matriculas || [];
       const mats = normalizeMats(matsRaw);
