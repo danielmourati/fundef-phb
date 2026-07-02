@@ -99,9 +99,27 @@ Deno.serve(async (req) => {
   }
 
 
+  const isContratado = user.tipo === "contratado";
+  const ownerField = isContratado ? "contratado_id" : "professor_id";
+  const ownerTable = isContratado ? "contratados" : "professors";
+
   try {
     // GET my profile
     if (req.method === "GET" && action === "profile") {
+      if (isContratado) {
+        const { data, error } = await supabase
+          .from("contratados")
+          .select("id, nome, cpf, matricula, data_nascimento, carga_horaria, total_cotas, cargo, vinculo, role, status")
+          .eq("id", user.sub)
+          .single();
+        if (error) throw error;
+        const { data: pers } = await supabase
+          .from("contratado_periodos")
+          .select("inicio, fim, ordem")
+          .eq("contratado_id", user.sub)
+          .order("ordem", { ascending: true });
+        return jsonResponse({ ...data, periodos: pers || [], tipo: "contratado" });
+      }
       const { data, error } = await supabase
         .from("professors")
         .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, total_cotas, role")
@@ -116,7 +134,7 @@ Deno.serve(async (req) => {
       const { data, error } = await supabase
         .from("contestacoes")
         .select("id, motivo, descricao, whatsapp, status, created_at, protocolo, resposta, documento_path, documento_nome")
-        .eq("professor_id", user.sub)
+        .eq(ownerField, user.sub)
         .order("created_at", { ascending: false });
       if (error) throw error;
       const withUrls = await attachDocumentUrls(data || []);
@@ -174,11 +192,14 @@ Deno.serve(async (req) => {
         });
       }
 
-      const { data: inserted, error } = await supabase.from("contestacoes").insert({
-        professor_id: user.sub,
+      const insertPayload: Record<string, unknown> = {
         motivo, descricao, whatsapp,
         documento_nome,
-      }).select("id, protocolo").single();
+      };
+      insertPayload[ownerField] = user.sub;
+
+      const { data: inserted, error } = await supabase.from("contestacoes").insert(insertPayload)
+        .select("id, protocolo").single();
       if (error) throw error;
 
       const path = `${user.sub}/${inserted.id}.pdf`;
@@ -198,7 +219,7 @@ Deno.serve(async (req) => {
     // GET messages (broadcast + personal notifications for professor)
     if (req.method === "GET" && action === "messages") {
       const { data: me } = await supabase
-        .from("professors")
+        .from(ownerTable)
         .select("id, role, cargo")
         .eq("id", user.sub)
         .maybeSingle();
@@ -234,7 +255,7 @@ Deno.serve(async (req) => {
         ? await supabase
             .from("message_reads")
             .select("message_id")
-            .eq("professor_id", user.sub)
+            .eq(ownerField, user.sub)
             .in("message_id", messageIds)
         : { data: [] };
 
@@ -255,10 +276,11 @@ Deno.serve(async (req) => {
       const messageId = body.message_id;
       if (!messageId) throw new Error("message_id obrigatório");
 
-      await supabase.from("message_reads").upsert({
-        message_id: messageId,
-        professor_id: user.sub,
-      }, { onConflict: "message_id,professor_id" });
+      const readPayload: Record<string, unknown> = { message_id: messageId };
+      readPayload[ownerField] = user.sub;
+      await supabase.from("message_reads").upsert(readPayload, {
+        onConflict: isContratado ? "message_id,contratado_id" : "message_id,professor_id",
+      });
       return jsonResponse({ success: true });
     }
 
@@ -270,24 +292,24 @@ Deno.serve(async (req) => {
          throw new Error("Senha inválida.");
       }
 
-      // First get the user's CPF
+      // First get the user's CPF from the correct table
       const { data: prof } = await supabase
-        .from("professors")
+        .from(ownerTable)
         .select("cpf")
         .eq("id", user.sub)
         .single();
-      
-      if (!prof?.cpf) throw new Error("Professor não encontrado.");
+
+      if (!prof?.cpf) throw new Error("Usuário não encontrado.");
 
       // Hash the new password
       const { data: hashData } = await supabase.rpc("hash_password", { plain_password: newPassword });
 
-      // Update all records with the same CPF
+      // Update all records with the same CPF in the same table
       const { error } = await supabase
-        .from("professors")
+        .from(ownerTable)
         .update({ senha_hash: hashData })
         .eq("cpf", prof.cpf);
-      
+
       if (error) throw error;
       return jsonResponse({ success: true });
     }
