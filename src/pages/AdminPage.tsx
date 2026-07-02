@@ -124,6 +124,7 @@ const AdminPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState<number>(50);
   const [totalProfs, setTotalProfs] = useState(0);
+  const [totalContratados, setTotalContratados] = useState(0);
   const [profsLoading, setProfsLoading] = useState(false);
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [profsRefreshTick, setProfsRefreshTick] = useState(0);
