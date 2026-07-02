@@ -118,6 +118,95 @@ export type Database = {
           },
         ]
       }
+      contratado_periodos: {
+        Row: {
+          contratado_id: string
+          created_at: string
+          fim: string
+          id: string
+          inicio: string
+          ordem: number
+          updated_at: string
+        }
+        Insert: {
+          contratado_id: string
+          created_at?: string
+          fim: string
+          id?: string
+          inicio: string
+          ordem?: number
+          updated_at?: string
+        }
+        Update: {
+          contratado_id?: string
+          created_at?: string
+          fim?: string
+          id?: string
+          inicio?: string
+          ordem?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contratado_periodos_contratado_id_fkey"
+            columns: ["contratado_id"]
+            isOneToOne: false
+            referencedRelation: "contratados"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contratados: {
+        Row: {
+          carga_horaria: number | null
+          cargo: string | null
+          cpf: string
+          created_at: string
+          data_nascimento: string | null
+          id: string
+          matricula: string | null
+          nome: string
+          role: string
+          senha_hash: string | null
+          status: string
+          total_cotas: number | null
+          updated_at: string
+          vinculo: string
+        }
+        Insert: {
+          carga_horaria?: number | null
+          cargo?: string | null
+          cpf: string
+          created_at?: string
+          data_nascimento?: string | null
+          id?: string
+          matricula?: string | null
+          nome: string
+          role?: string
+          senha_hash?: string | null
+          status?: string
+          total_cotas?: number | null
+          updated_at?: string
+          vinculo?: string
+        }
+        Update: {
+          carga_horaria?: number | null
+          cargo?: string | null
+          cpf?: string
+          created_at?: string
+          data_nascimento?: string | null
+          id?: string
+          matricula?: string | null
+          nome?: string
+          role?: string
+          senha_hash?: string | null
+          status?: string
+          total_cotas?: number | null
+          updated_at?: string
+          vinculo?: string
+        }
+        Relationships: []
+      }
       login_attempts: {
         Row: {
           cpf: string | null
