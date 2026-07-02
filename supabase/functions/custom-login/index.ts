@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
 
     // Parse and validate input
     const body = await req.json();
-    const tipo = String(body.tipo || "").trim().toLowerCase(); // "admin" ou vazio
+    const tipoRaw = String(body.tipo || "").trim().toLowerCase(); // "admin" | "efetivo" | "contratado" | ""
     const rawId = String(body.identificador || body.email || body.cpf || body.matricula || "").trim();
     const senha = String(body.senha || "").trim();
 
@@ -62,9 +62,12 @@ Deno.serve(async (req) => {
     let professor: any = null;
     let fetchErr: any = null;
     let requires_password_change = false;
+    // Tabela de origem do login (para incluir na claim do token)
+    let sourceTipo: "efetivo" | "contratado" | "admin" = "efetivo";
 
-    if (tipo === "admin" || rawId.includes("@")) {
+    if (tipoRaw === "admin" || rawId.includes("@")) {
       // Login por e-mail (admin/jurídico) na tabela users
+      sourceTipo = "admin";
       const email = rawId.toLowerCase();
       const u = await supabase
         .from("users")
@@ -87,8 +90,46 @@ Deno.serve(async (req) => {
         };
       }
       fetchErr = u.error;
+    } else if (tipoRaw === "contratado") {
+      // Login professor contratado por CPF na tabela contratados (+ períodos)
+      sourceTipo = "contratado";
+      const identificador = rawId.replace(/\D/g, "") || rawId;
+      const r = await supabase
+        .from("contratados")
+        .select("id, nome, cpf, matricula, data_nascimento, carga_horaria, total_cotas, cargo, vinculo, role, status, senha_hash")
+        .eq("cpf", identificador)
+        .order("matricula", { ascending: true });
+      let candidates = r.data || [];
+      fetchErr = r.error;
+      if (candidates.length === 0) {
+        const fb = await supabase
+          .from("contratados")
+          .select("id, nome, cpf, matricula, data_nascimento, carga_horaria, total_cotas, cargo, vinculo, role, status, senha_hash")
+          .eq("matricula", identificador);
+        candidates = fb.data || [];
+        fetchErr = fb.error;
+      }
+      for (const c of candidates) {
+        let ok = false;
+        if (c.senha_hash) {
+          const { data } = await supabase.rpc("verify_password", {
+            plain_password: senha,
+            hashed_password: c.senha_hash,
+          });
+          ok = !!data;
+        }
+        if (!ok && (passwordMatchesBirthDate(senha, c.data_nascimento) || onlyDigits(senha) === onlyDigits(c.cpf))) {
+          ok = true;
+        }
+        if (ok) {
+          professor = { ...c, vinculo_inicio: null, vinculo_fim: null };
+          if (onlyDigits(senha) === onlyDigits(c.cpf)) requires_password_change = true;
+          break;
+        }
+      }
     } else {
-      // Login professor por CPF (com fallback matrícula). Pode haver múltiplas linhas
+      // Login professor efetivo por CPF na tabela professors (comportamento atual)
+      sourceTipo = "efetivo";
       const identificador = rawId.replace(/\D/g, "") || rawId;
       const r = await supabase
         .from("professors")
@@ -129,6 +170,7 @@ Deno.serve(async (req) => {
         }
       }
     }
+
 
     if (fetchErr || !professor) {
       await supabase.from("login_attempts").insert({ ip_address: ip, matricula: rawId, success: false });
