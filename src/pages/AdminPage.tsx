@@ -856,7 +856,8 @@ const AdminPage = () => {
   const showingTo = Math.min(currentPage * itemsPerPage, totalProfs);
 
   const statCards = [
-    { label: 'Total Professores', value: totalProfs, icon: Users, color: 'bg-primary/10 text-primary' },
+    { label: 'Total Efetivos', value: totalProfs, icon: Users, color: 'bg-primary/10 text-primary' },
+    { label: 'Total Contratados', value: totalContratados, icon: UserPlus, color: 'bg-purple-50 text-purple-600' },
     { label: 'Contestações', value: contestacoes.length, icon: AlertTriangle, color: 'bg-red-50 text-red-600' },
     { label: 'Mensagens', value: messages.length, icon: MessageSquare, color: 'bg-blue-50 text-blue-600' },
   ];
