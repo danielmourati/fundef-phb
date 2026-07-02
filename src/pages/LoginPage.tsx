@@ -15,7 +15,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 
 const LoginPage = () => {
-  const [tipo, setTipo] = useState<'efetivo' | 'contratado'>('efetivo');
+  const [tipo, setTipo] = useState<'efetivo' | 'contratado' | null>(null);
   const [cpf, setCpf] = useState('');
   const [senha, setSenha] = useState('');
   const [showPassword, setShowPassword] = useState(false);
