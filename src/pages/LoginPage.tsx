@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertCircle, MessageCircle, Eye, EyeOff, ArrowDown, MousePointerClick, Info } from 'lucide-react';
+import { AlertCircle, MessageCircle, Eye, EyeOff } from 'lucide-react';
 import loginImage from '@/assets/login-education.jpg';
 import logoSeduc from '@/assets/logo-seduc-azul.png';
 import { toast } from '@/hooks/use-toast';
@@ -15,29 +15,20 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 
 const LoginPage = () => {
-  const [tipo, setTipo] = useState<'efetivo' | 'contratado' | null>(null);
+  const [tipo, setTipo] = useState<'efetivo' | 'contratado'>('efetivo');
   const [cpf, setCpf] = useState('');
   const [senha, setSenha] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
-  const firstTabRef = useRef<HTMLButtonElement | null>(null);
   const { login } = useAuth();
   const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!tipo && firstTabRef.current) {
-      firstTabRef.current.focus({ preventScroll: true });
-    }
-  }, [tipo]);
-
 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (!tipo) { setError('Selecione o tipo de vínculo.'); return; }
     setIsLoading(true);
 
     const result = await login(cpf, senha, tipo);
@@ -109,43 +100,15 @@ const LoginPage = () => {
           </div>
 
           {/* Tipo de vínculo */}
-          <div className="space-y-2">
-            {!tipo && (
-              <div className="flex items-center justify-center gap-2 text-sm font-semibold text-primary animate-pulse">
-                <span>Passo 1 · Escolha seu tipo de vínculo</span>
-                <ArrowDown className="w-4 h-4" />
-              </div>
-            )}
-            <div className="relative">
-              {!tipo && (
-                <>
-                  <MousePointerClick className="absolute -left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-primary animate-bounce hidden sm:block" />
-                  <MousePointerClick className="absolute -right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-primary animate-bounce hidden sm:block" style={{ animationDelay: '150ms' }} />
-                </>
-              )}
-              <Tabs value={tipo ?? ''} onValueChange={(v) => { setTipo(v as 'efetivo' | 'contratado'); setError(''); }} className="w-full">
-                <TabsList className={`grid grid-cols-2 w-full h-11 rounded-lg transition-all duration-300 ${!tipo ? 'ring-2 ring-primary/60 ring-offset-2 ring-offset-background animate-pulse' : ''}`}>
-                  <TabsTrigger ref={firstTabRef} value="efetivo" className="rounded-md">Professor Efetivo</TabsTrigger>
-                  <TabsTrigger value="contratado" className="rounded-md">Professor Contratado</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
-            {!tipo && (
-              <p className="flex items-center justify-center gap-1.5 text-xs text-primary font-medium">
-                <Info className="w-3.5 h-3.5" />
-                Selecione o tipo de vínculo para continuar.
-              </p>
-            )}
-          </div>
+          <Tabs value={tipo} onValueChange={(v) => setTipo(v as 'efetivo' | 'contratado')} className="w-full">
+            <TabsList className="grid grid-cols-2 w-full h-11 rounded-lg">
+              <TabsTrigger value="efetivo" className="rounded-md">Professor Efetivo</TabsTrigger>
+              <TabsTrigger value="contratado" className="rounded-md">Professor Contratado</TabsTrigger>
+            </TabsList>
+          </Tabs>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            {tipo && (
-              <div className="text-xs font-semibold text-primary/80 uppercase tracking-wide">
-                Passo 2 · Informe CPF e senha
-              </div>
-            )}
-
 
             <div className="space-y-2">
               <Label htmlFor="cpf" className="text-sm font-medium">
@@ -153,11 +116,10 @@ const LoginPage = () => {
               </Label>
               <Input
                 id="cpf"
-                placeholder={tipo ? 'Digite seu CPF (somente números)' : 'Selecione o tipo de vínculo acima'}
+                placeholder="Digite seu CPF (somente números)"
                 value={cpf}
                 onChange={(e) => setCpf(e.target.value)}
                 required
-                disabled={!tipo}
                 className="h-11 rounded-lg"
                 inputMode="numeric"
               />
@@ -170,18 +132,16 @@ const LoginPage = () => {
                 <Input
                   id="senha"
                   type={showPassword ? "text" : "password"}
-                  placeholder={tipo ? 'Digite sua senha' : 'Selecione o tipo de vínculo acima'}
+                  placeholder="Digite sua senha"
                   value={senha}
                   onChange={(e) => setSenha(e.target.value)}
                   required
-                  disabled={!tipo}
                   className="h-11 rounded-lg pr-10"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  disabled={!tipo}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground disabled:opacity-50"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
@@ -198,7 +158,7 @@ const LoginPage = () => {
             <Button
               type="submit"
               className="w-full h-11 rounded-lg text-base font-semibold"
-              disabled={isLoading || !tipo}
+              disabled={isLoading}
             >
               {isLoading ? 'Entrando...' : 'Entrar'}
             </Button>

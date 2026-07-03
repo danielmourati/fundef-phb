@@ -1,36 +1,42 @@
-## Objetivo
+## Problema
 
-Deixar o toggle de vínculo (Efetivo/Contratado) impossível de ignorar para o professor leigo, com pista visual automática enquanto nada estiver selecionado.
+O CSV de contratados usa `;` como separador de colunas, mas o mesmo `;` está sendo usado dentro da célula `periodos` para separar múltiplos intervalos (`07/2005 a 10/2005;01/2006 a 07/2006`). O parser de CSV atual quebra essa célula em duas colunas, corrompendo a linha inteira. O backend (`admin-api`) já sabe interpretar múltiplos períodos separados por `;` — o problema está no transporte via CSV.
 
-## Mudanças em `src/pages/LoginPage.tsx`
+## Solução
 
-Aplicar todas as pistas apenas enquanto `tipo === null`. Some assim que o usuário clica.
+Trocar o separador de períodos no arquivo CSV para `|` (pipe), que não conflita com o formato CSV. O `;` continua funcionando quando os dados vierem de outras fontes (PDF, colagem, JSON), preservando compatibilidade.
 
-1. **Rótulo explícito acima das abas** (novo):
-   - Texto: **"Passo 1 · Escolha seu tipo de vínculo"** com uma seta (`ArrowDown` do lucide) apontando para as abas.
-   - Cor `text-primary`, peso semibold, centralizado.
+Regra final de parsing de períodos (backend):
+- `07/2005 a 10/2005 | 01/2006 a 07/2006` → 2 períodos
+- `07/2005 a 10/2005 ; 01/2006 a 07/2006` → 2 períodos (mantido)
+- `08/2005 a 12/2006` → 1 período
+- Quebras de linha dentro da célula também separam períodos (mantido)
 
-2. **Halo animado nas abas (`TabsList`)**:
-   - Wrapper com `ring-2 ring-primary/60 ring-offset-2 animate-pulse rounded-lg` enquanto `!tipo`. Ao selecionar, ring some suavemente (transition).
+## Mudanças
 
-3. **Setas pulsantes convergindo para as duas abas**:
-   - Ícones `MousePointerClick` (lucide) discretos, um em cada extremidade da `TabsList`, com `animate-bounce` sutil. Removidos após seleção.
+### `src/components/admin/ContratadosView.tsx`
+- **Template CSV (`downloadTemplate`)**: trocar o separador de períodos de `;` para `|` nos exemplos:
+  - `07/2005 a 10/2005 | 01/2006 a 07/2006`
+  - `08/2005 a 12/2006` (inalterado — período único)
+- **Cabeçalho do template**: adicionar uma linha de instrução como comentário na primeira linha do arquivo? Não — manter simples: apenas atualizar os exemplos, o próprio exemplo documenta o formato.
 
-4. **Frase de apoio já existente** ("Selecione o tipo de vínculo para continuar") ganha ícone `Info` e cor `text-primary` (hoje é `muted-foreground`).
+### `supabase/functions/admin-api/index.ts` (ação `import_contratados`)
+- Ampliar o regex de split de `[;\n]` para `[;|\n]`, aceitando pipe como separador adicional. Mantém retrocompatibilidade com `;` para dados colados manualmente.
+- Nenhuma outra lógica muda: agrupamento por CPF, dedup e inserção em `contratado_periodos` seguem iguais.
 
-5. **Foco automático (acessibilidade)**:
-   - `useEffect` que dá `focus()` no primeiro `TabsTrigger` no mount quando `!tipo`, então usuários de teclado/leitor de tela também percebem.
-
-6. **Passo 2 implícito**: quando `tipo` estiver preenchido, aparece um pequeno rótulo **"Passo 2 · Informe CPF e senha"** acima do campo CPF, reforçando o fluxo.
+### `ImportReviewDialog` (se usado no fluxo de contratados)
+- Verificar se o preview aplica o mesmo split; se sim, aplicar a mesma extensão de regex. Se ele delega ao backend, nada muda.
 
 ## O que NÃO muda
 
-- Lógica de login, validação e roteamento.
-- Estrutura de `AuthContext`, edge functions, backend.
-- Layout geral da página (imagem lateral, logo, footer).
+- Estrutura das tabelas `contratados` e `contratado_periodos`.
+- Modal manual de adicionar/editar (já usa campos separados de `inicio`/`fim`).
+- Fluxo de efetivos, login, dashboard, contestações.
+- Formato exibido na UI (chips `MM/AAAA → MM/AAAA`).
 
 ## Validação
 
-1. Abrir `/login` sem interagir: ver rótulo "Passo 1", halo pulsante nas abas, setas piscando, mensagem em azul.
-2. Selecionar qualquer aba: todas as pistas somem; aparece "Passo 2" acima do CPF; campos e botão habilitam.
-3. Testar navegação por teclado: `Tab` inicial cai direto no primeiro toggle.
+1. Baixar novo template CSV → confirmar exemplo com `|`.
+2. Importar CSV com linha `... | ...` → 2 períodos criados.
+3. Importar CSV com período único → 1 período criado.
+4. Importar CSV antigo (usando `;` dentro de aspas, se houver) → continua funcionando pelo fallback do regex.
