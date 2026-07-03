@@ -104,7 +104,9 @@ const LoginPage = () => {
           <Tabs value={tipo} onValueChange={(v) => setTipo(v as 'efetivo' | 'contratado')} className="w-full">
             <TabsList className="grid grid-cols-2 w-full h-11 rounded-lg">
               <TabsTrigger value="efetivo" className="rounded-md">Professor Efetivo</TabsTrigger>
-              <TabsTrigger value="contratado" className="rounded-md">Professor Contratado</TabsTrigger>
+              <TabsTrigger value="contratado" disabled className="rounded-md opacity-60 cursor-not-allowed">
+                Professor Contratado <Badge variant="outline" className="ml-2 text-[10px] px-1.5 py-0">Em breve</Badge>
+              </TabsTrigger>
             </TabsList>
           </Tabs>
 
