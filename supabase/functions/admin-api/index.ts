@@ -430,14 +430,16 @@ Deno.serve(async (req) => {
         const nome = String(r.nome || "").trim();
         const mat = String(r.matricula || "").trim();
 
-        // localiza o registro: por CPF quando houver, senão por nome+matrícula
+        // localiza o registro: por CPF + matrícula quando houver, senão por nome+matrícula
         let query = supabase.from("contratados").select("id").limit(1);
         if (cpf.length === 11) {
           query = query.eq("cpf", cpf);
+          if (mat) query = query.eq("matricula", mat);
         } else if (nome) {
           query = query.eq("nome", nome);
           query = mat ? query.eq("matricula", mat) : query.is("matricula", null);
         } else { notFound++; continue; }
+
         const { data: found, error: fe } = await query;
         if (fe) throw fe;
         const target = found?.[0];
