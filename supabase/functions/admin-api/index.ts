@@ -363,23 +363,32 @@ Deno.serve(async (req) => {
       const all = [...groups.values()];
       if (all.length === 0) return jsonResponse({ success: true, count: 0, skipped: 0 });
 
-      // Filtra já existentes (por CPF quando houver; por nome+matrícula quando sem CPF)
+      // Filtra já existentes (por CPF + matrícula quando houver CPF; por nome+matrícula quando sem CPF)
       const cpfs = all.map(g => g.cpf).filter(Boolean);
-      const existSet = new Set<string>();
+      const existCpfMat = new Set<string>();
+      const existCpfAny = new Set<string>();
+      const existNameMat = new Set<string>();
       if (cpfs.length > 0) {
-        const { data: existing } = await supabase.from("contratados").select("cpf").in("cpf", cpfs);
-        (existing || []).forEach((r: any) => existSet.add(`cpf:${r.cpf}`));
+        const { data: existing } = await supabase.from("contratados").select("cpf, matricula").in("cpf", cpfs);
+        (existing || []).forEach((r: any) => {
+          existCpfMat.add(`cpf:${r.cpf}|${String(r.matricula ?? "").trim()}`);
+          existCpfAny.add(String(r.cpf));
+        });
       }
       const noCpfNames = all.filter(g => !g.cpf).map(g => g.data.nome);
       if (noCpfNames.length > 0) {
         const { data: existingByName } = await supabase.from("contratados").select("nome, matricula").in("nome", noCpfNames);
         (existingByName || []).forEach((r: any) =>
-          existSet.add(`nm:${String(r.nome || "").toUpperCase()}|${r.matricula || ""}`)
+          existNameMat.add(`nm:${String(r.nome || "").toUpperCase()}|${String(r.matricula ?? "").trim()}`)
         );
       }
 
       const pending = all.filter(g => {
-        if (existSet.has(g.key)) { skipped++; return false; }
+        const exists = g.cpf
+          ? (g.matricula ? existCpfMat.has(g.key) : existCpfAny.has(g.cpf))
+          : existNameMat.has(g.key);
+        if (exists) { skipped++; return false; }
+
         return true;
       });
       // Hashes gerados em paralelo (bcrypt sequencial estourava o tempo limite)
