@@ -35,7 +35,11 @@ import { toast } from 'sonner';
 import { maskCPF, unmaskCPF, isValidCPF, maskDate, isValidDate, maskPhone, STATUS_OPTIONS, statusBadgeClass, statusRowClass, normalizeStatus } from '@/lib/masks';
 import { ImportReviewDialog, type ReviewItem } from '@/components/ImportReviewDialog';
 import ContratadosView from '@/components/admin/ContratadosView';
-import { UserPlus } from 'lucide-react';
+import ImportLogsView from '@/components/admin/ImportLogsView';
+import { downloadImportReportPdf } from '@/lib/importReportPdf';
+import { logImport } from '@/lib/importLog';
+import { UserPlus, FileDown } from 'lucide-react';
+
 
 interface Professor {
   id: string;
