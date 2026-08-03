@@ -155,6 +155,59 @@ export function generateImportReportPdf(payload: ImportReportPayload): jsPDF {
   const sentTag = (it: ReviewItem) =>
     payload.selectedLines ? (sent.has(it.line) ? ' [enviada]' : ' [não enviada]') : '';
 
+  // Tabela Campo / Dado antigo / Dado atualizado
+  const COL_X = [M + 12, M + 152, M + 340];
+  const COL_W = [132, 180, maxW - 340 + M - M - 12];
+  const COL_LABELS = ['Campo', 'Dado antigo', 'Dado atualizado'];
+
+  const diffTableHeader = () => {
+    ensure(20);
+    doc.setFillColor(232, 238, 252);
+    doc.rect(M + 12, y - 8, maxW - 12, 14, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(29, 78, 216);
+    COL_LABELS.forEach((l, i) => doc.text(l, COL_X[i] + 3, y + 1));
+    doc.setTextColor(0);
+    y += 14;
+  };
+
+  const drawDiffTable = (diffs: NonNullable<ReviewItem['diffs']>) => {
+    diffTableHeader();
+    let zebra = false;
+    for (const d of diffs) {
+      const cells = [
+        doc.splitTextToSize(d.label || d.field, COL_W[0] - 6),
+        doc.splitTextToSize(d.current == null || d.current === '' ? 'não registrado' : String(d.current), COL_W[1] - 6),
+        doc.splitTextToSize(d.incoming || '—', COL_W[2] - 6),
+      ];
+      const rowH = Math.max(...cells.map((c) => c.length)) * 10 + 6;
+      if (y + rowH > pageH - 40) {
+        footer();
+        doc.addPage();
+        y = M;
+        diffTableHeader();
+      }
+      if (zebra) {
+        doc.setFillColor(246, 248, 252);
+        doc.rect(M + 12, y - 8, maxW - 12, rowH, 'F');
+      }
+      zebra = !zebra;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      cells.forEach((cell, i) => {
+        const missing = i === 1 && (d.current == null || d.current === '');
+        doc.setTextColor(missing ? 140 : i === 2 ? 29 : 0, missing ? 140 : i === 2 ? 78 : 0, missing ? 140 : i === 2 ? 216 : 0);
+        cell.forEach((partLine: string, j: number) => doc.text(partLine, COL_X[i] + 3, y + 1 + j * 10));
+      });
+      doc.setTextColor(0);
+      doc.setDrawColor(220);
+      doc.line(M + 12, y + rowH - 8, M + maxW, y + rowH - 8);
+      y += rowH;
+    }
+    y += 6;
+  };
+
   // 1. Atualizações
   const updates = [...byStatus('update'), ...byStatus('dup_base').filter((i) => (i.diffs || []).length > 0)];
   heading(`Linhas atualizadas (${updates.length})`);
@@ -162,24 +215,13 @@ export function generateImportReportPdf(payload: ImportReportPayload): jsPDF {
     line('Nenhuma linha com alteração de dados.', { color: 120 });
   } else {
     for (const it of updates) {
-      ensure(30);
+      ensure(40);
       line(`Linha ${it.line} — ${idOf(it)}${sentTag(it)}`, { bold: true });
-      for (const d of it.diffs || []) {
-        ensure(13);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8.5);
-        const label = doc.splitTextToSize(d.label || d.field, 110)[0];
-        doc.text(label, M + 12, y);
-        doc.setTextColor(150, 80, 0);
-        doc.text(`Atual: ${d.current || '—'}`, M + 140, y);
-        doc.setTextColor(29, 78, 216);
-        doc.text(`Novo: ${d.incoming || '—'}`, M + 320, y);
-        doc.setTextColor(0);
-        y += 12;
-      }
-      y += 3;
+      if (it.diffs?.length) drawDiffTable(it.diffs);
+      else line('Campos alterados não registrados.', { indent: 12, size: 8, color: 140 });
     }
   }
+
 
   // 2. Duplicadas
   const dupFile = byStatus('dup_file');
