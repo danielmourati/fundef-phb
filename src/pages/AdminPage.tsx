@@ -761,7 +761,10 @@ const AdminPage = () => {
           error: items.filter(i => i.status === 'error').length,
           dup_file: items.filter(i => i.status === 'dup_file').length,
           dup_base: items.filter(i => i.status === 'dup_base').length,
+          update: items.filter(i => i.status === 'update').length,
+          nochange: items.filter(i => i.status === 'nochange').length,
         };
+
         await runImport(rows, reviewCounts);
         return;
       }
