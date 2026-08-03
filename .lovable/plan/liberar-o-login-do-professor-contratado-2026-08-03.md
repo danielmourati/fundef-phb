@@ -4,8 +4,8 @@
 
 Sim, o login de contratado já foi construído junto com o módulo de contratados e continua no código:
 
-- **Backend `custom-login`**: já aceita `tipo: "contratado"`, busca na tabela **contratados** por CPF (com fallback por matrícula), valida senha bcrypt, permite primeiro acesso com CPF (ou data de nascimento) enquanto `senha_definida` for falso, marca `requires_password_change`, anexa os **períodos trabalhados** (`contratado_periodos`) e assina o token com a claim `tipo: "contratado"`.
-- **Backend `professor-api`**: já roteia tudo pela claim `tipo` — perfil, contestações, mensagens e troca de senha gravam em `contratados`/`contratado_id`.
+- **Backend `custom-login**`: já aceita `tipo: "contratado"`, busca na tabela **contratados** por CPF (com fallback por matrícula), valida senha bcrypt, permite primeiro acesso com CPF (ou data de nascimento) enquanto `senha_definida` for falso, marca `requires_password_change`, anexa os **períodos trabalhados** (`contratado_periodos`) e assina o token com a claim `tipo: "contratado"`.
+- **Backend `professor-api**`: já roteia tudo pela claim `tipo` — perfil, contestações, mensagens e troca de senha gravam em `contratados`/`contratado_id`.
 - **Dashboard**: `DashboardPage` já detecta `tipo === 'contratado'` e mostra os períodos em chips (coluna "Período Trabalhado Contemplado") em vez de vínculo início/fim.
 - **Login**: a aba "Professor Contratado" existe, mas foi **desativada de propósito** com badge "Em breve" (`TabsTrigger disabled`), porque na época os dados ainda não estavam no banco.
 
@@ -32,4 +32,8 @@ Ou seja: falta essencialmente destravar a aba e cobrir dois pontos reais dos dad
 - `src/pages/LoginPage.tsx`: `TabsTrigger value="contratado"` habilitado; rótulo/placeholder/`inputMode` condicionais ao `tipo`; texto de senha padrão condicional. Sem mudança de lógica de auth (o `login(cpf, senha, tipo)` já envia o tipo).
 - `supabase/functions/custom-login/index.ts` (bloco `tipoRaw === "contratado"`): bootstrap adicional `onlyDigits(cpf)` vazio → comparar `senha` normalizada com `matricula`; e criar `matriculas` para `sourceTipo === "contratado"` buscando todas as linhas com o mesmo CPF (quando houver CPF), assinando token por linha e anexando seus `contratado_periodos`. Redeploy da função.
 - `src/contexts/AuthContext.tsx`: ao trocar de matrícula/definir a ativa, preservar `tipo` e `periodos` do item selecionado (hoje esses campos são descartados na reconstrução do objeto), senão o dashboard do contratado perde os períodos.
-- Nada de mudança de schema; nenhuma alteração no dashboard do contratado além do que a preservação de `tipo`/`periodos` já resolve.
+- Nada de mudança de schema; nenhuma alteração no dashboard do contratado além do que a preservação de `tipo`/`periodos` já resolve.  
+  
+Não, o acesso é apenas com CPF, nada de matrícula ser aceita no login, apenas cpf, não errar isso, a matrícula serve apenas pra mostrar lá como já estava implementado antes.  
+Mais uma vez: o Acesso dos contratados é igual ao dos efetivos, pelo cpf, primeiro acesso cpf e senha cpf e aí já troca a senha quando acessar.  
+Conferir pra mostrar certinho todos os períodos do determinado funcionário contratado.
