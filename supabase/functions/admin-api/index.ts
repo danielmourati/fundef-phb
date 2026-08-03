@@ -6,6 +6,13 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
+// Aceita "40", "40H", "20/40", "20 / 40H" -> "40", "20/40"
+function normCarga(v: unknown): string | null {
+  const s = String(v ?? "").toUpperCase().replace(/[^0-9/]/g, "");
+  const m = s.match(/^\d{1,3}(?:\/\d{1,3})*/);
+  return m ? m[0] : null;
+}
+
 async function verifyToken(authHeader: string | null): Promise<{ sub: string; role: string } | null> {
   if (!authHeader?.startsWith("Bearer ")) return null;
   const token = authHeader.slice(7);
@@ -183,7 +190,7 @@ Deno.serve(async (req) => {
         cpf,
         matricula: body.matricula || null,
         data_nascimento: body.data_nascimento || null,
-        carga_horaria: Number(body.carga_horaria) || 20,
+        carga_horaria: normCarga(body.carga_horaria) || "20",
         total_cotas: Number(body.total_cotas) || 0,
         cargo: body.cargo || "PROFESSOR(A) EJA",
         vinculo: body.vinculo || "Contratado",
@@ -217,7 +224,7 @@ Deno.serve(async (req) => {
       const update: Record<string, unknown> = {
         nome: body.nome, cpf, matricula: body.matricula || null,
         data_nascimento: body.data_nascimento || null,
-        carga_horaria: Number(body.carga_horaria) || 20,
+        carga_horaria: normCarga(body.carga_horaria) || "20",
         total_cotas: Number(body.total_cotas) || 0,
         cargo: body.cargo || "PROFESSOR(A) EJA",
         vinculo: body.vinculo || "Contratado",
@@ -269,7 +276,7 @@ Deno.serve(async (req) => {
               cpf,
               matricula: (r.matricula || "").toString().trim() || null,
               data_nascimento: r.data_nascimento || null,
-              carga_horaria: Math.min(parseInt(String(r.carga_horaria || "").replace(/\D/g, "")) || 20, 200),
+              carga_horaria: normCarga(r.carga_horaria) || "20",
               total_cotas: Math.min(parseInt(String(r.total_cotas || "").replace(/\D/g, "")) || 0, 10000),
               cargo: (r.cargo && String(r.cargo).trim()) || "PROFESSOR(A) EJA",
               vinculo: r.vinculo || "Contratado",
@@ -493,7 +500,7 @@ Deno.serve(async (req) => {
         senha_hash: hashData,
         vinculo_inicio: body.vinculo_inicio || null,
         vinculo_fim: body.vinculo_fim || null,
-        carga_horaria: Number(body.carga_horaria) || 0,
+        carga_horaria: normCarga(body.carga_horaria),
         total_cotas: Number(body.total_cotas) || 0,
         cargo: body.cargo || null,
         role: body.role || "professor",
@@ -511,7 +518,7 @@ Deno.serve(async (req) => {
         nome: body.nome, cpf: body.cpf, matricula: body.matricula,
         vinculo_inicio: body.vinculo_inicio || null,
         vinculo_fim: body.vinculo_fim || null,
-        carga_horaria: Number(body.carga_horaria) || 0,
+        carga_horaria: normCarga(body.carga_horaria),
         total_cotas: Number(body.total_cotas) || 0,
         cargo: body.cargo || null,
         role: body.role || "professor",
@@ -618,8 +625,8 @@ Deno.serve(async (req) => {
         if (vi) patch.vinculo_inicio = vi;
         const vf = normalizeDateBR2(r.vinculo_fim);
         if (vf) patch.vinculo_fim = vf;
-        const cargaDigits = String(r.carga_horaria || "").replace(/\D/g, "");
-        if (cargaDigits) patch.carga_horaria = Math.min(parseInt(cargaDigits), 2147483647);
+        const cargaVal = normCarga(r.carga_horaria);
+        if (cargaVal) patch.carga_horaria = cargaVal;
         const cotas = String(r.total_cotas || "").replace(/\D/g, "");
         if (cotas) patch.total_cotas = Math.min(parseInt(cotas), 2147483647);
         const cargo = String(r.cargo || "").trim();
@@ -672,8 +679,7 @@ Deno.serve(async (req) => {
         const senha = (r.senha && String(r.senha).trim()) || cpfDigits;
         const { data: hashData } = await supabase.rpc("hash_password", { plain_password: senha });
         // Parse carga_horaria: aceita "40H", "20h", "40", etc.
-        const cargaDigits = String(r.carga_horaria || "").replace(/\D/g, "");
-        const carga = cargaDigits ? parseInt(cargaDigits) : 0;
+        const carga = normCarga(r.carga_horaria);
         toInsert.push({
           nome: String(r.nome || "").trim(),
           cpf: cpfDigits,
