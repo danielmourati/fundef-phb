@@ -20,7 +20,7 @@ interface Contratado {
   cpf: string;
   matricula: string | null;
   data_nascimento: string | null;
-  carga_horaria: number | null;
+  carga_horaria: string | number | null;
   total_cotas: number | null;
   cargo: string | null;
   vinculo: string;
@@ -30,7 +30,7 @@ interface Contratado {
 
 const emptyForm = {
   nome: '', cpf: '', matricula: '', senha: '', data_nascimento: '',
-  carga_horaria: 20, total_cotas: 0, cargo: 'PROFESSOR(A) EJA',
+  carga_horaria: '20', total_cotas: 0, cargo: 'PROFESSOR(A) EJA',
   vinculo: 'Contratado', status: 'ATIVO',
 };
 
@@ -93,7 +93,7 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
     setForm({
       nome: c.nome, cpf: maskCPF(c.cpf || ''), matricula: c.matricula || '', senha: '',
       data_nascimento: maskDate(c.data_nascimento || ''),
-      carga_horaria: c.carga_horaria || 20,
+      carga_horaria: c.carga_horaria != null ? String(c.carga_horaria) : '20',
       total_cotas: c.total_cotas || 0,
       cargo: c.cargo || 'PROFESSOR(A) EJA',
       vinculo: c.vinculo || 'Contratado',
@@ -295,7 +295,7 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
                         ))}
                       </div>
                     </TableCell>
-                    <TableCell className="text-xs hidden sm:table-cell">{c.carga_horaria || 0}H</TableCell>
+                    <TableCell className="text-xs hidden sm:table-cell">{c.carga_horaria ? `${c.carga_horaria}H` : '—'}</TableCell>
                     <TableCell className="text-xs hidden sm:table-cell">{c.total_cotas || 0}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
@@ -361,7 +361,7 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
               <div className="space-y-2"><Label>Data Nascimento</Label><Input value={form.data_nascimento} onChange={e => setForm({ ...form, data_nascimento: maskDate(e.target.value) })} placeholder="DD/MM/AAAA" /></div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Carga Horária (semanal)</Label><Input type="number" value={form.carga_horaria} onChange={e => setForm({ ...form, carga_horaria: parseInt(e.target.value) || 0 })} /></div>
+              <div className="space-y-2"><Label>Carga Horária (semanal)</Label><Input value={form.carga_horaria} onChange={e => setForm({ ...form, carga_horaria: e.target.value.replace(/[^0-9/]/g, '') })} placeholder="20 ou 20/40" /></div>
               <div className="space-y-2"><Label>Total de Cotas</Label><Input type="number" value={form.total_cotas} onChange={e => setForm({ ...form, total_cotas: parseInt(e.target.value) || 0 })} /></div>
             </div>
             <div className="grid grid-cols-2 gap-4">

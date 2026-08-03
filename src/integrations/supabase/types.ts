@@ -168,7 +168,7 @@ export type Database = {
       }
       contratados: {
         Row: {
-          carga_horaria: number | null
+          carga_horaria: string | null
           cargo: string | null
           cpf: string
           created_at: string
@@ -184,7 +184,7 @@ export type Database = {
           vinculo: string
         }
         Insert: {
-          carga_horaria?: number | null
+          carga_horaria?: string | null
           cargo?: string | null
           cpf: string
           created_at?: string
@@ -200,7 +200,7 @@ export type Database = {
           vinculo?: string
         }
         Update: {
-          carga_horaria?: number | null
+          carga_horaria?: string | null
           cargo?: string | null
           cpf?: string
           created_at?: string
@@ -340,7 +340,7 @@ export type Database = {
       }
       professors: {
         Row: {
-          carga_horaria: number | null
+          carga_horaria: string | null
           cargo: string | null
           cpf: string
           created_at: string
@@ -358,7 +358,7 @@ export type Database = {
           vinculo_inicio: string | null
         }
         Insert: {
-          carga_horaria?: number | null
+          carga_horaria?: string | null
           cargo?: string | null
           cpf: string
           created_at?: string
@@ -376,7 +376,7 @@ export type Database = {
           vinculo_inicio?: string | null
         }
         Update: {
-          carga_horaria?: number | null
+          carga_horaria?: string | null
           cargo?: string | null
           cpf?: string
           created_at?: string
