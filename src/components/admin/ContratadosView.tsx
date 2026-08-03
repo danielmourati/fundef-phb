@@ -13,6 +13,11 @@ import { Plus, Pencil, Trash2, Upload, Download, Trash, Loader2, Calendar, Eye, 
 import { toast } from 'sonner';
 import { maskCPF, unmaskCPF, isValidCPF, maskDate, isValidDate, maskMonthYear, isValidMonthYear, STATUS_OPTIONS, statusBadgeClass, normalizeStatus } from '@/lib/masks';
 import { ImportReviewDialog, type ReviewItem, type ReviewDiff } from '@/components/ImportReviewDialog';
+import { useAuth } from '@/contexts/AuthContext';
+import { downloadImportReportPdf } from '@/lib/importReportPdf';
+import { logImport } from '@/lib/importLog';
+import { FileDown } from 'lucide-react';
+
 
 interface Periodo { id?: string; inicio: string; fim: string; ordem?: number }
 interface Contratado {
