@@ -29,7 +29,7 @@ export async function logImport(params: {
   selectedLines?: number[];
 }) {
   try {
-    await supabase.functions.invoke('admin-api?action=log_import', {
+    const { data, error } = await supabase.functions.invoke('admin-api?action=log_import', {
       method: 'POST',
       headers: { Authorization: `Bearer ${params.token}` },
       body: {
@@ -40,6 +40,12 @@ export async function logImport(params: {
         items: slim(params.items),
       },
     });
+    if (error || (data as any)?.error) {
+      console.error('Falha ao registrar histórico de importação', error || data);
+      return { ok: false };
+    }
+    return { ok: true };
+
   } catch (e) {
     console.error('Falha ao registrar histórico de importação', e);
   }

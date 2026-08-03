@@ -223,7 +223,11 @@ const ImportLogsView = ({ token }: { token: string }) => {
                     <TableCell>
                       <Badge variant="outline">{TIPO_LABEL[r.tipo] || r.tipo}</Badge>
                     </TableCell>
-                    <TableCell className="max-w-[220px] truncate">{r.file_name || '—'}</TableCell>
+                    <TableCell className="max-w-[220px] truncate">
+                      {r.file_name || (
+                        <Badge variant="outline" className="bg-muted text-muted-foreground">Reconstruído</Badge>
+                      )}
+                    </TableCell>
                     <TableCell className="max-w-[160px] truncate">{r.executed_by_name || '—'}</TableCell>
                     <TableCell className="text-right font-semibold text-primary">{num(c.imported)}</TableCell>
                     <TableCell className="text-right font-semibold text-blue-700">{num(c.updated)}</TableCell>
