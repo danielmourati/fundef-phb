@@ -498,7 +498,7 @@ const AdminPage = () => {
     return diffs;
   };
 
-  const runImport = async (rows: Record<string, string>[], reviewCounts?: { total: number; valid: number; error: number; dup_file: number; dup_base: number }, updateRows: Record<string, string>[] = []) => {
+  const runImport = async (rows: Record<string, string>[], reviewCounts?: { total: number; valid: number; error: number; dup_file: number; dup_base: number; update?: number; nochange?: number }, updateRows: Record<string, string>[] = []) => {
 
     if (rows.length === 0 && updateRows.length === 0) { toast.error('Nenhuma linha selecionada.'); return; }
     setImporting(true);
