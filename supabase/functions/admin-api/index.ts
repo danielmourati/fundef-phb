@@ -311,8 +311,9 @@ Deno.serve(async (req) => {
     if (req.method === "POST" && action === "import_contratados") {
       const body = await req.json();
       const rows = Array.isArray(body.rows) ? body.rows : [];
-      // Agrupa por CPF (quando houver); linhas sem CPF (vazio ou "-") usam nome+matrícula como chave
-      const groups = new Map<string, { key: string; cpf: string; data: any; periodos: Array<{ inicio: string; fim: string }> }>();
+      // Agrupa por CPF + matrícula (mesmo CPF pode ter vários vínculos/matrículas);
+      // linhas sem CPF (vazio ou "-") usam nome+matrícula como chave
+      const groups = new Map<string, { key: string; cpf: string; matricula: string; nome: string; data: any; periodos: Array<{ inicio: string; fim: string }> }>();
       for (const r of rows) {
         const rawCpf = String(r.cpf || "").trim();
         const digits = rawCpf.replace(/\D/g, "");
@@ -320,7 +321,8 @@ Deno.serve(async (req) => {
         const nome = String(r.nome || "").trim();
         const matricula = (r.matricula || "").toString().trim().replace(/^[-–—]+$/, "");
         if (!cpf && !nome) continue;
-        const key = cpf ? `cpf:${cpf}` : `nm:${nome.toUpperCase()}|${matricula}`;
+        const key = cpf ? `cpf:${cpf}|${matricula}` : `nm:${nome.toUpperCase()}|${matricula}`;
+
         if (!groups.has(key)) {
           groups.set(key, {
             key,
