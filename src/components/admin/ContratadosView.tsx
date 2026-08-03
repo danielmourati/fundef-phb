@@ -13,6 +13,11 @@ import { Plus, Pencil, Trash2, Upload, Download, Trash, Loader2, Calendar, Eye, 
 import { toast } from 'sonner';
 import { maskCPF, unmaskCPF, isValidCPF, maskDate, isValidDate, maskMonthYear, isValidMonthYear, STATUS_OPTIONS, statusBadgeClass, normalizeStatus } from '@/lib/masks';
 import { ImportReviewDialog, type ReviewItem, type ReviewDiff } from '@/components/ImportReviewDialog';
+import { useAuth } from '@/contexts/AuthContext';
+import { downloadImportReportPdf } from '@/lib/importReportPdf';
+import { logImport } from '@/lib/importLog';
+import { FileDown } from 'lucide-react';
+
 
 interface Periodo { id?: string; inicio: string; fim: string; ordem?: number }
 interface Contratado {
@@ -129,6 +134,8 @@ interface Props { token: string; search: string; onCountChange?: (n: number) => 
 
 
 const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
+  const { professor } = useAuth();
+
   const authHeaders = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
   const apiCall = useCallback(async (method: 'GET' | 'POST' | 'PUT' | 'DELETE', action: string, body?: unknown) => {
@@ -239,10 +246,16 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
-  const [summary, setSummary] = useState({
+  const [importFileName, setImportFileName] = useState<string>('');
+  const [summary, setSummary] = useState<{
+    open: boolean; total: number; valid: number; error: number; dup_file: number; dup_base: number;
+    update: number; nochange: number; selected: number; imported: number; updated: number; skipped: number;
+    fileName?: string; items?: ReviewItem[]; selectedLines?: number[];
+  }>({
     open: false, total: 0, valid: 0, error: 0, dup_file: 0, dup_base: 0, update: 0, nochange: 0,
     selected: 0, imported: 0, updated: 0, skipped: 0,
   });
+
 
 
 
@@ -281,7 +294,9 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setImportFileName(file.name);
     setImporting(true);
+
     setImportProgress({ current: 0, total: 0 });
     try {
       const text = await file.text();
@@ -391,7 +406,7 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
     }
   };
 
-  const runImport = async (insertRows: Record<string, string>[], updateRows: Record<string, string>[], counts: ReviewCounts) => {
+  const runImport = async (insertRows: Record<string, string>[], updateRows: Record<string, string>[], counts: ReviewCounts, meta?: { items: ReviewItem[]; fileName?: string; selectedLines?: number[] }) => {
     if (insertRows.length === 0 && updateRows.length === 0) { toast.error('Nenhuma linha selecionada.'); return; }
     setImporting(true);
     const totalOps = insertRows.length + updateRows.length;
@@ -416,7 +431,22 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
         done += chunk.length;
         setImportProgress({ current: done, total: totalOps });
       }
-      setSummary({ open: true, ...counts, selected: totalOps, imported, updated, skipped });
+      setSummary({
+        open: true, ...counts, selected: totalOps, imported, updated, skipped,
+        fileName: meta?.fileName, items: meta?.items, selectedLines: meta?.selectedLines,
+      });
+      if (meta?.items?.length) {
+        await logImport({
+          token,
+          tipo: 'contratado',
+          fileName: meta.fileName,
+          executedByName: professor?.nome || professor?.email || 'Administrador',
+          counts: { ...counts, selected: totalOps, imported, updated, skipped },
+          items: meta.items,
+          selectedLines: meta.selectedLines,
+        });
+      }
+
       const parts: string[] = [];
       if (imported > 0) parts.push(`${imported} importado(s)`);
       if (updated > 0) parts.push(`${updated} atualizado(s)`);
@@ -708,7 +738,7 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
           };
           const updateRows = selectedItems.filter(i => i.status === 'update' || i.status === 'dup_base').map(i => i.data);
           const insertRows = selectedItems.filter(i => i.status !== 'update' && i.status !== 'dup_base').map(i => i.data);
-          await runImport(insertRows, updateRows, counts);
+          await runImport(insertRows, updateRows, counts, { items: allItems, fileName: importFileName, selectedLines: selectedItems.map(i => i.line) });
         }}
       />
 
@@ -760,9 +790,27 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
               <span className="font-bold text-blue-700 text-lg">{summary.updated}</span>
             </div>
           </div>
-          <DialogFooter>
-            <Button onClick={() => setSummary(s => ({ ...s, open: false }))}>Fechar</Button>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setSummary(s => ({ ...s, open: false }))}>Fechar</Button>
+            {!!summary.items?.length && (
+              <Button onClick={() => downloadImportReportPdf({
+                kind: 'contratado',
+                fileName: summary.fileName,
+                user: professor?.nome || professor?.email || 'Administrador',
+                counts: {
+                  total: summary.total, valid: summary.valid, error: summary.error,
+                  dup_file: summary.dup_file, dup_base: summary.dup_base, update: summary.update,
+                  nochange: summary.nochange, selected: summary.selected,
+                  imported: summary.imported, updated: summary.updated, skipped: summary.skipped,
+                },
+                items: summary.items!,
+                selectedLines: summary.selectedLines,
+              })}>
+                <FileDown className="w-4 h-4" /> Baixar relatório (PDF)
+              </Button>
+            )}
           </DialogFooter>
+
         </DialogContent>
       </Dialog>
     </Card>

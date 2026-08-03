@@ -35,7 +35,11 @@ import { toast } from 'sonner';
 import { maskCPF, unmaskCPF, isValidCPF, maskDate, isValidDate, maskPhone, STATUS_OPTIONS, statusBadgeClass, statusRowClass, normalizeStatus } from '@/lib/masks';
 import { ImportReviewDialog, type ReviewItem } from '@/components/ImportReviewDialog';
 import ContratadosView from '@/components/admin/ContratadosView';
-import { UserPlus } from 'lucide-react';
+import ImportLogsView from '@/components/admin/ImportLogsView';
+import { downloadImportReportPdf } from '@/lib/importReportPdf';
+import { logImport } from '@/lib/importLog';
+import { UserPlus, FileDown } from 'lucide-react';
+
 
 interface Professor {
   id: string;
@@ -86,7 +90,7 @@ const emptyProfessor = {
   status: 'ATIVO',
 };
 
-type ActiveTab = 'dashboard' | 'professors' | 'contratados' | 'contestacoes' | 'access_reports' | 'messages' | 'settings';
+type ActiveTab = 'dashboard' | 'professors' | 'contratados' | 'contestacoes' | 'access_reports' | 'messages' | 'import_logs' | 'settings';
 
 const navItems: { key: ActiveTab; label: string; icon: React.ElementType }[] = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -95,8 +99,10 @@ const navItems: { key: ActiveTab; label: string; icon: React.ElementType }[] = [
   { key: 'contestacoes', label: 'Contestações', icon: AlertTriangle },
   { key: 'access_reports', label: 'Reports de Acesso', icon: LifeBuoy },
   { key: 'messages', label: 'Mensagens', icon: MessageSquare },
+  { key: 'import_logs', label: 'Relatórios de Importação', icon: FileDown },
   { key: 'settings', label: 'Configurações', icon: Settings },
 ];
+
 
 
 
@@ -177,9 +183,13 @@ const AdminPage = () => {
     imported: number;
     updated: number;
     skipped: number;
+    fileName?: string;
+    items?: ReviewItem[];
+    selectedLines?: number[];
   }>({ open: false, totalLines: 0, validRows: 0, errorRows: 0, dupFileRows: 0, dupBaseRows: 0, updateRows: 0, noChangeRows: 0, selectedRows: 0, imported: 0, updated: 0, skipped: 0 });
 
-  const [reviewState, setReviewState] = useState<{ open: boolean; items: ReviewItem[]; validRows: Record<string, string>[] }>({ open: false, items: [], validRows: [] });
+  const [reviewState, setReviewState] = useState<{ open: boolean; items: ReviewItem[]; validRows: Record<string, string>[]; fileName?: string }>({ open: false, items: [], validRows: [] });
+
 
   const authHeaders = { Authorization: `Bearer ${token}` };
 
@@ -502,7 +512,7 @@ const AdminPage = () => {
     return diffs;
   };
 
-  const runImport = async (rows: Record<string, string>[], reviewCounts?: { total: number; valid: number; error: number; dup_file: number; dup_base: number; update?: number; nochange?: number }, updateRows: Record<string, string>[] = []) => {
+  const runImport = async (rows: Record<string, string>[], reviewCounts?: { total: number; valid: number; error: number; dup_file: number; dup_base: number; update?: number; nochange?: number }, updateRows: Record<string, string>[] = [], meta?: { items: ReviewItem[]; fileName?: string; selectedLines?: number[] }) => {
 
     if (rows.length === 0 && updateRows.length === 0) { toast.error('Nenhuma linha selecionada.'); return; }
     setImporting(true);
@@ -537,25 +547,53 @@ const AdminPage = () => {
         done += chunk.length;
         setImportProgress({ current: done, total: totalOps });
       }
+      const counts = {
+        total: reviewCounts?.total || totalOps,
+        valid: reviewCounts?.valid ?? rows.length,
+        error: reviewCounts?.error || 0,
+        dup_file: reviewCounts?.dup_file || 0,
+        dup_base: reviewCounts?.dup_base || 0,
+        update: reviewCounts?.update ?? updateRows.length,
+        nochange: reviewCounts?.nochange || 0,
+        selected: totalOps,
+        imported,
+        updated,
+        skipped,
+      };
       setSummaryDialog({
         open: true,
-        totalLines: reviewCounts?.total || totalOps,
-        validRows: reviewCounts?.valid || rows.length,
-        errorRows: reviewCounts?.error || 0,
-        dupFileRows: reviewCounts?.dup_file || 0,
-        dupBaseRows: reviewCounts?.dup_base || 0,
-        updateRows: reviewCounts?.update || updateRows.length,
-        noChangeRows: reviewCounts?.nochange || 0,
+        totalLines: counts.total,
+        validRows: counts.valid,
+        errorRows: counts.error,
+        dupFileRows: counts.dup_file,
+        dupBaseRows: counts.dup_base,
+        updateRows: counts.update,
+        noChangeRows: counts.nochange,
         selectedRows: totalOps,
         imported,
         updated,
         skipped,
+        fileName: meta?.fileName,
+        items: meta?.items,
+        selectedLines: meta?.selectedLines,
       });
+      if (meta?.items?.length) {
+        await logImport({
+          token: token!,
+          tipo: 'efetivo',
+          fileName: meta.fileName,
+          executedByName: professor?.nome || professor?.email || 'Administrador',
+          counts,
+          items: meta.items,
+          selectedLines: meta.selectedLines,
+        });
+      }
       const parts: string[] = [];
       if (imported > 0) parts.push(`${imported} importado(s)`);
       if (updated > 0) parts.push(`${updated} atualizado(s)`);
       toast.success(`${parts.join(' · ') || 'Nenhuma alteração'}${skipped > 0 ? ` (${skipped} ignorada(s) pelo servidor)` : ''}`);
       fetchData();
+
 
     } catch (err: any) {
       toast.error(`Erro ao importar: ${err?.message || err}`);
@@ -769,12 +807,13 @@ const AdminPage = () => {
           nochange: items.filter(i => i.status === 'nochange').length,
         };
 
-        await runImport(rows, reviewCounts);
+        await runImport(rows, reviewCounts, [], { items, fileName: file.name, selectedLines: items.filter(i => i.status === 'valid').map(i => i.line) });
         return;
       }
 
       // Abre o modal mostrando todas as linhas (válidas pré-selecionadas + conflitos para revisão).
-      setReviewState({ open: true, items, validRows: [] });
+      setReviewState({ open: true, items, validRows: [], fileName: file.name });
+
     } catch (err: any) {
       toast.error(`Erro ao processar arquivo: ${err?.message || err}`);
     } finally {
@@ -1675,6 +1714,11 @@ const AdminPage = () => {
             <ContratadosView token={token} search={searchQuery} onCountChange={setTotalContratados} />
           )}
 
+          {activeTab === 'import_logs' && token && (
+            <ImportLogsView token={token} />
+          )}
+
+
           {activeTab === 'settings' && (
             <Card>
               <CardContent className="p-6 space-y-6">
@@ -2065,8 +2109,34 @@ const AdminPage = () => {
               <span className="font-bold text-blue-700 text-lg">{summaryDialog.updated}</span>
             </div>
           </div>
-          <DialogFooter>
-            <Button onClick={() => setSummaryDialog(s => ({ ...s, open: false }))}>Fechar</Button>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setSummaryDialog(s => ({ ...s, open: false }))}>Fechar</Button>
+            {!!summaryDialog.items?.length && (
+              <Button
+                onClick={() => downloadImportReportPdf({
+                  kind: 'efetivo',
+                  fileName: summaryDialog.fileName,
+                  user: professor?.nome || professor?.email || 'Administrador',
+                  counts: {
+                    total: summaryDialog.totalLines,
+                    valid: summaryDialog.validRows,
+                    error: summaryDialog.errorRows,
+                    dup_file: summaryDialog.dupFileRows,
+                    dup_base: summaryDialog.dupBaseRows,
+                    update: summaryDialog.updateRows,
+                    nochange: summaryDialog.noChangeRows,
+                    selected: summaryDialog.selectedRows,
+                    imported: summaryDialog.imported,
+                    updated: summaryDialog.updated,
+                    skipped: summaryDialog.skipped,
+                  },
+                  items: summaryDialog.items!,
+                  selectedLines: summaryDialog.selectedLines,
+                })}
+              >
+                <FileDown className="w-4 h-4" /> Baixar relatório (PDF)
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -2077,6 +2147,7 @@ const AdminPage = () => {
         onCancel={() => { setReviewState({ open: false, items: [], validRows: [] }); toast.info('Importação cancelada.'); }}
         onConfirm={async (rows, selectedItems) => {
           const allItems = reviewState.items;
+          const fileName = reviewState.fileName;
           setReviewState({ open: false, items: [], validRows: [] });
           const reviewCounts = {
             total: allItems.length,
@@ -2089,9 +2160,14 @@ const AdminPage = () => {
           };
           const updateRows = selectedItems.filter(i => i.status === 'update').map(i => i.data);
           const insertRows = selectedItems.filter(i => i.status !== 'update').map(i => i.data);
-          await runImport(insertRows, reviewCounts, updateRows);
+          await runImport(insertRows, reviewCounts, updateRows, {
+            items: allItems,
+            fileName,
+            selectedLines: selectedItems.map(i => i.line),
+          });
         }}
       />
+
 
       <Dialog open={!!selectedReport} onOpenChange={(v) => { if (!v) setSelectedReport(null); }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
