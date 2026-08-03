@@ -442,7 +442,60 @@ const AdminPage = () => {
     return rows;
   };
 
-  const runImport = async (rows: Record<string, string>[], reviewCounts?: { total: number; valid: number; error: number; dup_file: number; dup_base: number }) => {
+  // ==== Comparação entre registro existente e linha importada ====
+  const DIFF_FIELDS: { field: string; label: string; kind: 'text' | 'date' | 'number' }[] = [
+    { field: 'nome', label: 'Nome', kind: 'text' },
+    { field: 'vinculo_inicio', label: 'Admissão', kind: 'date' },
+    { field: 'vinculo_fim', label: 'Aposentadoria', kind: 'date' },
+    { field: 'carga_horaria', label: 'Carga horária', kind: 'number' },
+    { field: 'total_cotas', label: 'Total de cotas', kind: 'number' },
+    { field: 'cargo', label: 'Cargo', kind: 'text' },
+    { field: 'status', label: 'Status', kind: 'text' },
+  ];
+
+  const normDateBR = (v: unknown): string => {
+    const s = String(v ?? '').trim();
+    if (!s) return '';
+    const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+    const br = s.match(/^(\d{2})[/-](\d{2})[/-](\d{4})/);
+    if (br) return `${br[1]}/${br[2]}/${br[3]}`;
+    const d = s.replace(/\D/g, '');
+    if (d.length === 8) return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}`;
+    return s;
+  };
+
+  const normValue = (v: unknown, kind: 'text' | 'date' | 'number'): string => {
+    if (kind === 'date') return normDateBR(v);
+    const s = String(v ?? '').trim();
+    if (!s) return '';
+    if (kind === 'number') {
+      const digits = s.replace(/\D/g, '');
+      return digits ? String(parseInt(digits, 10)) : '';
+    }
+    return s.toUpperCase().replace(/\s+/g, ' ');
+  };
+
+  const computeDiffs = (existing: Professor, incoming: Record<string, string>) => {
+    const diffs: { field: string; label: string; current: string; incoming: string }[] = [];
+    DIFF_FIELDS.forEach(({ field, label, kind }) => {
+      const inc = normValue((incoming as any)[field], kind);
+      if (!inc) return; // vazio no arquivo não sobrescreve
+      const cur = normValue((existing as any)[field], kind);
+      if (cur !== inc) {
+        diffs.push({
+          field,
+          label,
+          current: kind === 'text' ? String((existing as any)[field] ?? '') : cur,
+          incoming: kind === 'text' ? String((incoming as any)[field] ?? '') : inc,
+        });
+      }
+    });
+    return diffs;
+  };
+
+  const runImport = async (rows: Record<string, string>[], reviewCounts?: { total: number; valid: number; error: number; dup_file: number; dup_base: number }, updateRows: Record<string, string>[] = []) => {
+
     if (rows.length === 0) { toast.error('Nenhuma linha selecionada.'); return; }
     setImporting(true);
     setImportProgress({ current: 0, total: rows.length });
