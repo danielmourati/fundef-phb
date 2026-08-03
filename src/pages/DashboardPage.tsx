@@ -324,9 +324,6 @@ const DashboardPage = () => {
                   </button>
                 );
               })}
-
-                );
-              })}
             </div>
           </div>
         )}
