@@ -1012,6 +1012,67 @@ if (req.method === "PUT" && action === "update_access_report") {
   return jsonResponse({ success: true });
 }
 
+// POST log_import — registra o histórico de uma importação
+if (req.method === "POST" && action === "log_import") {
+  const body = await req.json();
+  const tipo = body?.tipo === "contratado" ? "contratado" : "efetivo";
+  const items = Array.isArray(body?.items) ? body.items.slice(0, 5000) : [];
+  const { data, error } = await supabase.from("import_logs").insert({
+    tipo,
+    file_name: body?.file_name ? String(body.file_name).slice(0, 300) : null,
+    executed_by: user.sub || null,
+    executed_by_name: body?.executed_by_name ? String(body.executed_by_name).slice(0, 200) : null,
+    counts: body?.counts ?? {},
+    items,
+  }).select("id").single();
+  if (error) throw error;
+  return jsonResponse({ success: true, id: data?.id });
+}
+
+// GET import_logs — lista paginada
+if (req.method === "GET" && action === "import_logs") {
+  const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10) || 1);
+  const rawSize = parseInt(url.searchParams.get("pageSize") || "25", 10) || 25;
+  const pageSize = [25, 50, 100].includes(rawSize) ? rawSize : 25;
+  const tipo = (url.searchParams.get("tipo") || "").trim();
+  const search = (url.searchParams.get("search") || "").trim();
+  const from = (url.searchParams.get("from") || "").trim();
+  const to = (url.searchParams.get("to") || "").trim();
+
+  let q = supabase
+    .from("import_logs")
+    .select("id, tipo, file_name, executed_by_name, counts, created_at", { count: "exact" })
+    .order("created_at", { ascending: false });
+
+  if (tipo === "efetivo" || tipo === "contratado") q = q.eq("tipo", tipo);
+  if (search) q = q.or(`file_name.ilike.%${search}%,executed_by_name.ilike.%${search}%`);
+  if (from) q = q.gte("created_at", from);
+  if (to) q = q.lte("created_at", to);
+
+  const { data, error, count } = await q.range((page - 1) * pageSize, page * pageSize - 1);
+  if (error) throw error;
+  return jsonResponse({ rows: data || [], total: count || 0, page, pageSize });
+}
+
+// GET import_log — detalhe completo
+if (req.method === "GET" && action === "import_log") {
+  const id = url.searchParams.get("id");
+  if (!id) throw new Error("ID obrigatório");
+  const { data, error } = await supabase.from("import_logs").select("*").eq("id", id).single();
+  if (error) throw error;
+  return jsonResponse(data);
+}
+
+// DELETE import_log
+if (req.method === "DELETE" && action === "delete_import_log") {
+  const id = url.searchParams.get("id");
+  if (!id) throw new Error("ID obrigatório");
+  const { error } = await supabase.from("import_logs").delete().eq("id", id);
+  if (error) throw error;
+  return jsonResponse({ success: true });
+}
+
+
 return new Response(JSON.stringify({ error: "Ação não encontrada." }), {
   status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
 });
