@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { FileDown, Eye, Loader2, Search, ArrowRight, Trash2, History } from 'lucide-react';
+import { FileDown, Eye, Loader2, Search, ArrowRight, Trash2, History, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { downloadImportReportPdf, type ImportKind } from '@/lib/importReportPdf';
 import type { ReviewItem } from '@/components/ImportReviewDialog';
@@ -97,7 +97,44 @@ const ImportLogsView = ({ token }: { token: string }) => {
   };
 
 
+  const parseCsv = async (file: File): Promise<Record<string, string>[]> => {
+    const text = await file.text();
+    const lines = text.split('\n').filter((l) => l.trim());
+    if (lines.length < 2) return [];
+    const sep = lines[0].includes(';') ? ';' : ',';
+    const headers = lines[0].split(sep).map((h) => h.trim().toLowerCase().replace(/^\ufeff/, ''));
+    return lines.slice(1).map((line) => {
+      const values = line.split(sep).map((v) => v.trim());
+      const obj: Record<string, string> = {};
+      headers.forEach((h, i) => { obj[h] = values[i] || ''; });
+      return obj;
+    });
+  };
+
+  const handleBaselineFile = async (logId: string, file: File) => {
+    setBusyId(logId);
+    try {
+      const rows = await parseCsv(file);
+      if (!rows.length) { toast.error('Planilha vazia ou inválida (use CSV com cabeçalho).'); return; }
+      const { data, error } = await supabase.functions.invoke('admin-api?action=apply_baseline_diffs', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: { log_id: logId, rows },
+      });
+      if (error || data?.error) { toast.error('Não foi possível aplicar a planilha anterior.'); return; }
+      toast.success(
+        `${data?.with_diffs ?? 0} registro(s) com dados antigos preenchidos (${data?.matched ?? 0} localizado(s)).`,
+      );
+      load();
+    } catch {
+      toast.error('Erro ao ler a planilha.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   useEffect(() => { load(); }, [load]);
+
 
   const fetchDetail = async (id: string): Promise<LogDetail | null> => {
     const { data, error } = await call('GET', 'import_log', `&id=${id}`);
@@ -237,6 +274,28 @@ const ImportLogsView = ({ token }: { token: string }) => {
                       <Button size="icon" variant="ghost" title="Ver detalhes" disabled={busyId === r.id} onClick={() => handleView(r)}>
                         <Eye className="w-4 h-4" />
                       </Button>
+                      <label>
+                        <input
+                          type="file"
+                          accept=".csv,text/csv"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            e.target.value = '';
+                            if (f) handleBaselineFile(r.id, f);
+                          }}
+                        />
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          asChild
+                          title="Enviar planilha anterior (dados antigos)"
+                          disabled={busyId === r.id}
+                        >
+                          <span><Upload className="w-4 h-4" /></span>
+                        </Button>
+                      </label>
+
                       <Button size="icon" variant="ghost" title="Baixar PDF" disabled={busyId === r.id} onClick={() => handleDownload(r)}>
                         {busyId === r.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
                       </Button>

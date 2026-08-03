@@ -1182,6 +1182,116 @@ if (req.method === "POST" && action === "backfill_import_logs") {
   return jsonResponse({ success: true, created: created.length, date: dateStr });
 }
 
+// POST apply_baseline_diffs — preenche "dado antigo" de um relatório usando a planilha anterior
+if (req.method === "POST" && action === "apply_baseline_diffs") {
+  const body = await req.json().catch(() => ({}));
+  const logId = body?.log_id ? String(body.log_id) : "";
+  const baseRows: Record<string, string>[] = Array.isArray(body?.rows) ? body.rows : [];
+  if (!logId) throw new Error("log_id obrigatório");
+
+  const LABELS: Record<string, string> = {
+    nome: "Nome",
+    cpf: "CPF",
+    matricula: "Matrícula",
+    data_nascimento: "Data de nascimento",
+    carga_horaria: "Carga horária",
+    cargo: "Cargo",
+    total_cotas: "Total de cotas",
+    status: "Status",
+    vinculo: "Vínculo",
+    vinculo_inicio: "Início do vínculo",
+    vinculo_fim: "Fim do vínculo",
+  };
+
+  const { data: log, error: logErr } = await supabase
+    .from("import_logs").select("id, tipo, items, counts").eq("id", logId).single();
+  if (logErr) throw logErr;
+  const table = log.tipo === "contratado" ? "contratados" : "professors";
+  const FIELDS = Object.keys(LABELS).filter((f) =>
+    table === "professors"
+      ? f !== "vinculo"
+      : f !== "vinculo_inicio" && f !== "vinculo_fim"
+  );
+
+  const norm = (v: unknown) => String(v ?? "").trim();
+  const isBlank = (v: string) => !v || /^-+$/.test(v);
+  const digits = (v: unknown) => norm(v).replace(/\D/g, "");
+  const keysOf = (nome: string, cpf: string, mat: string) => {
+    const k: string[] = [];
+    const c = digits(cpf);
+    const m = norm(mat);
+    if (c) k.push(`c:${c}|${m}`);
+    if (nome) k.push(`n:${nome.toUpperCase()}|${m}`);
+    return k;
+  };
+
+  // planilha anterior indexada
+  const baseline = new Map<string, Record<string, string>>();
+  for (const r of baseRows) {
+    const row: Record<string, string> = {};
+    for (const k of Object.keys(r || {})) row[k.trim().toLowerCase()] = norm(r[k]);
+    for (const key of keysOf(row.nome || "", row.cpf || "", row.matricula || "")) {
+      if (!baseline.has(key)) baseline.set(key, row);
+    }
+  }
+
+  // estado atual do banco
+  const currentByKey = new Map<string, Record<string, unknown>>();
+  let offset = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from(table).select(`id, ${FIELDS.join(", ")}`)
+      .order("id", { ascending: true })
+      .range(offset, offset + 999);
+    if (error) throw error;
+    const chunk = (data || []) as Record<string, unknown>[];
+    for (const rec of chunk) {
+      for (const key of keysOf(norm(rec.nome), norm(rec.cpf), norm(rec.matricula))) {
+        if (!currentByKey.has(key)) currentByKey.set(key, rec);
+      }
+    }
+    if (chunk.length < 1000) break;
+    offset += 1000;
+  }
+
+  const items = Array.isArray(log.items) ? (log.items as Record<string, any>[]) : [];
+  let matched = 0;
+  let withDiffs = 0;
+  const nextItems = items.map((it) => {
+    const d = it?.data || {};
+    const lookup = keysOf(norm(d.nome), norm(d.cpf), norm(d.matricula));
+    const base = lookup.map((k) => baseline.get(k)).find(Boolean);
+    const cur = lookup.map((k) => currentByKey.get(k)).find(Boolean);
+    if (!base || !cur) return it;
+    matched++;
+    const diffs: { field: string; label: string; current: string | null; incoming: string }[] = [];
+    for (const f of FIELDS) {
+      const oldV = norm(base[f]);
+      const newV = norm(cur[f]);
+      if (isBlank(oldV) && isBlank(newV)) continue;
+      const cmpOld = f === "cpf" ? digits(oldV) : oldV.toUpperCase();
+      const cmpNew = f === "cpf" ? digits(newV) : newV.toUpperCase();
+      if (cmpOld === cmpNew) continue;
+      diffs.push({
+        field: f,
+        label: LABELS[f],
+        current: isBlank(oldV) ? null : oldV,
+        incoming: newV,
+      });
+    }
+    if (!diffs.length) return it;
+    withDiffs++;
+    return { ...it, status: it.status === "valid" ? it.status : "update", diffs };
+  });
+
+  const counts = { ...(log.counts as Record<string, unknown>), baseline_applied: 1 };
+  const { error: updErr } = await supabase
+    .from("import_logs").update({ items: nextItems, counts }).eq("id", logId);
+  if (updErr) throw updErr;
+
+  return jsonResponse({ success: true, matched, with_diffs: withDiffs, rows: baseRows.length });
+}
+
 // GET import_logs — lista paginada
 if (req.method === "GET" && action === "import_logs") {
   const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10) || 1);
