@@ -483,8 +483,12 @@ const AdminPage = () => {
   const computeDiffs = (existing: Professor, incoming: Record<string, string>) => {
     const diffs: { field: string; label: string; current: string; incoming: string }[] = [];
     DIFF_FIELDS.forEach(({ field, label, kind }) => {
+      const raw = String((incoming as any)[field] ?? '').trim();
+      // valores "vazios" marcados com traços (-, --, —, –) não devem sobrescrever nada
+      if (/^[-–—]+$/.test(raw)) return;
       const inc = normValue((incoming as any)[field], kind);
       if (!inc) return; // vazio no arquivo não sobrescreve
+
       const cur = normValue((existing as any)[field], kind);
       if (cur !== inc) {
         diffs.push({
