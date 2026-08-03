@@ -589,7 +589,58 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: true });
     }
 
+    // POST atualização de professores já existentes (via importação)
+    if (req.method === "POST" && action === "update_professors_csv") {
+      const body = await req.json();
+      const rows = (body.rows || []) as Array<Record<string, string>>;
+      const normalizeDateBR2 = (v: string | null | undefined): string | null => {
+        if (!v) return null;
+        const s = String(v).trim();
+        if (!s) return null;
+        const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+        const br = s.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
+        if (br) return `${br[1]}/${br[2]}/${br[3]}`;
+        const digits = s.replace(/\D/g, "");
+        if (digits.length === 8) return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+        return s;
+      };
+      let updated = 0;
+      let notFound = 0;
+      for (const r of rows) {
+        const cpf = (r.cpf || "").replace(/\D/g, "");
+        if (cpf.length !== 11) { notFound++; continue; }
+        const mat = (r.matricula || "").toString().trim();
+        const patch: Record<string, unknown> = {};
+        const nome = String(r.nome || "").trim();
+        if (nome) patch.nome = nome;
+        const vi = normalizeDateBR2(r.vinculo_inicio);
+        if (vi) patch.vinculo_inicio = vi;
+        const vf = normalizeDateBR2(r.vinculo_fim);
+        if (vf) patch.vinculo_fim = vf;
+        const cargaDigits = String(r.carga_horaria || "").replace(/\D/g, "");
+        if (cargaDigits) patch.carga_horaria = Math.min(parseInt(cargaDigits), 2147483647);
+        const cotas = String(r.total_cotas || "").replace(/\D/g, "");
+        if (cotas) patch.total_cotas = Math.min(parseInt(cotas), 2147483647);
+        const cargo = String(r.cargo || "").trim();
+        if (cargo) patch.cargo = cargo;
+        const status = String(r.status || "").trim();
+        if (status) patch.status = status.toUpperCase();
+        if (Object.keys(patch).length === 0) continue;
+        patch.updated_at = new Date().toISOString();
+
+        let query = supabase.from("professors").update(patch).eq("cpf", cpf);
+        query = mat ? query.eq("matricula", mat) : query.is("matricula", null);
+        const { data, error } = await query.select("id");
+        if (error) throw error;
+        if (!data || data.length === 0) notFound++;
+        else updated += data.length;
+      }
+      return jsonResponse({ success: true, updated, not_found: notFound });
+    }
+
     // POST CSV import
+
     if (req.method === "POST" && action === "import_csv") {
       const body = await req.json();
       const rows = body.rows as Array<Record<string, string>>;

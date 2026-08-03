@@ -171,10 +171,14 @@ const AdminPage = () => {
     errorRows: number;
     dupFileRows: number;
     dupBaseRows: number;
+    updateRows: number;
+    noChangeRows: number;
     selectedRows: number;
     imported: number;
+    updated: number;
     skipped: number;
-  }>({ open: false, totalLines: 0, validRows: 0, errorRows: 0, dupFileRows: 0, dupBaseRows: 0, selectedRows: 0, imported: 0, skipped: 0 });
+  }>({ open: false, totalLines: 0, validRows: 0, errorRows: 0, dupFileRows: 0, dupBaseRows: 0, updateRows: 0, noChangeRows: 0, selectedRows: 0, imported: 0, updated: 0, skipped: 0 });
+
   const [reviewState, setReviewState] = useState<{ open: boolean; items: ReviewItem[]; validRows: Record<string, string>[] }>({ open: false, items: [], validRows: [] });
 
   const authHeaders = { Authorization: `Bearer ${token}` };
@@ -442,14 +446,70 @@ const AdminPage = () => {
     return rows;
   };
 
-  const runImport = async (rows: Record<string, string>[], reviewCounts?: { total: number; valid: number; error: number; dup_file: number; dup_base: number }) => {
-    if (rows.length === 0) { toast.error('Nenhuma linha selecionada.'); return; }
+  // ==== Comparação entre registro existente e linha importada ====
+  const DIFF_FIELDS: { field: string; label: string; kind: 'text' | 'date' | 'number' }[] = [
+    { field: 'nome', label: 'Nome', kind: 'text' },
+    { field: 'vinculo_inicio', label: 'Admissão', kind: 'date' },
+    { field: 'vinculo_fim', label: 'Aposentadoria', kind: 'date' },
+    { field: 'carga_horaria', label: 'Carga horária', kind: 'number' },
+    { field: 'total_cotas', label: 'Total de cotas', kind: 'number' },
+    { field: 'cargo', label: 'Cargo', kind: 'text' },
+    { field: 'status', label: 'Status', kind: 'text' },
+  ];
+
+  const normDateBR = (v: unknown): string => {
+    const s = String(v ?? '').trim();
+    if (!s) return '';
+    const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+    const br = s.match(/^(\d{2})[/-](\d{2})[/-](\d{4})/);
+    if (br) return `${br[1]}/${br[2]}/${br[3]}`;
+    const d = s.replace(/\D/g, '');
+    if (d.length === 8) return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}`;
+    return s;
+  };
+
+  const normValue = (v: unknown, kind: 'text' | 'date' | 'number'): string => {
+    if (kind === 'date') return normDateBR(v);
+    const s = String(v ?? '').trim();
+    if (!s) return '';
+    if (kind === 'number') {
+      const digits = s.replace(/\D/g, '');
+      return digits ? String(parseInt(digits, 10)) : '';
+    }
+    return s.toUpperCase().replace(/\s+/g, ' ');
+  };
+
+  const computeDiffs = (existing: Professor, incoming: Record<string, string>) => {
+    const diffs: { field: string; label: string; current: string; incoming: string }[] = [];
+    DIFF_FIELDS.forEach(({ field, label, kind }) => {
+      const inc = normValue((incoming as any)[field], kind);
+      if (!inc) return; // vazio no arquivo não sobrescreve
+      const cur = normValue((existing as any)[field], kind);
+      if (cur !== inc) {
+        diffs.push({
+          field,
+          label,
+          current: kind === 'text' ? String((existing as any)[field] ?? '') : cur,
+          incoming: kind === 'text' ? String((incoming as any)[field] ?? '') : inc,
+        });
+      }
+    });
+    return diffs;
+  };
+
+  const runImport = async (rows: Record<string, string>[], reviewCounts?: { total: number; valid: number; error: number; dup_file: number; dup_base: number; update?: number; nochange?: number }, updateRows: Record<string, string>[] = []) => {
+
+    if (rows.length === 0 && updateRows.length === 0) { toast.error('Nenhuma linha selecionada.'); return; }
     setImporting(true);
-    setImportProgress({ current: 0, total: rows.length });
+    const totalOps = rows.length + updateRows.length;
+    setImportProgress({ current: 0, total: totalOps });
     try {
       const CHUNK = 100;
       let imported = 0;
       let skipped = 0;
+      let updated = 0;
+      let done = 0;
       for (let i = 0; i < rows.length; i += CHUNK) {
         const chunk = rows.slice(i, i + CHUNK);
         const { data, error } = await apiCall('POST', 'import_csv', { rows: chunk });
@@ -459,21 +519,40 @@ const AdminPage = () => {
         }
         imported += data?.count || 0;
         skipped += data?.skipped || 0;
-        setImportProgress({ current: Math.min(i + chunk.length, rows.length), total: rows.length });
+        done += chunk.length;
+        setImportProgress({ current: done, total: totalOps });
+      }
+      for (let i = 0; i < updateRows.length; i += CHUNK) {
+        const chunk = updateRows.slice(i, i + CHUNK);
+        const { data, error } = await apiCall('POST', 'update_professors_csv', { rows: chunk });
+        if (error || data?.error) {
+          toast.error(data?.error || 'Erro ao atualizar registros existentes.');
+          return;
+        }
+        updated += data?.updated || 0;
+        done += chunk.length;
+        setImportProgress({ current: done, total: totalOps });
       }
       setSummaryDialog({
         open: true,
-        totalLines: reviewCounts?.total || rows.length,
+        totalLines: reviewCounts?.total || totalOps,
         validRows: reviewCounts?.valid || rows.length,
         errorRows: reviewCounts?.error || 0,
         dupFileRows: reviewCounts?.dup_file || 0,
         dupBaseRows: reviewCounts?.dup_base || 0,
-        selectedRows: rows.length,
+        updateRows: reviewCounts?.update || updateRows.length,
+        noChangeRows: reviewCounts?.nochange || 0,
+        selectedRows: totalOps,
         imported,
+        updated,
         skipped,
       });
-      toast.success(`${imported} professor(es) importado(s)!${skipped > 0 ? ` (${skipped} ignorada(s) pelo servidor)` : ''}`);
+      const parts: string[] = [];
+      if (imported > 0) parts.push(`${imported} importado(s)`);
+      if (updated > 0) parts.push(`${updated} atualizado(s)`);
+      toast.success(`${parts.join(' · ') || 'Nenhuma alteração'}${skipped > 0 ? ` (${skipped} ignorada(s) pelo servidor)` : ''}`);
       fetchData();
+
     } catch (err: any) {
       toast.error(`Erro ao importar: ${err?.message || err}`);
     } finally {
@@ -532,6 +611,14 @@ const AdminPage = () => {
         if (!existingByCpf.has(c)) existingByCpf.set(c, new Set());
         existingByCpf.get(c)!.add(m);
       });
+      // Registro completo existente por cpf|matrícula (para comparação atual x novo)
+      const existingByPair = new Map<string, Professor>();
+      allProfs.forEach(p => {
+        const c = (p.cpf || '').replace(/\D/g, '');
+        if (!c) return;
+        existingByPair.set(`${c}|${(p.matricula || '').trim()}`, p);
+      });
+
       const existingMatToCpf = new Map<string, string>();
       allProfs.forEach(p => {
         const m = (p.matricula || '').trim();
@@ -582,15 +669,33 @@ const AdminPage = () => {
           return;
         }
 
-        // 2) cpf+matrícula já existe na base
+        // 2) cpf+matrícula já existe na base → comparar e propor atualização
         if (existingByCpf.get(cpf)?.has(mat)) {
-          items.push({
-            line: ln, status: 'dup_base',
-            reason: 'Cadastro já existe (cpf+matrícula) na base',
-            data: clean, selectable: true,
-          });
+          const existing = existingByPair.get(pairKey);
+          const diffs = existing ? computeDiffs(existing, clean) : [];
+          seenPair.set(pairKey, ln);
+          if (!existing) {
+            items.push({
+              line: ln, status: 'dup_base',
+              reason: 'Cadastro já existe (cpf+matrícula) na base',
+              data: clean, selectable: true,
+            });
+          } else if (diffs.length === 0) {
+            items.push({
+              line: ln, status: 'nochange',
+              reason: 'Cadastro já existe e não há campos alterados',
+              data: clean, selectable: false,
+            });
+          } else {
+            items.push({
+              line: ln, status: 'update',
+              reason: `Cadastro existente — ${diffs.length} campo(s) a atualizar`,
+              data: clean, selectable: true, diffs,
+            });
+          }
           return;
         }
+
 
         // 3) CPF repetido no arquivo, matrícula diferente → 2º vínculo válido
         if (seenCpf.has(cpf)) {
@@ -656,7 +761,10 @@ const AdminPage = () => {
           error: items.filter(i => i.status === 'error').length,
           dup_file: items.filter(i => i.status === 'dup_file').length,
           dup_base: items.filter(i => i.status === 'dup_base').length,
+          update: items.filter(i => i.status === 'update').length,
+          nochange: items.filter(i => i.status === 'nochange').length,
         };
+
         await runImport(rows, reviewCounts);
         return;
       }
@@ -1928,8 +2036,16 @@ const AdminPage = () => {
               <span className="text-muted-foreground">Já existentes na base</span>
               <span className="font-semibold text-orange-600">{summaryDialog.dupBaseRows}</span>
             </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Com dados a atualizar</span>
+              <span className="font-semibold text-blue-600">{summaryDialog.updateRows}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Sem alterações</span>
+              <span className="font-semibold">{summaryDialog.noChangeRows}</span>
+            </div>
             <div className="flex justify-between border-t pt-2 mt-2">
-              <span className="text-muted-foreground">Selecionadas para importar</span>
+              <span className="text-muted-foreground">Selecionadas para processar</span>
               <span className="font-semibold">{summaryDialog.selectedRows}</span>
             </div>
             <div className="flex justify-between">
@@ -1939,6 +2055,10 @@ const AdminPage = () => {
             <div className="flex justify-between border-t pt-2 mt-2">
               <span className="font-semibold text-primary">Registros importados</span>
               <span className="font-bold text-primary text-lg">{summaryDialog.imported}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="font-semibold text-blue-700">Registros atualizados</span>
+              <span className="font-bold text-blue-700 text-lg">{summaryDialog.updated}</span>
             </div>
           </div>
           <DialogFooter>
@@ -1951,16 +2071,21 @@ const AdminPage = () => {
         open={reviewState.open}
         items={reviewState.items}
         onCancel={() => { setReviewState({ open: false, items: [], validRows: [] }); toast.info('Importação cancelada.'); }}
-        onConfirm={async (rows) => {
+        onConfirm={async (rows, selectedItems) => {
+          const allItems = reviewState.items;
           setReviewState({ open: false, items: [], validRows: [] });
           const reviewCounts = {
-            total: reviewState.items.length,
-            valid: reviewState.items.filter(i => i.status === 'valid').length,
-            error: reviewState.items.filter(i => i.status === 'error').length,
-            dup_file: reviewState.items.filter(i => i.status === 'dup_file').length,
-            dup_base: reviewState.items.filter(i => i.status === 'dup_base').length,
+            total: allItems.length,
+            valid: allItems.filter(i => i.status === 'valid').length,
+            error: allItems.filter(i => i.status === 'error').length,
+            dup_file: allItems.filter(i => i.status === 'dup_file').length,
+            dup_base: allItems.filter(i => i.status === 'dup_base').length,
+            update: allItems.filter(i => i.status === 'update').length,
+            nochange: allItems.filter(i => i.status === 'nochange').length,
           };
-          await runImport(rows, reviewCounts);
+          const updateRows = selectedItems.filter(i => i.status === 'update').map(i => i.data);
+          const insertRows = selectedItems.filter(i => i.status !== 'update').map(i => i.data);
+          await runImport(insertRows, reviewCounts, updateRows);
         }}
       />
 
