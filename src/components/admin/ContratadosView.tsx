@@ -738,7 +738,7 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
           };
           const updateRows = selectedItems.filter(i => i.status === 'update' || i.status === 'dup_base').map(i => i.data);
           const insertRows = selectedItems.filter(i => i.status !== 'update' && i.status !== 'dup_base').map(i => i.data);
-          await runImport(insertRows, updateRows, counts);
+          await runImport(insertRows, updateRows, counts, { items: allItems, fileName: importFileName, selectedLines: selectedItems.map(i => i.line) });
         }}
       />
 
