@@ -85,7 +85,8 @@ Deno.serve(async (req) => {
       if (error) throw error;
       return jsonResponse({ success: true, protocolo: data?.protocolo });
     } catch (e: any) {
-      return new Response(JSON.stringify({ error: e.message || "Erro interno." }), {
+      console.error("Unhandled error:", e);
+      return new Response(JSON.stringify({ error: "Erro interno do servidor." }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -307,7 +308,7 @@ Deno.serve(async (req) => {
       // Update all records with the same CPF in the same table
       const { error } = await supabase
         .from(ownerTable)
-        .update({ senha_hash: hashData })
+        .update({ senha_hash: hashData, senha_definida: true })
         .eq("cpf", prof.cpf);
 
       if (error) throw error;
@@ -403,7 +404,8 @@ Deno.serve(async (req) => {
       status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e: any) {
-    return new Response(JSON.stringify({ error: e.message || "Erro interno." }), {
+    console.error("Unhandled error:", e);
+    return new Response(JSON.stringify({ error: "Erro interno do servidor." }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

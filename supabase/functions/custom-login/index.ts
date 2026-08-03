@@ -96,7 +96,7 @@ Deno.serve(async (req) => {
       const identificador = rawId.replace(/\D/g, "") || rawId;
       const r = await supabase
         .from("contratados")
-        .select("id, nome, cpf, matricula, data_nascimento, carga_horaria, total_cotas, cargo, vinculo, role, status, senha_hash")
+        .select("id, nome, cpf, matricula, data_nascimento, carga_horaria, total_cotas, cargo, vinculo, role, status, senha_hash, senha_definida")
         .eq("cpf", identificador)
         .order("matricula", { ascending: true });
       let candidates = r.data || [];
@@ -104,7 +104,7 @@ Deno.serve(async (req) => {
       if (candidates.length === 0) {
         const fb = await supabase
           .from("contratados")
-          .select("id, nome, cpf, matricula, data_nascimento, carga_horaria, total_cotas, cargo, vinculo, role, status, senha_hash")
+          .select("id, nome, cpf, matricula, data_nascimento, carga_horaria, total_cotas, cargo, vinculo, role, status, senha_hash, senha_definida")
           .eq("matricula", identificador);
         candidates = fb.data || [];
         fetchErr = fb.error;
@@ -118,7 +118,9 @@ Deno.serve(async (req) => {
           });
           ok = !!data;
         }
-        if (!ok && (passwordMatchesBirthDate(senha, c.data_nascimento) || onlyDigits(senha) === onlyDigits(c.cpf))) {
+        // Bootstrap login (CPF / data de nascimento) só é permitido enquanto o
+        // usuário não definiu a própria senha. Após a troca, é desativado.
+        if (!ok && !c.senha_definida && (passwordMatchesBirthDate(senha, c.data_nascimento) || onlyDigits(senha) === onlyDigits(c.cpf))) {
           ok = true;
         }
         if (ok) {
@@ -133,7 +135,7 @@ Deno.serve(async (req) => {
       const identificador = rawId.replace(/\D/g, "") || rawId;
       const r = await supabase
         .from("professors")
-        .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, carga_horaria, total_cotas, cargo, role, status, senha_hash")
+        .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, carga_horaria, total_cotas, cargo, role, status, senha_hash, senha_definida")
         .eq("cpf", identificador)
         .order("matricula", { ascending: true });
       let candidates = r.data || [];
@@ -141,7 +143,7 @@ Deno.serve(async (req) => {
       if (candidates.length === 0) {
         const fb = await supabase
           .from("professors")
-          .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, carga_horaria, total_cotas, cargo, role, status, senha_hash")
+          .select("id, nome, cpf, matricula, data_nascimento, vinculo_inicio, vinculo_fim, carga_horaria, total_cotas, cargo, role, status, senha_hash, senha_definida")
           .eq("matricula", identificador);
         candidates = fb.data || [];
         fetchErr = fb.error;
@@ -158,7 +160,9 @@ Deno.serve(async (req) => {
           ok = !!data;
         }
 
-        if (!ok && (passwordMatchesBirthDate(senha, c.data_nascimento) || onlyDigits(senha) === onlyDigits(c.cpf))) {
+        // Bootstrap login (CPF / data de nascimento) só é permitido enquanto o
+        // usuário não definiu a própria senha. Após a troca, é desativado.
+        if (!ok && !c.senha_definida && (passwordMatchesBirthDate(senha, c.data_nascimento) || onlyDigits(senha) === onlyDigits(c.cpf))) {
           ok = true;
         }
         if (ok) {
