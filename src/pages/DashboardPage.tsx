@@ -306,7 +306,7 @@ const DashboardPage = () => {
         {matriculas.length > 1 && (
           <div className="space-y-1.5">
             <p className="text-[11px] text-muted-foreground uppercase tracking-wider px-1">
-              Você possui {matriculas.length} matrículas. Selecione para visualizar:
+              Você possui {matriculas.length} registros. Selecione para visualizar:
             </p>
             <div className="flex gap-1.5 overflow-x-auto pb-1">
               {matriculas.map(m => {
@@ -320,8 +320,11 @@ const DashboardPage = () => {
                         : 'bg-background text-foreground border-border hover:bg-muted'
                       }`}
                   >
-                    Matrícula {m.matricula}
+                    {m.matricula ? `Matrícula ${m.matricula}` : 'Sem matrícula'}
                   </button>
+                );
+              })}
+
                 );
               })}
             </div>
