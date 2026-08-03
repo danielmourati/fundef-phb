@@ -90,7 +90,7 @@ const emptyProfessor = {
   status: 'ATIVO',
 };
 
-type ActiveTab = 'dashboard' | 'professors' | 'contratados' | 'contestacoes' | 'access_reports' | 'messages' | 'settings';
+type ActiveTab = 'dashboard' | 'professors' | 'contratados' | 'contestacoes' | 'access_reports' | 'messages' | 'import_logs' | 'settings';
 
 const navItems: { key: ActiveTab; label: string; icon: React.ElementType }[] = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -99,8 +99,10 @@ const navItems: { key: ActiveTab; label: string; icon: React.ElementType }[] = [
   { key: 'contestacoes', label: 'Contestações', icon: AlertTriangle },
   { key: 'access_reports', label: 'Reports de Acesso', icon: LifeBuoy },
   { key: 'messages', label: 'Mensagens', icon: MessageSquare },
+  { key: 'import_logs', label: 'Relatórios de Importação', icon: FileDown },
   { key: 'settings', label: 'Configurações', icon: Settings },
 ];
+
 
 
 
