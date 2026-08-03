@@ -244,10 +244,16 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
-  const [summary, setSummary] = useState({
+  const [importFileName, setImportFileName] = useState<string>('');
+  const [summary, setSummary] = useState<{
+    open: boolean; total: number; valid: number; error: number; dup_file: number; dup_base: number;
+    update: number; nochange: number; selected: number; imported: number; updated: number; skipped: number;
+    fileName?: string; items?: ReviewItem[]; selectedLines?: number[];
+  }>({
     open: false, total: 0, valid: 0, error: 0, dup_file: 0, dup_base: 0, update: 0, nochange: 0,
     selected: 0, imported: 0, updated: 0, skipped: 0,
   });
+
 
 
 
