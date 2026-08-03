@@ -97,7 +97,44 @@ const ImportLogsView = ({ token }: { token: string }) => {
   };
 
 
+  const parseCsv = async (file: File): Promise<Record<string, string>[]> => {
+    const text = await file.text();
+    const lines = text.split('\n').filter((l) => l.trim());
+    if (lines.length < 2) return [];
+    const sep = lines[0].includes(';') ? ';' : ',';
+    const headers = lines[0].split(sep).map((h) => h.trim().toLowerCase().replace(/^\ufeff/, ''));
+    return lines.slice(1).map((line) => {
+      const values = line.split(sep).map((v) => v.trim());
+      const obj: Record<string, string> = {};
+      headers.forEach((h, i) => { obj[h] = values[i] || ''; });
+      return obj;
+    });
+  };
+
+  const handleBaselineFile = async (logId: string, file: File) => {
+    setBusyId(logId);
+    try {
+      const rows = await parseCsv(file);
+      if (!rows.length) { toast.error('Planilha vazia ou inválida (use CSV com cabeçalho).'); return; }
+      const { data, error } = await supabase.functions.invoke('admin-api?action=apply_baseline_diffs', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: { log_id: logId, rows },
+      });
+      if (error || data?.error) { toast.error('Não foi possível aplicar a planilha anterior.'); return; }
+      toast.success(
+        `${data?.with_diffs ?? 0} registro(s) com dados antigos preenchidos (${data?.matched ?? 0} localizado(s)).`,
+      );
+      load();
+    } catch {
+      toast.error('Erro ao ler a planilha.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   useEffect(() => { load(); }, [load]);
+
 
   const fetchDetail = async (id: string): Promise<LogDetail | null> => {
     const { data, error } = await call('GET', 'import_log', `&id=${id}`);
