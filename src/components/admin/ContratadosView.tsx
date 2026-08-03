@@ -303,13 +303,21 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
       // Base atual (para duplicidade e comparação)
       const { data: allData } = await apiCall('GET', 'contratados_all');
       const existing: ExistingContratado[] = Array.isArray(allData) ? allData : [];
-      const byCpf = new Map<string, ExistingContratado>();
+      const byCpfMat = new Map<string, ExistingContratado>();
+      const cpfCount = new Map<string, number>();
+      const byCpfSingle = new Map<string, ExistingContratado>();
       const byNameMat = new Map<string, ExistingContratado>();
       existing.forEach(c => {
         const cpf = (c.cpf || '').replace(/\D/g, '');
-        if (cpf.length === 11) byCpf.set(cpf, c);
-        byNameMat.set(`${(c.nome || '').toUpperCase()}|${(c.matricula || '').trim()}`, c);
+        const mat = (c.matricula || '').trim();
+        if (cpf.length === 11) {
+          byCpfMat.set(`${cpf}|${mat}`, c);
+          cpfCount.set(cpf, (cpfCount.get(cpf) || 0) + 1);
+          byCpfSingle.set(cpf, c);
+        }
+        byNameMat.set(`${(c.nome || '').toUpperCase()}|${mat}`, c);
       });
+
 
       const seen = new Map<string, number>();
       const items: ReviewItem[] = [];
@@ -342,18 +350,24 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
           return;
         }
 
-        const key = clean.cpf ? `cpf:${clean.cpf}` : `nm:${nome.toUpperCase()}|${mat}`;
+        // Mesmo CPF pode ter múltiplas matrículas: a chave inclui a matrícula
+        const key = clean.cpf ? `cpf:${clean.cpf}|${mat}` : `nm:${nome.toUpperCase()}|${mat}`;
         if (seen.has(key)) {
           items.push({
             line: ln, status: 'dup_file',
-            reason: `Linha duplicada (${clean.cpf ? 'CPF' : 'nome+matrícula'}) — 1ª ocorrência linha ${seen.get(key)}`,
-            data: clean, selectable: false,
+            reason: `Linha duplicada (${clean.cpf ? 'CPF + matrícula' : 'nome + matrícula'}) — 1ª ocorrência linha ${seen.get(key)}`,
+            data: clean, selectable: true,
           });
           return;
         }
         seen.set(key, ln);
 
-        const found = clean.cpf ? byCpf.get(clean.cpf) : byNameMat.get(`${nome.toUpperCase()}|${mat}`);
+        const found = clean.cpf
+          ? (mat
+              ? byCpfMat.get(`${clean.cpf}|${mat}`)
+              : (cpfCount.get(clean.cpf) === 1 ? byCpfSingle.get(clean.cpf) : undefined))
+          : byNameMat.get(`${nome.toUpperCase()}|${mat}`);
+
         if (found) {
           const diffs = computeDiffs(found, clean, periodos);
           if (diffs.length === 0) {
