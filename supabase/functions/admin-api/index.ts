@@ -1001,7 +1001,7 @@ return new Response(JSON.stringify({ error: "Ação não encontrada." }), {
 });
 
   } catch (e: any) {
-  return new Response(JSON.stringify({ error: e.message || "Erro interno." }), {
+  return new Response(JSON.stringify({ error: "Erro interno do servidor." }), {
     status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
