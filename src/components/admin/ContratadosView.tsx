@@ -669,7 +669,84 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Revisão da importação */}
+      <ImportReviewDialog
+        open={reviewOpen}
+        items={reviewItems}
+        onCancel={() => { setReviewOpen(false); setReviewItems([]); toast.info('Importação cancelada.'); }}
+        onConfirm={async (_rows, selectedItems) => {
+          const allItems = reviewItems;
+          setReviewOpen(false);
+          const counts: ReviewCounts = {
+            total: allItems.length,
+            valid: allItems.filter(i => i.status === 'valid').length,
+            error: allItems.filter(i => i.status === 'error').length,
+            dup_file: allItems.filter(i => i.status === 'dup_file').length,
+            dup_base: allItems.filter(i => i.status === 'dup_base').length,
+            update: allItems.filter(i => i.status === 'update').length,
+            nochange: allItems.filter(i => i.status === 'nochange').length,
+          };
+          const updateRows = selectedItems.filter(i => i.status === 'update' || i.status === 'dup_base').map(i => i.data);
+          const insertRows = selectedItems.filter(i => i.status !== 'update' && i.status !== 'dup_base').map(i => i.data);
+          await runImport(insertRows, updateRows, counts);
+        }}
+      />
+
+      {/* Resumo da importação */}
+      <Dialog open={summary.open} onOpenChange={(o) => !o && setSummary(s => ({ ...s, open: false }))}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Importação concluída</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between border-b pb-2">
+              <span className="text-muted-foreground">Total de linhas no arquivo</span>
+              <span className="font-semibold">{summary.total}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Linhas válidas</span>
+              <span className="font-semibold text-green-600">{summary.valid}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Linhas com erro</span>
+              <span className="font-semibold text-red-600">{summary.error}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Duplicadas no arquivo</span>
+              <span className="font-semibold text-yellow-600">{summary.dup_file}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Com dados a atualizar</span>
+              <span className="font-semibold text-blue-600">{summary.update}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Sem alterações</span>
+              <span className="font-semibold">{summary.nochange}</span>
+            </div>
+            <div className="flex justify-between border-t pt-2 mt-2">
+              <span className="text-muted-foreground">Selecionadas para processar</span>
+              <span className="font-semibold">{summary.selected}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Ignoradas pelo servidor</span>
+              <span className="font-semibold">{summary.skipped}</span>
+            </div>
+            <div className="flex justify-between border-t pt-2 mt-2">
+              <span className="font-semibold text-primary">Registros importados</span>
+              <span className="font-bold text-primary text-lg">{summary.imported}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="font-semibold text-blue-700">Registros atualizados</span>
+              <span className="font-bold text-blue-700 text-lg">{summary.updated}</span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setSummary(s => ({ ...s, open: false }))}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
+
   );
 };
 
