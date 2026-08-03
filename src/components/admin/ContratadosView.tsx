@@ -53,34 +53,40 @@ interface ExistingContratado {
 type ReviewCounts = { total: number; valid: number; error: number; dup_file: number; dup_base: number; update: number; nochange: number };
 
 /** Interpreta períodos: intervalos ("a", "até", "-"), meses isolados, conector "e" e listas mistas. */
+const MES_ANO = String.raw`(\d{1,2})\s*\/\s*(\d{4})`;
+const CONECTOR = String.raw`(?:a|à|as|às|at[ée]|-|–|—|→|~)`;
+const PERIODO_RE = new RegExp(`${MES_ANO}(?:\\s*${CONECTOR}\\s*${MES_ANO})?`, 'gi');
+
+const normalizaTexto = (raw: string) =>
+  raw.replace(/[\u00A0\u2007\u202F\t]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+const ordinal = (mesAno: string) => {
+  const [m, y] = mesAno.split('/');
+  return Number(y) * 12 + Number(m);
+};
+
 export const parsePeriodosClient = (input: unknown): { inicio: string; fim: string }[] => {
-  const raw = String(input ?? '').trim();
+  const raw = normalizaTexto(String(input ?? ''));
   if (!raw) return [];
   const out: { inicio: string; fim: string }[] = [];
   const seen = new Set<string>();
   raw.split(/[;|\n]+/).map(s => s.trim()).filter(Boolean).forEach(chunk => {
-    chunk.split(/\s+e\s+|,/i).map(s => s.trim()).filter(Boolean).forEach(part => {
-      const range = part.match(/(\d{1,2})\s*\/\s*(\d{4})\s*(?:a|at[ée]|-|–|—|→)\s*(\d{1,2})\s*\/\s*(\d{4})/i);
-      if (range) {
-        const inicio = `${range[1].padStart(2, '0')}/${range[2]}`;
-        const fim = `${range[3].padStart(2, '0')}/${range[4]}`;
-        const k = `${inicio}-${fim}`;
-        if (!seen.has(k)) { seen.add(k); out.push({ inicio, fim }); }
-        return;
-      }
-      const single = part.match(/(\d{1,2})\s*\/\s*(\d{4})/);
-      if (single) {
-        const mes = `${single[1].padStart(2, '0')}/${single[2]}`;
-        const k = `${mes}-${mes}`;
-        if (!seen.has(k)) { seen.add(k); out.push({ inicio: mes, fim: mes }); }
-      }
-    });
+    PERIODO_RE.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = PERIODO_RE.exec(chunk)) !== null) {
+      let inicio = `${m[1].padStart(2, '0')}/${m[2]}`;
+      let fim = m[3] && m[4] ? `${m[3].padStart(2, '0')}/${m[4]}` : inicio;
+      if (ordinal(fim) < ordinal(inicio)) { const t = inicio; inicio = fim; fim = t; }
+      const k = `${inicio}-${fim}`;
+      if (!seen.has(k)) { seen.add(k); out.push({ inicio, fim }); }
+    }
   });
   return out;
 };
 
 const fmtPeriodos = (ps: { inicio: string; fim: string }[]): string =>
-  ps.map(p => (p.inicio === p.fim ? p.inicio : `${p.inicio}–${p.fim}`)).join(', ');
+  ps.map(p => (p.inicio === p.fim ? p.inicio : `${p.inicio} a ${p.fim}`)).join(', ');
+
 
 const normTxt = (v: unknown) => String(v ?? '').trim().toUpperCase().replace(/\s+/g, ' ');
 const normNum = (v: unknown) => {
