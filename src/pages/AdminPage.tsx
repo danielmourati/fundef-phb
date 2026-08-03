@@ -669,15 +669,33 @@ const AdminPage = () => {
           return;
         }
 
-        // 2) cpf+matrícula já existe na base
+        // 2) cpf+matrícula já existe na base → comparar e propor atualização
         if (existingByCpf.get(cpf)?.has(mat)) {
-          items.push({
-            line: ln, status: 'dup_base',
-            reason: 'Cadastro já existe (cpf+matrícula) na base',
-            data: clean, selectable: true,
-          });
+          const existing = existingByPair.get(pairKey);
+          const diffs = existing ? computeDiffs(existing, clean) : [];
+          seenPair.set(pairKey, ln);
+          if (!existing) {
+            items.push({
+              line: ln, status: 'dup_base',
+              reason: 'Cadastro já existe (cpf+matrícula) na base',
+              data: clean, selectable: true,
+            });
+          } else if (diffs.length === 0) {
+            items.push({
+              line: ln, status: 'nochange',
+              reason: 'Cadastro já existe e não há campos alterados',
+              data: clean, selectable: false,
+            });
+          } else {
+            items.push({
+              line: ln, status: 'update',
+              reason: `Cadastro existente — ${diffs.length} campo(s) a atualizar`,
+              data: clean, selectable: true, diffs,
+            });
+          }
           return;
         }
+
 
         // 3) CPF repetido no arquivo, matrícula diferente → 2º vínculo válido
         if (seenCpf.has(cpf)) {
