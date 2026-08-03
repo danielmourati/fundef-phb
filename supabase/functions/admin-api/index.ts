@@ -1038,8 +1038,23 @@ if (req.method === "POST" && action === "backfill_import_logs") {
   const end = new Date(`${dateStr}T23:59:59.999Z`);
   const GAP_MS = 15 * 60 * 1000;
 
-  type Rec = { nome: string; cpf: string | null; matricula: string | null; created_at: string; updated_at: string };
+  type Rec = { id: string; nome: string; cpf: string | null; matricula: string | null; created_at: string; updated_at: string };
   const created: string[] = [];
+
+  const FIELD_LABELS: Record<string, string> = {
+    nome: "Nome",
+    cpf: "CPF",
+    matricula: "Matrícula",
+    data_nascimento: "Data de nascimento",
+    carga_horaria: "Carga horária",
+    cargo: "Cargo",
+    total_cotas: "Total de cotas",
+    status: "Status",
+    vinculo: "Vínculo",
+    vinculo_inicio: "Início do vínculo",
+    vinculo_fim: "Fim do vínculo",
+    role: "Perfil",
+  };
 
   for (const tipo of ["efetivo", "contratado"] as const) {
     const table = tipo === "efetivo" ? "professors" : "contratados";
@@ -1048,7 +1063,7 @@ if (req.method === "POST" && action === "backfill_import_logs") {
     while (true) {
       const { data, error } = await supabase
         .from(table)
-        .select("nome, cpf, matricula, created_at, updated_at")
+        .select("id, nome, cpf, matricula, created_at, updated_at")
         .or(`created_at.gte.${start.toISOString()},updated_at.gte.${start.toISOString()}`)
         .lte("updated_at", end.toISOString())
         .order("updated_at", { ascending: true })
@@ -1079,21 +1094,64 @@ if (req.method === "POST" && action === "backfill_import_logs") {
     if (current.length) batches.push(current);
 
     for (const batch of batches) {
+      const at = batch[batch.length - 1].updated_at;
+      const winStart = new Date(new Date(batch[0].updated_at).getTime() - 2000).toISOString();
+      const winEnd = new Date(new Date(at).getTime() + 2000).toISOString();
+
+      // histórico de alterações (valor antigo → novo) gravado pelo gatilho
+      const changesBy = new Map<string, { field: string; label: string; current: string | null; incoming: string }[]>();
+      let cOffset = 0;
+      while (true) {
+        const { data: chg, error: chgErr } = await supabase
+          .from("record_changes")
+          .select("record_id, field, old_value, new_value")
+          .eq("table_name", table)
+          .gte("changed_at", winStart)
+          .lte("changed_at", winEnd)
+          .order("changed_at", { ascending: true })
+          .range(cOffset, cOffset + 999);
+        if (chgErr) throw chgErr;
+        const chunk = chg || [];
+        for (const c of chunk) {
+          const list = changesBy.get(c.record_id) || [];
+          list.push({
+            field: c.field,
+            label: FIELD_LABELS[c.field] || c.field,
+            current: c.old_value,
+            incoming: c.new_value ?? "",
+          });
+          changesBy.set(c.record_id, list);
+        }
+        if (chunk.length < 1000) break;
+        cOffset += 1000;
+      }
+
       const items = batch.map((r, i) => {
         const isNew = Math.abs(new Date(r.created_at).getTime() - new Date(r.updated_at).getTime()) < 2000;
+        const diffs = changesBy.get(r.id) || [];
         return {
           line: i + 1,
           status: isNew ? "valid" : "update",
           reason: isNew ? "Registro criado" : "Registro atualizado",
           data: { nome: r.nome, cpf: r.cpf || "", matricula: r.matricula || "" },
           selectable: false,
+          ...(isNew || !diffs.length ? {} : { diffs }),
         };
       });
       const imported = items.filter((i) => i.status === "valid").length;
       const updated = items.length - imported;
-      const at = batch[batch.length - 1].updated_at;
 
-      // evita duplicar backfill do mesmo lote
+      const payload = {
+        tipo,
+        file_name: null,
+        executed_by: user.sub || null,
+        executed_by_name: "Histórico reconstruído",
+        counts: { total: items.length, valid: imported, update: updated, imported, updated, reconstructed: 1 },
+        items: items.slice(0, 5000),
+        created_at: at,
+      };
+
+      // se o lote já foi reconstruído antes, atualiza (para incorporar o histórico)
       const { data: exists } = await supabase
         .from("import_logs")
         .select("id")
@@ -1102,21 +1160,24 @@ if (req.method === "POST" && action === "backfill_import_logs") {
         .gte("created_at", new Date(new Date(at).getTime() - GAP_MS).toISOString())
         .lte("created_at", new Date(new Date(at).getTime() + GAP_MS).toISOString())
         .limit(1);
-      if (exists && exists.length) continue;
 
-      const { data: ins, error: insErr } = await supabase.from("import_logs").insert({
-        tipo,
-        file_name: null,
-        executed_by: user.sub || null,
-        executed_by_name: "Histórico reconstruído",
-        counts: { total: items.length, valid: imported, update: updated, imported, updated, reconstructed: 1 },
-        items: items.slice(0, 5000),
-        created_at: at,
-      }).select("id").single();
+      if (exists && exists.length) {
+        const { error: updErr } = await supabase
+          .from("import_logs")
+          .update({ counts: payload.counts, items: payload.items })
+          .eq("id", exists[0].id);
+        if (updErr) throw updErr;
+        created.push(exists[0].id);
+        continue;
+      }
+
+      const { data: ins, error: insErr } = await supabase.from("import_logs")
+        .insert(payload).select("id").single();
       if (insErr) throw insErr;
       if (ins?.id) created.push(ins.id);
     }
   }
+
 
   return jsonResponse({ success: true, created: created.length, date: dateStr });
 }
