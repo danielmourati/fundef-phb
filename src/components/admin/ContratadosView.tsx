@@ -404,7 +404,7 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
     }
   };
 
-  const runImport = async (insertRows: Record<string, string>[], updateRows: Record<string, string>[], counts: ReviewCounts) => {
+  const runImport = async (insertRows: Record<string, string>[], updateRows: Record<string, string>[], counts: ReviewCounts, meta?: { items: ReviewItem[]; fileName?: string; selectedLines?: number[] }) => {
     if (insertRows.length === 0 && updateRows.length === 0) { toast.error('Nenhuma linha selecionada.'); return; }
     setImporting(true);
     const totalOps = insertRows.length + updateRows.length;
@@ -429,7 +429,22 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
         done += chunk.length;
         setImportProgress({ current: done, total: totalOps });
       }
-      setSummary({ open: true, ...counts, selected: totalOps, imported, updated, skipped });
+      setSummary({
+        open: true, ...counts, selected: totalOps, imported, updated, skipped,
+        fileName: meta?.fileName, items: meta?.items, selectedLines: meta?.selectedLines,
+      });
+      if (meta?.items?.length) {
+        await logImport({
+          token,
+          tipo: 'contratado',
+          fileName: meta.fileName,
+          executedByName: professor?.nome || professor?.email || 'Administrador',
+          counts: { ...counts, selected: totalOps, imported, updated, skipped },
+          items: meta.items,
+          selectedLines: meta.selectedLines,
+        });
+      }
+
       const parts: string[] = [];
       if (imported > 0) parts.push(`${imported} importado(s)`);
       if (updated > 0) parts.push(`${updated} atualizado(s)`);
