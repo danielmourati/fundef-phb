@@ -134,6 +134,8 @@ interface Props { token: string; search: string; onCountChange?: (n: number) => 
 
 
 const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
+  const { professor } = useAuth();
+
   const authHeaders = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
   const apiCall = useCallback(async (method: 'GET' | 'POST' | 'PUT' | 'DELETE', action: string, body?: unknown) => {
