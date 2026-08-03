@@ -303,13 +303,21 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
       // Base atual (para duplicidade e comparação)
       const { data: allData } = await apiCall('GET', 'contratados_all');
       const existing: ExistingContratado[] = Array.isArray(allData) ? allData : [];
-      const byCpf = new Map<string, ExistingContratado>();
+      const byCpfMat = new Map<string, ExistingContratado>();
+      const cpfCount = new Map<string, number>();
+      const byCpfSingle = new Map<string, ExistingContratado>();
       const byNameMat = new Map<string, ExistingContratado>();
       existing.forEach(c => {
         const cpf = (c.cpf || '').replace(/\D/g, '');
-        if (cpf.length === 11) byCpf.set(cpf, c);
-        byNameMat.set(`${(c.nome || '').toUpperCase()}|${(c.matricula || '').trim()}`, c);
+        const mat = (c.matricula || '').trim();
+        if (cpf.length === 11) {
+          byCpfMat.set(`${cpf}|${mat}`, c);
+          cpfCount.set(cpf, (cpfCount.get(cpf) || 0) + 1);
+          byCpfSingle.set(cpf, c);
+        }
+        byNameMat.set(`${(c.nome || '').toUpperCase()}|${mat}`, c);
       });
+
 
       const seen = new Map<string, number>();
       const items: ReviewItem[] = [];
