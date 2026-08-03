@@ -611,6 +611,14 @@ const AdminPage = () => {
         if (!existingByCpf.has(c)) existingByCpf.set(c, new Set());
         existingByCpf.get(c)!.add(m);
       });
+      // Registro completo existente por cpf|matrícula (para comparação atual x novo)
+      const existingByPair = new Map<string, Professor>();
+      allProfs.forEach(p => {
+        const c = (p.cpf || '').replace(/\D/g, '');
+        if (!c) return;
+        existingByPair.set(`${c}|${(p.matricula || '').trim()}`, p);
+      });
+
       const existingMatToCpf = new Map<string, string>();
       allProfs.forEach(p => {
         const m = (p.matricula || '').trim();
