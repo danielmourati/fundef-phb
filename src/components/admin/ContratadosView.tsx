@@ -350,18 +350,24 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
           return;
         }
 
-        const key = clean.cpf ? `cpf:${clean.cpf}` : `nm:${nome.toUpperCase()}|${mat}`;
+        // Mesmo CPF pode ter múltiplas matrículas: a chave inclui a matrícula
+        const key = clean.cpf ? `cpf:${clean.cpf}|${mat}` : `nm:${nome.toUpperCase()}|${mat}`;
         if (seen.has(key)) {
           items.push({
             line: ln, status: 'dup_file',
-            reason: `Linha duplicada (${clean.cpf ? 'CPF' : 'nome+matrícula'}) — 1ª ocorrência linha ${seen.get(key)}`,
-            data: clean, selectable: false,
+            reason: `Linha duplicada (${clean.cpf ? 'CPF + matrícula' : 'nome + matrícula'}) — 1ª ocorrência linha ${seen.get(key)}`,
+            data: clean, selectable: true,
           });
           return;
         }
         seen.set(key, ln);
 
-        const found = clean.cpf ? byCpf.get(clean.cpf) : byNameMat.get(`${nome.toUpperCase()}|${mat}`);
+        const found = clean.cpf
+          ? (mat
+              ? byCpfMat.get(`${clean.cpf}|${mat}`)
+              : (cpfCount.get(clean.cpf) === 1 ? byCpfSingle.get(clean.cpf) : undefined))
+          : byNameMat.get(`${nome.toUpperCase()}|${mat}`);
+
         if (found) {
           const diffs = computeDiffs(found, clean, periodos);
           if (diffs.length === 0) {
