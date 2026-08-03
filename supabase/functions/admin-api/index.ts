@@ -13,6 +13,38 @@ function normCarga(v: unknown): string | null {
   return m ? m[0] : null;
 }
 
+// Interpreta "03/2002 a 05/2002;07/2002;11/2004 e 12/2004;05/2004 a 07/2004 e 10/2004"
+// Separadores de período: ";" "|" quebra de linha. Também aceita " e " como separador
+// entre trechos e intervalos com "a"/"até"/"-"/"–"/"→". Mês isolado => inicio = fim.
+export function parsePeriodos(input: unknown): Array<{ inicio: string; fim: string }> {
+  const raw = String(input ?? "").trim();
+  if (!raw) return [];
+  const out: Array<{ inicio: string; fim: string }> = [];
+  const seen = new Set<string>();
+  const chunks = raw.split(/[;|\n]+/).map((s) => s.trim()).filter(Boolean);
+  for (const chunk of chunks) {
+    // divide "X a Y e Z" em trechos por " e " / " , "
+    const parts = chunk.split(/\s+e\s+|,/i).map((s) => s.trim()).filter(Boolean);
+    for (const part of parts) {
+      const range = part.match(/(\d{1,2})\s*\/\s*(\d{4})\s*(?:a|at[ée]|-|–|—|→)\s*(\d{1,2})\s*\/\s*(\d{4})/i);
+      if (range) {
+        const inicio = `${range[1].padStart(2, "0")}/${range[2]}`;
+        const fim = `${range[3].padStart(2, "0")}/${range[4]}`;
+        const k = `${inicio}-${fim}`;
+        if (!seen.has(k)) { seen.add(k); out.push({ inicio, fim }); }
+        continue;
+      }
+      const single = part.match(/(\d{1,2})\s*\/\s*(\d{4})/);
+      if (single) {
+        const mes = `${single[1].padStart(2, "0")}/${single[2]}`;
+        const k = `${mes}-${mes}`;
+        if (!seen.has(k)) { seen.add(k); out.push({ inicio: mes, fim: mes }); }
+      }
+    }
+  }
+  return out;
+}
+
 async function verifyToken(authHeader: string | null): Promise<{ sub: string; role: string } | null> {
   if (!authHeader?.startsWith("Bearer ")) return null;
   const token = authHeader.slice(7);
