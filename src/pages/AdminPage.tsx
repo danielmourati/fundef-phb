@@ -2104,8 +2104,34 @@ const AdminPage = () => {
               <span className="font-bold text-blue-700 text-lg">{summaryDialog.updated}</span>
             </div>
           </div>
-          <DialogFooter>
-            <Button onClick={() => setSummaryDialog(s => ({ ...s, open: false }))}>Fechar</Button>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setSummaryDialog(s => ({ ...s, open: false }))}>Fechar</Button>
+            {!!summaryDialog.items?.length && (
+              <Button
+                onClick={() => downloadImportReportPdf({
+                  kind: 'efetivo',
+                  fileName: summaryDialog.fileName,
+                  user: professor?.nome || professor?.email || 'Administrador',
+                  counts: {
+                    total: summaryDialog.totalLines,
+                    valid: summaryDialog.validRows,
+                    error: summaryDialog.errorRows,
+                    dup_file: summaryDialog.dupFileRows,
+                    dup_base: summaryDialog.dupBaseRows,
+                    update: summaryDialog.updateRows,
+                    nochange: summaryDialog.noChangeRows,
+                    selected: summaryDialog.selectedRows,
+                    imported: summaryDialog.imported,
+                    updated: summaryDialog.updated,
+                    skipped: summaryDialog.skipped,
+                  },
+                  items: summaryDialog.items!,
+                  selectedLines: summaryDialog.selectedLines,
+                })}
+              >
+                <FileDown className="w-4 h-4" /> Baixar relatório (PDF)
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -2116,6 +2142,7 @@ const AdminPage = () => {
         onCancel={() => { setReviewState({ open: false, items: [], validRows: [] }); toast.info('Importação cancelada.'); }}
         onConfirm={async (rows, selectedItems) => {
           const allItems = reviewState.items;
+          const fileName = reviewState.fileName;
           setReviewState({ open: false, items: [], validRows: [] });
           const reviewCounts = {
             total: allItems.length,
@@ -2128,9 +2155,14 @@ const AdminPage = () => {
           };
           const updateRows = selectedItems.filter(i => i.status === 'update').map(i => i.data);
           const insertRows = selectedItems.filter(i => i.status !== 'update').map(i => i.data);
-          await runImport(insertRows, reviewCounts, updateRows);
+          await runImport(insertRows, reviewCounts, updateRows, {
+            items: allItems,
+            fileName,
+            selectedLines: selectedItems.map(i => i.line),
+          });
         }}
       />
+
 
       <Dialog open={!!selectedReport} onOpenChange={(v) => { if (!v) setSelectedReport(null); }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
