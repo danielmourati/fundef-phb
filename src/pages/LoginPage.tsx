@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertCircle, MessageCircle, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, MessageCircle, Eye, EyeOff, Check } from 'lucide-react';
 
 import loginImage from '@/assets/login-education.jpg';
 import logoSeduc from '@/assets/logo-seduc-azul.png';
@@ -101,13 +101,28 @@ const LoginPage = () => {
           </div>
 
           {/* Tipo de vínculo */}
-          <Tabs value={tipo} onValueChange={(v) => setTipo(v as 'efetivo' | 'contratado')} className="w-full">
-            <TabsList className="grid grid-cols-2 w-full h-11 rounded-lg">
-              <TabsTrigger value="efetivo" className="rounded-md">Professor Efetivo</TabsTrigger>
-              <TabsTrigger value="contratado" className="rounded-md">Professor Contratado</TabsTrigger>
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Selecione o seu vínculo profissional:</Label>
+            <Tabs value={tipo} onValueChange={(v) => setTipo(v as 'efetivo' | 'contratado')} className="w-full">
+              <TabsList className="grid grid-cols-2 w-full h-11 rounded-lg bg-slate-100 p-1">
+                <TabsTrigger
+                  value="efetivo"
+                  className="rounded-md gap-1.5 bg-slate-100 text-slate-600 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:font-bold data-[state=active]:shadow-sm"
+                >
+                  {tipo === 'efetivo' && <Check className="w-4 h-4 shrink-0" />}
+                  Servidor Efetivo
+                </TabsTrigger>
+                <TabsTrigger
+                  value="contratado"
+                  className="rounded-md gap-1.5 bg-slate-100 text-slate-600 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:font-bold data-[state=active]:shadow-sm"
+                >
+                  {tipo === 'contratado' && <Check className="w-4 h-4 shrink-0" />}
+                  Servidor Contratado
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
 
-            </TabsList>
-          </Tabs>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
