@@ -292,7 +292,9 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setImportFileName(file.name);
     setImporting(true);
+
     setImportProgress({ current: 0, total: 0 });
     try {
       const text = await file.text();
