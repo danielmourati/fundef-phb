@@ -45,8 +45,8 @@ export async function logImport(params: {
       return { ok: false };
     }
     return { ok: true };
-
   } catch (e) {
     console.error('Falha ao registrar histórico de importação', e);
+    return { ok: false };
   }
 }
