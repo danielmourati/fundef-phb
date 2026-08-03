@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { FileDown, Eye, Loader2, Search, ArrowRight, Trash2 } from 'lucide-react';
+import { FileDown, Eye, Loader2, Search, ArrowRight, Trash2, History } from 'lucide-react';
 import { toast } from 'sonner';
 import { downloadImportReportPdf, type ImportKind } from '@/lib/importReportPdf';
 import type { ReviewItem } from '@/components/ImportReviewDialog';
@@ -41,6 +41,7 @@ const ImportLogsView = ({ token }: { token: string }) => {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [loading, setLoading] = useState(true);
+  const [backfilling, setBackfilling] = useState(false);
   const [detail, setDetail] = useState<LogDetail | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
