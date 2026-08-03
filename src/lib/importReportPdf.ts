@@ -157,7 +157,7 @@ export function generateImportReportPdf(payload: ImportReportPayload): jsPDF {
 
   // Tabela Campo / Dado antigo / Dado atualizado
   const COL_X = [M + 12, M + 152, M + 340];
-  const COL_W = [132, 180, maxW - 340 + M - M - 12];
+  const COL_W = [140, 188, maxW - 340];
   const COL_LABELS = ['Campo', 'Dado antigo', 'Dado atualizado'];
 
   const diffTableHeader = () => {
