@@ -457,7 +457,9 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
             </Button>
             <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={() => fileRef.current?.click()} disabled={importing}>
               {importing ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Upload className="w-4 h-4 mr-1.5" />}
-              Importar (CSV)
+              {importing && importProgress.total > 0
+                ? `Importando ${importProgress.current}/${importProgress.total}`
+                : 'Importar (CSV)'}
             </Button>
             <Button size="sm" variant="destructive" className="flex-1 sm:flex-none" onClick={() => setClearOpen(true)}>
               <Trash className="w-4 h-4 mr-1.5" /> Limpar Base
