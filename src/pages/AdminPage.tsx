@@ -496,13 +496,16 @@ const AdminPage = () => {
 
   const runImport = async (rows: Record<string, string>[], reviewCounts?: { total: number; valid: number; error: number; dup_file: number; dup_base: number }, updateRows: Record<string, string>[] = []) => {
 
-    if (rows.length === 0) { toast.error('Nenhuma linha selecionada.'); return; }
+    if (rows.length === 0 && updateRows.length === 0) { toast.error('Nenhuma linha selecionada.'); return; }
     setImporting(true);
-    setImportProgress({ current: 0, total: rows.length });
+    const totalOps = rows.length + updateRows.length;
+    setImportProgress({ current: 0, total: totalOps });
     try {
       const CHUNK = 100;
       let imported = 0;
       let skipped = 0;
+      let updated = 0;
+      let done = 0;
       for (let i = 0; i < rows.length; i += CHUNK) {
         const chunk = rows.slice(i, i + CHUNK);
         const { data, error } = await apiCall('POST', 'import_csv', { rows: chunk });
@@ -512,21 +515,40 @@ const AdminPage = () => {
         }
         imported += data?.count || 0;
         skipped += data?.skipped || 0;
-        setImportProgress({ current: Math.min(i + chunk.length, rows.length), total: rows.length });
+        done += chunk.length;
+        setImportProgress({ current: done, total: totalOps });
+      }
+      for (let i = 0; i < updateRows.length; i += CHUNK) {
+        const chunk = updateRows.slice(i, i + CHUNK);
+        const { data, error } = await apiCall('POST', 'update_professors_csv', { rows: chunk });
+        if (error || data?.error) {
+          toast.error(data?.error || 'Erro ao atualizar registros existentes.');
+          return;
+        }
+        updated += data?.updated || 0;
+        done += chunk.length;
+        setImportProgress({ current: done, total: totalOps });
       }
       setSummaryDialog({
         open: true,
-        totalLines: reviewCounts?.total || rows.length,
+        totalLines: reviewCounts?.total || totalOps,
         validRows: reviewCounts?.valid || rows.length,
         errorRows: reviewCounts?.error || 0,
         dupFileRows: reviewCounts?.dup_file || 0,
         dupBaseRows: reviewCounts?.dup_base || 0,
-        selectedRows: rows.length,
+        updateRows: reviewCounts?.update || updateRows.length,
+        noChangeRows: reviewCounts?.nochange || 0,
+        selectedRows: totalOps,
         imported,
+        updated,
         skipped,
       });
-      toast.success(`${imported} professor(es) importado(s)!${skipped > 0 ? ` (${skipped} ignorada(s) pelo servidor)` : ''}`);
+      const parts: string[] = [];
+      if (imported > 0) parts.push(`${imported} importado(s)`);
+      if (updated > 0) parts.push(`${updated} atualizado(s)`);
+      toast.success(`${parts.join(' · ') || 'Nenhuma alteração'}${skipped > 0 ? ` (${skipped} ignorada(s) pelo servidor)` : ''}`);
       fetchData();
+
     } catch (err: any) {
       toast.error(`Erro ao importar: ${err?.message || err}`);
     } finally {
