@@ -183,14 +183,93 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setImporting(true);
+    setImportProgress({ current: 0, total: 0 });
     try {
       const text = await file.text();
       const parsed = parseCSV(text);
       if (parsed.length === 0) { toast.error('CSV vazio ou inválido.'); return; }
-      const { data, error } = await apiCall('POST', 'import_contratados', { rows: parsed });
-      if (error || data?.error) { toast.error(data?.error || 'Erro ao importar.'); return; }
-      toast.success(`${data?.count || 0} contratado(s) importado(s). ${data?.skipped || 0} ignorado(s).`);
-      fetchRows();
+
+      // Conferência de colunas
+      const headers = Object.keys(parsed[0] || {});
+      const missing = TEMPLATE_COLUMNS.filter(c => !headers.includes(c));
+      const extras = headers.filter(h => h && !TEMPLATE_COLUMNS.includes(h as typeof TEMPLATE_COLUMNS[number]));
+      if (missing.length > 0 || extras.length > 0) {
+        const parts: string[] = [];
+        if (missing.length) parts.push(`Faltando: ${missing.join(', ')}`);
+        if (extras.length) parts.push(`Não reconhecidas: ${extras.join(', ')}`);
+        toast.error(`Colunas divergentes do modelo. ${parts.join(' | ')}. Baixe o "Modelo CSV" e ajuste o arquivo.`);
+        return;
+      }
+
+      // Base atual (para duplicidade e comparação)
+      const { data: allData } = await apiCall('GET', 'contratados_all');
+      const existing: ExistingContratado[] = Array.isArray(allData) ? allData : [];
+      const byCpf = new Map<string, ExistingContratado>();
+      const byNameMat = new Map<string, ExistingContratado>();
+      existing.forEach(c => {
+        const cpf = (c.cpf || '').replace(/\D/g, '');
+        if (cpf.length === 11) byCpf.set(cpf, c);
+        byNameMat.set(`${(c.nome || '').toUpperCase()}|${(c.matricula || '').trim()}`, c);
+      });
+
+      const seen = new Map<string, number>();
+      const items: ReviewItem[] = [];
+
+      parsed.forEach((r, idx) => {
+        const ln = idx + 2;
+        const clean: Record<string, string> = {};
+        TEMPLATE_COLUMNS.forEach(k => {
+          const v = String(r[k] ?? '').trim();
+          clean[k] = /^[-–—]+$/.test(v) ? '' : v;
+        });
+        const nome = clean.nome;
+        const cpfRaw = clean.cpf;
+        const cpf = cpfRaw.replace(/\D/g, '');
+        clean.cpf = cpf.length === 11 ? cpf : '';
+        const mat = clean.matricula;
+        const periodos = parsePeriodosClient(clean.periodos);
+        clean.periodos_fmt = fmtPeriodos(periodos);
+
+        if (!nome) {
+          items.push({ line: ln, status: 'error', reason: 'Nome ausente', data: clean, selectable: false });
+          return;
+        }
+        if (cpf && cpf.length !== 11) {
+          items.push({ line: ln, status: 'error', reason: `CPF inválido "${cpfRaw}" (${cpf.length} dígitos)`, data: clean, selectable: false });
+          return;
+        }
+        if (clean.total_cotas && isNaN(Number(clean.total_cotas.replace(/\D/g, '')))) {
+          items.push({ line: ln, status: 'error', reason: `total_cotas não numérico "${clean.total_cotas}"`, data: clean, selectable: false });
+          return;
+        }
+
+        const key = clean.cpf ? `cpf:${clean.cpf}` : `nm:${nome.toUpperCase()}|${mat}`;
+        if (seen.has(key)) {
+          items.push({
+            line: ln, status: 'dup_file',
+            reason: `Linha duplicada (${clean.cpf ? 'CPF' : 'nome+matrícula'}) — 1ª ocorrência linha ${seen.get(key)}`,
+            data: clean, selectable: false,
+          });
+          return;
+        }
+        seen.set(key, ln);
+
+        const found = clean.cpf ? byCpf.get(clean.cpf) : byNameMat.get(`${nome.toUpperCase()}|${mat}`);
+        if (found) {
+          const diffs = computeDiffs(found, clean, periodos);
+          if (diffs.length === 0) {
+            items.push({ line: ln, status: 'nochange', reason: 'Cadastro já existe e não há campos alterados', data: clean, selectable: false });
+          } else {
+            items.push({ line: ln, status: 'update', reason: `Cadastro existente — ${diffs.length} campo(s) a atualizar`, data: clean, selectable: true, diffs });
+          }
+          return;
+        }
+
+        items.push({ line: ln, status: 'valid', reason: 'Novo contratado', data: clean, selectable: true });
+      });
+
+      setReviewItems(items);
+      setReviewOpen(true);
     } catch (err: any) {
       toast.error(`Erro: ${err?.message || err}`);
     } finally {
@@ -198,6 +277,45 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
       if (fileRef.current) fileRef.current.value = '';
     }
   };
+
+  const runImport = async (insertRows: Record<string, string>[], updateRows: Record<string, string>[], counts: ReviewCounts) => {
+    if (insertRows.length === 0 && updateRows.length === 0) { toast.error('Nenhuma linha selecionada.'); return; }
+    setImporting(true);
+    const totalOps = insertRows.length + updateRows.length;
+    setImportProgress({ current: 0, total: totalOps });
+    try {
+      const CHUNK = 50;
+      let imported = 0, updated = 0, skipped = 0, done = 0;
+      for (let i = 0; i < insertRows.length; i += CHUNK) {
+        const chunk = insertRows.slice(i, i + CHUNK);
+        const { data, error } = await apiCall('POST', 'import_contratados', { rows: chunk });
+        if (error || data?.error) { toast.error(data?.error || 'Erro na importação.'); return; }
+        imported += data?.count || 0;
+        skipped += data?.skipped || 0;
+        done += chunk.length;
+        setImportProgress({ current: done, total: totalOps });
+      }
+      for (let i = 0; i < updateRows.length; i += CHUNK) {
+        const chunk = updateRows.slice(i, i + CHUNK);
+        const { data, error } = await apiCall('POST', 'update_contratados_csv', { rows: chunk });
+        if (error || data?.error) { toast.error(data?.error || 'Erro ao atualizar registros existentes.'); return; }
+        updated += data?.updated || 0;
+        done += chunk.length;
+        setImportProgress({ current: done, total: totalOps });
+      }
+      setSummary({ open: true, ...counts, selected: totalOps, imported, updated, skipped });
+      const parts: string[] = [];
+      if (imported > 0) parts.push(`${imported} importado(s)`);
+      if (updated > 0) parts.push(`${updated} atualizado(s)`);
+      toast.success(`${parts.join(' · ') || 'Nenhuma alteração'}${skipped > 0 ? ` (${skipped} ignorada(s) pelo servidor)` : ''}`);
+      fetchRows();
+    } catch (err: any) {
+      toast.error(`Erro ao importar: ${err?.message || err}`);
+    } finally {
+      setImporting(false);
+    }
+  };
+
 
   const downloadTemplate = () => {
     const example = [
