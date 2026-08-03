@@ -11,7 +11,7 @@ interface Professor {
   matricula: string;
   vinculo_inicio: string | null;
   vinculo_fim: string | null;
-  carga_horaria?: number | null;
+  carga_horaria?: string | number | null;
   total_cotas: number | null;
   cargo?: string | null;
   role: string;

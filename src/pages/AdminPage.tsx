@@ -45,7 +45,7 @@ interface Professor {
   data_nascimento: string | null;
   vinculo_inicio: string | null;
   vinculo_fim: string | null;
-  carga_horaria: number | null;
+  carga_horaria: string | number | null;
   total_cotas: number | null;
   cargo?: string | null;
   role: string;
@@ -82,7 +82,7 @@ interface ProfLookup { id: string; nome: string; matricula: string | null; cargo
 
 const emptyProfessor = {
   nome: '', cpf: '', matricula: '', senha: '', data_nascimento: '',
-  vinculo_inicio: '', vinculo_fim: '', carga_horaria: 0, total_cotas: 0, cargo: '', role: 'professor',
+  vinculo_inicio: '', vinculo_fim: '', carga_horaria: '', total_cotas: 0, cargo: '', role: 'professor',
   status: 'ATIVO',
 };
 
@@ -279,7 +279,7 @@ const AdminPage = () => {
       data_nascimento: maskDate(p.data_nascimento || ''),
       vinculo_inicio: maskDate(p.vinculo_inicio || ''),
       vinculo_fim: maskDate(p.vinculo_fim || ''),
-      carga_horaria: p.carga_horaria || 0,
+      carga_horaria: p.carga_horaria != null ? String(p.carga_horaria) : '',
       total_cotas: p.total_cotas || 0,
       cargo: (p as any).cargo || '',
       role: p.role || 'professor',
@@ -385,8 +385,8 @@ const AdminPage = () => {
       const isDateLike = (t: string) =>
         /^\d{2}\/\d{2}\/\d{4}$/.test(t) || /^\d{2}\/\d{4}$/.test(t);
       // Aceita "40H" e variações com letra O em vez de zero (ex: "4OH")
-      const cargaRe = /(\d{1,2}[O0]?|[O0]?\d{1,2})\s*H\b/i;
-      const normalizeCarga = (s: string) => s.replace(/O/gi, '0');
+      const cargaRe = /((?:\d{1,2}[O0]?|[O0]?\d{1,2})(?:\s*\/\s*(?:\d{1,2}[O0]?|[O0]?\d{1,2}))*)\s*H\b/i;
+      const normalizeCarga = (s: string) => s.replace(/O/gi, '0').replace(/\s+/g, '');
       for (const y of ys) {
         const parts = linesMap.get(y)!.sort((a, b) => a.x - b.x).map(p => p.s);
         const lineText = parts.join(' ').replace(/\s+/g, ' ').trim();
@@ -451,7 +451,7 @@ const AdminPage = () => {
     { field: 'nome', label: 'Nome', kind: 'text' },
     { field: 'vinculo_inicio', label: 'Admissão', kind: 'date' },
     { field: 'vinculo_fim', label: 'Aposentadoria', kind: 'date' },
-    { field: 'carga_horaria', label: 'Carga horária', kind: 'number' },
+    { field: 'carga_horaria', label: 'Carga horária', kind: 'text' },
     { field: 'total_cotas', label: 'Total de cotas', kind: 'number' },
     { field: 'cargo', label: 'Cargo', kind: 'text' },
     { field: 'status', label: 'Status', kind: 'text' },
@@ -1742,7 +1742,7 @@ const AdminPage = () => {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Carga Horária (semanal)</Label>
-                <Input type="number" value={formData.carga_horaria} onChange={e => setFormData({ ...formData, carga_horaria: parseInt(e.target.value) || 0 })} placeholder="40" />
+                <Input value={formData.carga_horaria} onChange={e => setFormData({ ...formData, carga_horaria: e.target.value.replace(/[^0-9/]/g, '') })} placeholder="40 ou 20/40" />
               </div>
               <div className="space-y-2">
                 <Label>Total de Cotas</Label>
