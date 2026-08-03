@@ -36,7 +36,90 @@ const emptyForm = {
 
 const TEMPLATE_COLUMNS = ['nome', 'matricula', 'cpf', 'periodos', 'carga_horaria', 'total_cotas', 'cargo', 'vinculo'] as const;
 
+interface ExistingContratado {
+  id: string;
+  nome: string;
+  cpf: string | null;
+  matricula: string | null;
+  carga_horaria: string | number | null;
+  total_cotas: number | null;
+  cargo: string | null;
+  vinculo: string | null;
+  status: string | null;
+  periodos: { inicio: string; fim: string }[];
+}
+
+type ReviewCounts = { total: number; valid: number; error: number; dup_file: number; dup_base: number; update: number; nochange: number };
+
+/** Interpreta períodos: intervalos ("a", "até", "-"), meses isolados, conector "e" e listas mistas. */
+export const parsePeriodosClient = (input: unknown): { inicio: string; fim: string }[] => {
+  const raw = String(input ?? '').trim();
+  if (!raw) return [];
+  const out: { inicio: string; fim: string }[] = [];
+  const seen = new Set<string>();
+  raw.split(/[;|\n]+/).map(s => s.trim()).filter(Boolean).forEach(chunk => {
+    chunk.split(/\s+e\s+|,/i).map(s => s.trim()).filter(Boolean).forEach(part => {
+      const range = part.match(/(\d{1,2})\s*\/\s*(\d{4})\s*(?:a|at[ée]|-|–|—|→)\s*(\d{1,2})\s*\/\s*(\d{4})/i);
+      if (range) {
+        const inicio = `${range[1].padStart(2, '0')}/${range[2]}`;
+        const fim = `${range[3].padStart(2, '0')}/${range[4]}`;
+        const k = `${inicio}-${fim}`;
+        if (!seen.has(k)) { seen.add(k); out.push({ inicio, fim }); }
+        return;
+      }
+      const single = part.match(/(\d{1,2})\s*\/\s*(\d{4})/);
+      if (single) {
+        const mes = `${single[1].padStart(2, '0')}/${single[2]}`;
+        const k = `${mes}-${mes}`;
+        if (!seen.has(k)) { seen.add(k); out.push({ inicio: mes, fim: mes }); }
+      }
+    });
+  });
+  return out;
+};
+
+const fmtPeriodos = (ps: { inicio: string; fim: string }[]): string =>
+  ps.map(p => (p.inicio === p.fim ? p.inicio : `${p.inicio}–${p.fim}`)).join(', ');
+
+const normTxt = (v: unknown) => String(v ?? '').trim().toUpperCase().replace(/\s+/g, ' ');
+const normNum = (v: unknown) => {
+  const d = String(v ?? '').replace(/\D/g, '');
+  return d ? String(parseInt(d, 10)) : '';
+};
+
+const DIFF_FIELDS: { field: string; label: string; kind: 'text' | 'number' }[] = [
+  { field: 'nome', label: 'Nome', kind: 'text' },
+  { field: 'matricula', label: 'Matrícula', kind: 'text' },
+  { field: 'carga_horaria', label: 'Carga horária', kind: 'text' },
+  { field: 'total_cotas', label: 'Total de cotas', kind: 'number' },
+  { field: 'cargo', label: 'Cargo', kind: 'text' },
+  { field: 'vinculo', label: 'Vínculo', kind: 'text' },
+];
+
+const computeDiffs = (
+  existing: ExistingContratado,
+  incoming: Record<string, string>,
+  periodos: { inicio: string; fim: string }[],
+): ReviewDiff[] => {
+  const diffs: ReviewDiff[] = [];
+  DIFF_FIELDS.forEach(({ field, label, kind }) => {
+    const raw = String(incoming[field] ?? '').trim();
+    if (!raw) return; // vazio ou traços não sobrescrevem
+    const inc = kind === 'number' ? normNum(raw) : normTxt(raw);
+    const cur = kind === 'number' ? normNum((existing as any)[field]) : normTxt((existing as any)[field]);
+    if (!inc || cur === inc) return;
+    diffs.push({ field, label, current: String((existing as any)[field] ?? ''), incoming: raw });
+  });
+  if (periodos.length > 0) {
+    const cur = fmtPeriodos(existing.periodos || []);
+    const inc = fmtPeriodos(periodos);
+    if (cur !== inc) diffs.push({ field: 'periodos', label: 'Períodos', current: cur || '—', incoming: inc });
+  }
+  return diffs;
+};
+
 interface Props { token: string; search: string; onCountChange?: (n: number) => void }
+
 
 const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
   const authHeaders = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
