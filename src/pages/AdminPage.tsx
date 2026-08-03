@@ -547,25 +547,53 @@ const AdminPage = () => {
         done += chunk.length;
         setImportProgress({ current: done, total: totalOps });
       }
+      const counts = {
+        total: reviewCounts?.total || totalOps,
+        valid: reviewCounts?.valid ?? rows.length,
+        error: reviewCounts?.error || 0,
+        dup_file: reviewCounts?.dup_file || 0,
+        dup_base: reviewCounts?.dup_base || 0,
+        update: reviewCounts?.update ?? updateRows.length,
+        nochange: reviewCounts?.nochange || 0,
+        selected: totalOps,
+        imported,
+        updated,
+        skipped,
+      };
       setSummaryDialog({
         open: true,
-        totalLines: reviewCounts?.total || totalOps,
-        validRows: reviewCounts?.valid || rows.length,
-        errorRows: reviewCounts?.error || 0,
-        dupFileRows: reviewCounts?.dup_file || 0,
-        dupBaseRows: reviewCounts?.dup_base || 0,
-        updateRows: reviewCounts?.update || updateRows.length,
-        noChangeRows: reviewCounts?.nochange || 0,
+        totalLines: counts.total,
+        validRows: counts.valid,
+        errorRows: counts.error,
+        dupFileRows: counts.dup_file,
+        dupBaseRows: counts.dup_base,
+        updateRows: counts.update,
+        noChangeRows: counts.nochange,
         selectedRows: totalOps,
         imported,
         updated,
         skipped,
+        fileName: meta?.fileName,
+        items: meta?.items,
+        selectedLines: meta?.selectedLines,
       });
+      if (meta?.items?.length) {
+        await logImport({
+          token: token!,
+          tipo: 'efetivo',
+          fileName: meta.fileName,
+          executedByName: professor?.nome || professor?.email || 'Administrador',
+          counts,
+          items: meta.items,
+          selectedLines: meta.selectedLines,
+        });
+      }
       const parts: string[] = [];
       if (imported > 0) parts.push(`${imported} importado(s)`);
       if (updated > 0) parts.push(`${updated} atualizado(s)`);
       toast.success(`${parts.join(' · ') || 'Nenhuma alteração'}${skipped > 0 ? ` (${skipped} ignorada(s) pelo servidor)` : ''}`);
       fetchData();
+
 
     } catch (err: any) {
       toast.error(`Erro ao importar: ${err?.message || err}`);
