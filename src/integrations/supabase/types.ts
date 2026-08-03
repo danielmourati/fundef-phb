@@ -220,6 +220,42 @@ export type Database = {
         }
         Relationships: []
       }
+      import_logs: {
+        Row: {
+          counts: Json
+          created_at: string
+          executed_by: string | null
+          executed_by_name: string | null
+          file_name: string | null
+          id: string
+          items: Json
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          counts?: Json
+          created_at?: string
+          executed_by?: string | null
+          executed_by_name?: string | null
+          file_name?: string | null
+          id?: string
+          items?: Json
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          counts?: Json
+          created_at?: string
+          executed_by?: string | null
+          executed_by_name?: string | null
+          file_name?: string | null
+          id?: string
+          items?: Json
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       login_attempts: {
         Row: {
           cpf: string | null
