@@ -190,7 +190,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ total: count || 0 });
     }
 
-    // GET all contratados (chunked, for import dedup)
+    // GET all contratados (chunked, for import dedup / comparação)
     if (req.method === "GET" && action === "contratados_all") {
       const all: any[] = [];
       const chunk = 1000;
@@ -198,12 +198,19 @@ Deno.serve(async (req) => {
       while (true) {
         const { data, error } = await supabase
           .from("contratados")
-          .select("id, cpf, matricula")
+          .select("id, nome, cpf, matricula, carga_horaria, total_cotas, cargo, vinculo, status, contratado_periodos(inicio, fim, ordem)")
           .order("nome")
           .range(from, from + chunk - 1);
         if (error) throw error;
         if (!data || data.length === 0) break;
-        all.push(...data);
+        all.push(...data.map((r: any) => ({
+          ...r,
+          periodos: (r.contratado_periodos || [])
+            .slice()
+            .sort((a: any, b: any) => (a.ordem || 0) - (b.ordem || 0))
+            .map((p: any) => ({ inicio: p.inicio, fim: p.fim })),
+          contratado_periodos: undefined,
+        })));
         if (data.length < chunk) break;
         from += chunk;
       }
