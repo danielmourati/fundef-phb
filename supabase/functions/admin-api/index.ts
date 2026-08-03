@@ -1029,6 +1029,98 @@ if (req.method === "POST" && action === "log_import") {
   return jsonResponse({ success: true, id: data?.id });
 }
 
+// POST backfill_import_logs — reconstrói o histórico a partir dos próprios dados
+if (req.method === "POST" && action === "backfill_import_logs") {
+  const body = await req.json().catch(() => ({}));
+  const dateStr = (body?.date && String(body.date).slice(0, 10)) ||
+    new Date().toISOString().slice(0, 10);
+  const start = new Date(`${dateStr}T00:00:00.000Z`);
+  const end = new Date(`${dateStr}T23:59:59.999Z`);
+  const GAP_MS = 15 * 60 * 1000;
+
+  type Rec = { nome: string; cpf: string | null; matricula: string | null; created_at: string; updated_at: string };
+  const created: string[] = [];
+
+  for (const tipo of ["efetivo", "contratado"] as const) {
+    const table = tipo === "efetivo" ? "professors" : "contratados";
+    const rows: Rec[] = [];
+    let offset = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from(table)
+        .select("nome, cpf, matricula, created_at, updated_at")
+        .or(`created_at.gte.${start.toISOString()},updated_at.gte.${start.toISOString()}`)
+        .lte("updated_at", end.toISOString())
+        .order("updated_at", { ascending: true })
+        .range(offset, offset + 999);
+      if (error) throw error;
+      const chunk = (data || []) as Rec[];
+      rows.push(...chunk);
+      if (chunk.length < 1000) break;
+      offset += 1000;
+    }
+    const inDay = rows.filter((r) => {
+      const u = new Date(r.updated_at).getTime();
+      const c = new Date(r.created_at).getTime();
+      return (u >= start.getTime() && u <= end.getTime()) || (c >= start.getTime() && c <= end.getTime());
+    });
+    if (!inDay.length) continue;
+
+    // agrupa em lotes por proximidade temporal
+    const batches: Rec[][] = [];
+    let current: Rec[] = [];
+    let last = 0;
+    for (const r of inDay) {
+      const t = new Date(r.updated_at).getTime();
+      if (current.length && t - last > GAP_MS) { batches.push(current); current = []; }
+      current.push(r);
+      last = t;
+    }
+    if (current.length) batches.push(current);
+
+    for (const batch of batches) {
+      const items = batch.map((r, i) => {
+        const isNew = Math.abs(new Date(r.created_at).getTime() - new Date(r.updated_at).getTime()) < 2000;
+        return {
+          line: i + 1,
+          status: isNew ? "valid" : "update",
+          reason: isNew ? "Registro criado" : "Registro atualizado",
+          data: { nome: r.nome, cpf: r.cpf || "", matricula: r.matricula || "" },
+          selectable: false,
+        };
+      });
+      const imported = items.filter((i) => i.status === "valid").length;
+      const updated = items.length - imported;
+      const at = batch[batch.length - 1].updated_at;
+
+      // evita duplicar backfill do mesmo lote
+      const { data: exists } = await supabase
+        .from("import_logs")
+        .select("id")
+        .eq("tipo", tipo)
+        .is("file_name", null)
+        .gte("created_at", new Date(new Date(at).getTime() - GAP_MS).toISOString())
+        .lte("created_at", new Date(new Date(at).getTime() + GAP_MS).toISOString())
+        .limit(1);
+      if (exists && exists.length) continue;
+
+      const { data: ins, error: insErr } = await supabase.from("import_logs").insert({
+        tipo,
+        file_name: null,
+        executed_by: user.sub || null,
+        executed_by_name: "Histórico reconstruído",
+        counts: { total: items.length, valid: imported, update: updated, imported, updated, reconstructed: 1 },
+        items: items.slice(0, 5000),
+        created_at: at,
+      }).select("id").single();
+      if (insErr) throw insErr;
+      if (ins?.id) created.push(ins.id);
+    }
+  }
+
+  return jsonResponse({ success: true, created: created.length, date: dateStr });
+}
+
 // GET import_logs — lista paginada
 if (req.method === "GET" && action === "import_logs") {
   const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10) || 1);
