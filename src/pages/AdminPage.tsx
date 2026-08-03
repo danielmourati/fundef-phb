@@ -183,9 +183,13 @@ const AdminPage = () => {
     imported: number;
     updated: number;
     skipped: number;
+    fileName?: string;
+    items?: ReviewItem[];
+    selectedLines?: number[];
   }>({ open: false, totalLines: 0, validRows: 0, errorRows: 0, dupFileRows: 0, dupBaseRows: 0, updateRows: 0, noChangeRows: 0, selectedRows: 0, imported: 0, updated: 0, skipped: 0 });
 
-  const [reviewState, setReviewState] = useState<{ open: boolean; items: ReviewItem[]; validRows: Record<string, string>[] }>({ open: false, items: [], validRows: [] });
+  const [reviewState, setReviewState] = useState<{ open: boolean; items: ReviewItem[]; validRows: Record<string, string>[]; fileName?: string }>({ open: false, items: [], validRows: [] });
+
 
   const authHeaders = { Authorization: `Bearer ${token}` };
 
