@@ -394,6 +394,70 @@ Deno.serve(async (req) => {
 
     }
 
+    // POST atualizar contratados existentes via CSV (não sobrescreve com vazio/traços)
+    if (req.method === "POST" && action === "update_contratados_csv") {
+      const body = await req.json();
+      const rows = (Array.isArray(body.rows) ? body.rows : []) as Array<Record<string, string>>;
+      const isDash = (v: unknown) => /^[-–—]+$/.test(String(v ?? "").trim());
+      let updated = 0;
+      let notFound = 0;
+      for (const raw0 of rows) {
+        const r: Record<string, string> = {};
+        for (const [k, v] of Object.entries(raw0)) r[k] = isDash(v) ? "" : String(v ?? "");
+        const cpf = (r.cpf || "").replace(/\D/g, "");
+        const nome = String(r.nome || "").trim();
+        const mat = String(r.matricula || "").trim();
+
+        // localiza o registro: por CPF quando houver, senão por nome+matrícula
+        let query = supabase.from("contratados").select("id").limit(1);
+        if (cpf.length === 11) {
+          query = query.eq("cpf", cpf);
+        } else if (nome) {
+          query = query.eq("nome", nome);
+          query = mat ? query.eq("matricula", mat) : query.is("matricula", null);
+        } else { notFound++; continue; }
+        const { data: found, error: fe } = await query;
+        if (fe) throw fe;
+        const target = found?.[0];
+        if (!target) { notFound++; continue; }
+
+        const patch: Record<string, unknown> = {};
+        if (nome) patch.nome = nome;
+        if (mat) patch.matricula = mat;
+        const cargaVal = normCarga(r.carga_horaria);
+        if (cargaVal) patch.carga_horaria = cargaVal;
+        const cotas = String(r.total_cotas || "").replace(/\D/g, "");
+        if (cotas) patch.total_cotas = Math.min(parseInt(cotas), 2147483647);
+        const cargo = String(r.cargo || "").trim();
+        if (cargo) patch.cargo = cargo;
+        const vinculo = String(r.vinculo || "").trim();
+        if (vinculo) patch.vinculo = vinculo;
+        const status = String(r.status || "").trim();
+        if (status) patch.status = status.toUpperCase();
+
+        if (Object.keys(patch).length > 0) {
+          patch.updated_at = new Date().toISOString();
+          const { error: ue } = await supabase.from("contratados").update(patch).eq("id", target.id);
+          if (ue) throw ue;
+        }
+
+        // Períodos: quando o arquivo traz períodos, substitui a lista
+        const periodos = parsePeriodos(r.periodos ?? r.periodo_trabalhado ?? r.periodo);
+        if (periodos.length > 0) {
+          const { error: de } = await supabase.from("contratado_periodos").delete().eq("contratado_id", target.id);
+          if (de) throw de;
+          const { error: ie } = await supabase.from("contratado_periodos").insert(
+            periodos.map((p, i) => ({ contratado_id: target.id, inicio: p.inicio, fim: p.fim, ordem: i }))
+          );
+          if (ie) throw ie;
+        }
+        updated++;
+      }
+      return jsonResponse({ success: true, updated, not_found: notFound });
+    }
+
+
+
     // POST clear contratados (requires admin password)
     if ((req.method === "DELETE" || req.method === "POST") && action === "delete_all_contratados") {
       let cbody: { password?: string } = {};
