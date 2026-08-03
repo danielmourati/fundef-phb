@@ -1714,6 +1714,11 @@ const AdminPage = () => {
             <ContratadosView token={token} search={searchQuery} onCountChange={setTotalContratados} />
           )}
 
+          {activeTab === 'import_logs' && token && (
+            <ImportLogsView token={token} />
+          )}
+
+
           {activeTab === 'settings' && (
             <Card>
               <CardContent className="p-6 space-y-6">
