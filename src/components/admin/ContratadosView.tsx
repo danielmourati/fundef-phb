@@ -790,9 +790,27 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
               <span className="font-bold text-blue-700 text-lg">{summary.updated}</span>
             </div>
           </div>
-          <DialogFooter>
-            <Button onClick={() => setSummary(s => ({ ...s, open: false }))}>Fechar</Button>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setSummary(s => ({ ...s, open: false }))}>Fechar</Button>
+            {!!summary.items?.length && (
+              <Button onClick={() => downloadImportReportPdf({
+                kind: 'contratado',
+                fileName: summary.fileName,
+                user: professor?.nome || professor?.email || 'Administrador',
+                counts: {
+                  total: summary.total, valid: summary.valid, error: summary.error,
+                  dup_file: summary.dup_file, dup_base: summary.dup_base, update: summary.update,
+                  nochange: summary.nochange, selected: summary.selected,
+                  imported: summary.imported, updated: summary.updated, skipped: summary.skipped,
+                },
+                items: summary.items!,
+                selectedLines: summary.selectedLines,
+              })}>
+                <FileDown className="w-4 h-4" /> Baixar relatório (PDF)
+              </Button>
+            )}
           </DialogFooter>
+
         </DialogContent>
       </Dialog>
     </Card>
