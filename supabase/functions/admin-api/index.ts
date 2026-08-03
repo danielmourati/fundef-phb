@@ -332,19 +332,16 @@ Deno.serve(async (req) => {
           });
         }
         const g = groups.get(key)!;
-        // Períodos vindos como "MM/AAAA a MM/AAAA; MM/AAAA a MM/AAAA" ou já parseados
-        const periodosStr = String(r.periodos || r.periodo_trabalhado || r.periodo || "").trim();
-        if (periodosStr) {
-          const parts = periodosStr.split(/[;|\n]/).map(s => s.trim()).filter(Boolean);
-          for (const p of parts) {
-            const m = p.match(/(\d{2}\/\d{4})\s*(?:a|até|-|→)\s*(\d{2}\/\d{4})/i);
-            if (m) g.periodos.push({ inicio: m[1], fim: m[2] });
-          }
+        // Períodos: aceita intervalos, meses isolados, conector "e" e listas mistas
+        for (const p of parsePeriodos(r.periodos ?? r.periodo_trabalhado ?? r.periodo)) {
+          if (!g.periodos.some(x => x.inicio === p.inicio && x.fim === p.fim)) g.periodos.push(p);
         }
         // Aceita também array de períodos já estruturado
         if (Array.isArray(r.periodos_parsed)) {
           for (const p of r.periodos_parsed) {
-            if (p?.inicio && p?.fim) g.periodos.push({ inicio: p.inicio, fim: p.fim });
+            if (p?.inicio && p?.fim && !g.periodos.some(x => x.inicio === p.inicio && x.fim === p.fim)) {
+              g.periodos.push({ inicio: p.inicio, fim: p.fim });
+            }
           }
         }
       }
@@ -368,15 +365,18 @@ Deno.serve(async (req) => {
         );
       }
 
-      const toInsert: any[] = [];
-      const orderedGroups: Array<{ periodos: Array<{ inicio: string; fim: string }> }> = [];
-      for (const g of all) {
-        if (existSet.has(g.key)) { skipped++; continue; }
+      const pending = all.filter(g => {
+        if (existSet.has(g.key)) { skipped++; return false; }
+        return true;
+      });
+      // Hashes gerados em paralelo (bcrypt sequencial estourava o tempo limite)
+      const hashes = await Promise.all(pending.map(async (g) => {
         const plain = g.cpf || g.data.matricula || "123456";
-        const { data: hashData } = await supabase.rpc("hash_password", { plain_password: plain });
-        toInsert.push({ ...g.data, senha_hash: hashData, role: "professor" });
-        orderedGroups.push({ periodos: g.periodos });
-      }
+        const { data } = await supabase.rpc("hash_password", { plain_password: plain });
+        return data as string;
+      }));
+      const toInsert = pending.map((g, i) => ({ ...g.data, senha_hash: hashes[i], role: "professor" }));
+      const orderedGroups = pending.map(g => ({ periodos: g.periodos }));
       if (toInsert.length === 0) return jsonResponse({ success: true, count: 0, skipped });
       const { data: inserted, error } = await supabase.from("contratados").insert(toInsert).select("id");
       if (error) throw error;
