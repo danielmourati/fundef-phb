@@ -327,6 +327,9 @@ Deno.serve(async (req) => {
           groups.set(key, {
             key,
             cpf,
+            matricula,
+            nome,
+
             data: {
               nome,
               cpf,
