@@ -274,6 +274,28 @@ const ImportLogsView = ({ token }: { token: string }) => {
                       <Button size="icon" variant="ghost" title="Ver detalhes" disabled={busyId === r.id} onClick={() => handleView(r)}>
                         <Eye className="w-4 h-4" />
                       </Button>
+                      <label>
+                        <input
+                          type="file"
+                          accept=".csv,text/csv"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            e.target.value = '';
+                            if (f) handleBaselineFile(r.id, f);
+                          }}
+                        />
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          asChild
+                          title="Enviar planilha anterior (dados antigos)"
+                          disabled={busyId === r.id}
+                        >
+                          <span><Upload className="w-4 h-4" /></span>
+                        </Button>
+                      </label>
+
                       <Button size="icon" variant="ghost" title="Baixar PDF" disabled={busyId === r.id} onClick={() => handleDownload(r)}>
                         {busyId === r.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
                       </Button>
