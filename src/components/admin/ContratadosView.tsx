@@ -12,6 +12,7 @@ import { Pagination, PaginationContent, PaginationItem, PaginationLink, Paginati
 import { Plus, Pencil, Trash2, Upload, Download, Trash, Loader2, Calendar, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { maskCPF, unmaskCPF, isValidCPF, maskDate, isValidDate, maskMonthYear, isValidMonthYear, STATUS_OPTIONS, statusBadgeClass, normalizeStatus } from '@/lib/masks';
+import { ImportReviewDialog, type ReviewItem, type ReviewDiff } from '@/components/ImportReviewDialog';
 
 interface Periodo { id?: string; inicio: string; fim: string; ordem?: number }
 interface Contratado {
@@ -36,7 +37,90 @@ const emptyForm = {
 
 const TEMPLATE_COLUMNS = ['nome', 'matricula', 'cpf', 'periodos', 'carga_horaria', 'total_cotas', 'cargo', 'vinculo'] as const;
 
+interface ExistingContratado {
+  id: string;
+  nome: string;
+  cpf: string | null;
+  matricula: string | null;
+  carga_horaria: string | number | null;
+  total_cotas: number | null;
+  cargo: string | null;
+  vinculo: string | null;
+  status: string | null;
+  periodos: { inicio: string; fim: string }[];
+}
+
+type ReviewCounts = { total: number; valid: number; error: number; dup_file: number; dup_base: number; update: number; nochange: number };
+
+/** Interpreta períodos: intervalos ("a", "até", "-"), meses isolados, conector "e" e listas mistas. */
+export const parsePeriodosClient = (input: unknown): { inicio: string; fim: string }[] => {
+  const raw = String(input ?? '').trim();
+  if (!raw) return [];
+  const out: { inicio: string; fim: string }[] = [];
+  const seen = new Set<string>();
+  raw.split(/[;|\n]+/).map(s => s.trim()).filter(Boolean).forEach(chunk => {
+    chunk.split(/\s+e\s+|,/i).map(s => s.trim()).filter(Boolean).forEach(part => {
+      const range = part.match(/(\d{1,2})\s*\/\s*(\d{4})\s*(?:a|at[ée]|-|–|—|→)\s*(\d{1,2})\s*\/\s*(\d{4})/i);
+      if (range) {
+        const inicio = `${range[1].padStart(2, '0')}/${range[2]}`;
+        const fim = `${range[3].padStart(2, '0')}/${range[4]}`;
+        const k = `${inicio}-${fim}`;
+        if (!seen.has(k)) { seen.add(k); out.push({ inicio, fim }); }
+        return;
+      }
+      const single = part.match(/(\d{1,2})\s*\/\s*(\d{4})/);
+      if (single) {
+        const mes = `${single[1].padStart(2, '0')}/${single[2]}`;
+        const k = `${mes}-${mes}`;
+        if (!seen.has(k)) { seen.add(k); out.push({ inicio: mes, fim: mes }); }
+      }
+    });
+  });
+  return out;
+};
+
+const fmtPeriodos = (ps: { inicio: string; fim: string }[]): string =>
+  ps.map(p => (p.inicio === p.fim ? p.inicio : `${p.inicio}–${p.fim}`)).join(', ');
+
+const normTxt = (v: unknown) => String(v ?? '').trim().toUpperCase().replace(/\s+/g, ' ');
+const normNum = (v: unknown) => {
+  const d = String(v ?? '').replace(/\D/g, '');
+  return d ? String(parseInt(d, 10)) : '';
+};
+
+const DIFF_FIELDS: { field: string; label: string; kind: 'text' | 'number' }[] = [
+  { field: 'nome', label: 'Nome', kind: 'text' },
+  { field: 'matricula', label: 'Matrícula', kind: 'text' },
+  { field: 'carga_horaria', label: 'Carga horária', kind: 'text' },
+  { field: 'total_cotas', label: 'Total de cotas', kind: 'number' },
+  { field: 'cargo', label: 'Cargo', kind: 'text' },
+  { field: 'vinculo', label: 'Vínculo', kind: 'text' },
+];
+
+const computeDiffs = (
+  existing: ExistingContratado,
+  incoming: Record<string, string>,
+  periodos: { inicio: string; fim: string }[],
+): ReviewDiff[] => {
+  const diffs: ReviewDiff[] = [];
+  DIFF_FIELDS.forEach(({ field, label, kind }) => {
+    const raw = String(incoming[field] ?? '').trim();
+    if (!raw) return; // vazio ou traços não sobrescrevem
+    const inc = kind === 'number' ? normNum(raw) : normTxt(raw);
+    const cur = kind === 'number' ? normNum((existing as any)[field]) : normTxt((existing as any)[field]);
+    if (!inc || cur === inc) return;
+    diffs.push({ field, label, current: String((existing as any)[field] ?? ''), incoming: raw });
+  });
+  if (periodos.length > 0) {
+    const cur = fmtPeriodos(existing.periodos || []);
+    const inc = fmtPeriodos(periodos);
+    if (cur !== inc) diffs.push({ field: 'periodos', label: 'Períodos', current: cur || '—', incoming: inc });
+  }
+  return diffs;
+};
+
 interface Props { token: string; search: string; onCountChange?: (n: number) => void }
+
 
 const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
   const authHeaders = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
@@ -146,6 +230,15 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
   // ============== Import CSV ==============
   const fileRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
+  const [summary, setSummary] = useState({
+    open: false, total: 0, valid: 0, error: 0, dup_file: 0, dup_base: 0, update: 0, nochange: 0,
+    selected: 0, imported: 0, updated: 0, skipped: 0,
+  });
+
+
 
   const parseCSV = (text: string): Record<string, string>[] => {
     const lines = text.split('\n').map(l => l.replace(/\r$/, '')).filter(l => l.trim());
@@ -183,14 +276,93 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setImporting(true);
+    setImportProgress({ current: 0, total: 0 });
     try {
       const text = await file.text();
       const parsed = parseCSV(text);
       if (parsed.length === 0) { toast.error('CSV vazio ou inválido.'); return; }
-      const { data, error } = await apiCall('POST', 'import_contratados', { rows: parsed });
-      if (error || data?.error) { toast.error(data?.error || 'Erro ao importar.'); return; }
-      toast.success(`${data?.count || 0} contratado(s) importado(s). ${data?.skipped || 0} ignorado(s).`);
-      fetchRows();
+
+      // Conferência de colunas
+      const headers = Object.keys(parsed[0] || {});
+      const missing = TEMPLATE_COLUMNS.filter(c => !headers.includes(c));
+      const extras = headers.filter(h => h && !TEMPLATE_COLUMNS.includes(h as typeof TEMPLATE_COLUMNS[number]));
+      if (missing.length > 0 || extras.length > 0) {
+        const parts: string[] = [];
+        if (missing.length) parts.push(`Faltando: ${missing.join(', ')}`);
+        if (extras.length) parts.push(`Não reconhecidas: ${extras.join(', ')}`);
+        toast.error(`Colunas divergentes do modelo. ${parts.join(' | ')}. Baixe o "Modelo CSV" e ajuste o arquivo.`);
+        return;
+      }
+
+      // Base atual (para duplicidade e comparação)
+      const { data: allData } = await apiCall('GET', 'contratados_all');
+      const existing: ExistingContratado[] = Array.isArray(allData) ? allData : [];
+      const byCpf = new Map<string, ExistingContratado>();
+      const byNameMat = new Map<string, ExistingContratado>();
+      existing.forEach(c => {
+        const cpf = (c.cpf || '').replace(/\D/g, '');
+        if (cpf.length === 11) byCpf.set(cpf, c);
+        byNameMat.set(`${(c.nome || '').toUpperCase()}|${(c.matricula || '').trim()}`, c);
+      });
+
+      const seen = new Map<string, number>();
+      const items: ReviewItem[] = [];
+
+      parsed.forEach((r, idx) => {
+        const ln = idx + 2;
+        const clean: Record<string, string> = {};
+        TEMPLATE_COLUMNS.forEach(k => {
+          const v = String(r[k] ?? '').trim();
+          clean[k] = /^[-–—]+$/.test(v) ? '' : v;
+        });
+        const nome = clean.nome;
+        const cpfRaw = clean.cpf;
+        const cpf = cpfRaw.replace(/\D/g, '');
+        clean.cpf = cpf.length === 11 ? cpf : '';
+        const mat = clean.matricula;
+        const periodos = parsePeriodosClient(clean.periodos);
+        clean.periodos_fmt = fmtPeriodos(periodos);
+
+        if (!nome) {
+          items.push({ line: ln, status: 'error', reason: 'Nome ausente', data: clean, selectable: false });
+          return;
+        }
+        if (cpf && cpf.length !== 11) {
+          items.push({ line: ln, status: 'error', reason: `CPF inválido "${cpfRaw}" (${cpf.length} dígitos)`, data: clean, selectable: false });
+          return;
+        }
+        if (clean.total_cotas && isNaN(Number(clean.total_cotas.replace(/\D/g, '')))) {
+          items.push({ line: ln, status: 'error', reason: `total_cotas não numérico "${clean.total_cotas}"`, data: clean, selectable: false });
+          return;
+        }
+
+        const key = clean.cpf ? `cpf:${clean.cpf}` : `nm:${nome.toUpperCase()}|${mat}`;
+        if (seen.has(key)) {
+          items.push({
+            line: ln, status: 'dup_file',
+            reason: `Linha duplicada (${clean.cpf ? 'CPF' : 'nome+matrícula'}) — 1ª ocorrência linha ${seen.get(key)}`,
+            data: clean, selectable: false,
+          });
+          return;
+        }
+        seen.set(key, ln);
+
+        const found = clean.cpf ? byCpf.get(clean.cpf) : byNameMat.get(`${nome.toUpperCase()}|${mat}`);
+        if (found) {
+          const diffs = computeDiffs(found, clean, periodos);
+          if (diffs.length === 0) {
+            items.push({ line: ln, status: 'nochange', reason: 'Cadastro já existe e não há campos alterados', data: clean, selectable: false });
+          } else {
+            items.push({ line: ln, status: 'update', reason: `Cadastro existente — ${diffs.length} campo(s) a atualizar`, data: clean, selectable: true, diffs });
+          }
+          return;
+        }
+
+        items.push({ line: ln, status: 'valid', reason: 'Novo contratado', data: clean, selectable: true });
+      });
+
+      setReviewItems(items);
+      setReviewOpen(true);
     } catch (err: any) {
       toast.error(`Erro: ${err?.message || err}`);
     } finally {
@@ -198,6 +370,45 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
       if (fileRef.current) fileRef.current.value = '';
     }
   };
+
+  const runImport = async (insertRows: Record<string, string>[], updateRows: Record<string, string>[], counts: ReviewCounts) => {
+    if (insertRows.length === 0 && updateRows.length === 0) { toast.error('Nenhuma linha selecionada.'); return; }
+    setImporting(true);
+    const totalOps = insertRows.length + updateRows.length;
+    setImportProgress({ current: 0, total: totalOps });
+    try {
+      const CHUNK = 50;
+      let imported = 0, updated = 0, skipped = 0, done = 0;
+      for (let i = 0; i < insertRows.length; i += CHUNK) {
+        const chunk = insertRows.slice(i, i + CHUNK);
+        const { data, error } = await apiCall('POST', 'import_contratados', { rows: chunk });
+        if (error || data?.error) { toast.error(data?.error || 'Erro na importação.'); return; }
+        imported += data?.count || 0;
+        skipped += data?.skipped || 0;
+        done += chunk.length;
+        setImportProgress({ current: done, total: totalOps });
+      }
+      for (let i = 0; i < updateRows.length; i += CHUNK) {
+        const chunk = updateRows.slice(i, i + CHUNK);
+        const { data, error } = await apiCall('POST', 'update_contratados_csv', { rows: chunk });
+        if (error || data?.error) { toast.error(data?.error || 'Erro ao atualizar registros existentes.'); return; }
+        updated += data?.updated || 0;
+        done += chunk.length;
+        setImportProgress({ current: done, total: totalOps });
+      }
+      setSummary({ open: true, ...counts, selected: totalOps, imported, updated, skipped });
+      const parts: string[] = [];
+      if (imported > 0) parts.push(`${imported} importado(s)`);
+      if (updated > 0) parts.push(`${updated} atualizado(s)`);
+      toast.success(`${parts.join(' · ') || 'Nenhuma alteração'}${skipped > 0 ? ` (${skipped} ignorada(s) pelo servidor)` : ''}`);
+      fetchRows();
+    } catch (err: any) {
+      toast.error(`Erro ao importar: ${err?.message || err}`);
+    } finally {
+      setImporting(false);
+    }
+  };
+
 
   const downloadTemplate = () => {
     const example = [
@@ -246,7 +457,9 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
             </Button>
             <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={() => fileRef.current?.click()} disabled={importing}>
               {importing ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Upload className="w-4 h-4 mr-1.5" />}
-              Importar (CSV)
+              {importing && importProgress.total > 0
+                ? `Importando ${importProgress.current}/${importProgress.total}`
+                : 'Importar (CSV)'}
             </Button>
             <Button size="sm" variant="destructive" className="flex-1 sm:flex-none" onClick={() => setClearOpen(true)}>
               <Trash className="w-4 h-4 mr-1.5" /> Limpar Base
@@ -456,7 +669,84 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Revisão da importação */}
+      <ImportReviewDialog
+        open={reviewOpen}
+        items={reviewItems}
+        onCancel={() => { setReviewOpen(false); setReviewItems([]); toast.info('Importação cancelada.'); }}
+        onConfirm={async (_rows, selectedItems) => {
+          const allItems = reviewItems;
+          setReviewOpen(false);
+          const counts: ReviewCounts = {
+            total: allItems.length,
+            valid: allItems.filter(i => i.status === 'valid').length,
+            error: allItems.filter(i => i.status === 'error').length,
+            dup_file: allItems.filter(i => i.status === 'dup_file').length,
+            dup_base: allItems.filter(i => i.status === 'dup_base').length,
+            update: allItems.filter(i => i.status === 'update').length,
+            nochange: allItems.filter(i => i.status === 'nochange').length,
+          };
+          const updateRows = selectedItems.filter(i => i.status === 'update' || i.status === 'dup_base').map(i => i.data);
+          const insertRows = selectedItems.filter(i => i.status !== 'update' && i.status !== 'dup_base').map(i => i.data);
+          await runImport(insertRows, updateRows, counts);
+        }}
+      />
+
+      {/* Resumo da importação */}
+      <Dialog open={summary.open} onOpenChange={(o) => !o && setSummary(s => ({ ...s, open: false }))}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Importação concluída</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between border-b pb-2">
+              <span className="text-muted-foreground">Total de linhas no arquivo</span>
+              <span className="font-semibold">{summary.total}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Linhas válidas</span>
+              <span className="font-semibold text-green-600">{summary.valid}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Linhas com erro</span>
+              <span className="font-semibold text-red-600">{summary.error}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Duplicadas no arquivo</span>
+              <span className="font-semibold text-yellow-600">{summary.dup_file}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Com dados a atualizar</span>
+              <span className="font-semibold text-blue-600">{summary.update}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Sem alterações</span>
+              <span className="font-semibold">{summary.nochange}</span>
+            </div>
+            <div className="flex justify-between border-t pt-2 mt-2">
+              <span className="text-muted-foreground">Selecionadas para processar</span>
+              <span className="font-semibold">{summary.selected}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Ignoradas pelo servidor</span>
+              <span className="font-semibold">{summary.skipped}</span>
+            </div>
+            <div className="flex justify-between border-t pt-2 mt-2">
+              <span className="font-semibold text-primary">Registros importados</span>
+              <span className="font-bold text-primary text-lg">{summary.imported}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="font-semibold text-blue-700">Registros atualizados</span>
+              <span className="font-bold text-blue-700 text-lg">{summary.updated}</span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setSummary(s => ({ ...s, open: false }))}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
+
   );
 };
 

@@ -13,6 +13,38 @@ function normCarga(v: unknown): string | null {
   return m ? m[0] : null;
 }
 
+// Interpreta "03/2002 a 05/2002;07/2002;11/2004 e 12/2004;05/2004 a 07/2004 e 10/2004"
+// Separadores de período: ";" "|" quebra de linha. Também aceita " e " como separador
+// entre trechos e intervalos com "a"/"até"/"-"/"–"/"→". Mês isolado => inicio = fim.
+export function parsePeriodos(input: unknown): Array<{ inicio: string; fim: string }> {
+  const raw = String(input ?? "").trim();
+  if (!raw) return [];
+  const out: Array<{ inicio: string; fim: string }> = [];
+  const seen = new Set<string>();
+  const chunks = raw.split(/[;|\n]+/).map((s) => s.trim()).filter(Boolean);
+  for (const chunk of chunks) {
+    // divide "X a Y e Z" em trechos por " e " / " , "
+    const parts = chunk.split(/\s+e\s+|,/i).map((s) => s.trim()).filter(Boolean);
+    for (const part of parts) {
+      const range = part.match(/(\d{1,2})\s*\/\s*(\d{4})\s*(?:a|at[ée]|-|–|—|→)\s*(\d{1,2})\s*\/\s*(\d{4})/i);
+      if (range) {
+        const inicio = `${range[1].padStart(2, "0")}/${range[2]}`;
+        const fim = `${range[3].padStart(2, "0")}/${range[4]}`;
+        const k = `${inicio}-${fim}`;
+        if (!seen.has(k)) { seen.add(k); out.push({ inicio, fim }); }
+        continue;
+      }
+      const single = part.match(/(\d{1,2})\s*\/\s*(\d{4})/);
+      if (single) {
+        const mes = `${single[1].padStart(2, "0")}/${single[2]}`;
+        const k = `${mes}-${mes}`;
+        if (!seen.has(k)) { seen.add(k); out.push({ inicio: mes, fim: mes }); }
+      }
+    }
+  }
+  return out;
+}
+
 async function verifyToken(authHeader: string | null): Promise<{ sub: string; role: string } | null> {
   if (!authHeader?.startsWith("Bearer ")) return null;
   const token = authHeader.slice(7);
@@ -158,7 +190,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ total: count || 0 });
     }
 
-    // GET all contratados (chunked, for import dedup)
+    // GET all contratados (chunked, for import dedup / comparação)
     if (req.method === "GET" && action === "contratados_all") {
       const all: any[] = [];
       const chunk = 1000;
@@ -166,12 +198,19 @@ Deno.serve(async (req) => {
       while (true) {
         const { data, error } = await supabase
           .from("contratados")
-          .select("id, cpf, matricula")
+          .select("id, nome, cpf, matricula, carga_horaria, total_cotas, cargo, vinculo, status, contratado_periodos(inicio, fim, ordem)")
           .order("nome")
           .range(from, from + chunk - 1);
         if (error) throw error;
         if (!data || data.length === 0) break;
-        all.push(...data);
+        all.push(...data.map((r: any) => ({
+          ...r,
+          periodos: (r.contratado_periodos || [])
+            .slice()
+            .sort((a: any, b: any) => (a.ordem || 0) - (b.ordem || 0))
+            .map((p: any) => ({ inicio: p.inicio, fim: p.fim })),
+          contratado_periodos: undefined,
+        })));
         if (data.length < chunk) break;
         from += chunk;
       }
@@ -293,19 +332,16 @@ Deno.serve(async (req) => {
           });
         }
         const g = groups.get(key)!;
-        // Períodos vindos como "MM/AAAA a MM/AAAA; MM/AAAA a MM/AAAA" ou já parseados
-        const periodosStr = String(r.periodos || r.periodo_trabalhado || r.periodo || "").trim();
-        if (periodosStr) {
-          const parts = periodosStr.split(/[;|\n]/).map(s => s.trim()).filter(Boolean);
-          for (const p of parts) {
-            const m = p.match(/(\d{2}\/\d{4})\s*(?:a|até|-|→)\s*(\d{2}\/\d{4})/i);
-            if (m) g.periodos.push({ inicio: m[1], fim: m[2] });
-          }
+        // Períodos: aceita intervalos, meses isolados, conector "e" e listas mistas
+        for (const p of parsePeriodos(r.periodos ?? r.periodo_trabalhado ?? r.periodo)) {
+          if (!g.periodos.some(x => x.inicio === p.inicio && x.fim === p.fim)) g.periodos.push(p);
         }
         // Aceita também array de períodos já estruturado
         if (Array.isArray(r.periodos_parsed)) {
           for (const p of r.periodos_parsed) {
-            if (p?.inicio && p?.fim) g.periodos.push({ inicio: p.inicio, fim: p.fim });
+            if (p?.inicio && p?.fim && !g.periodos.some(x => x.inicio === p.inicio && x.fim === p.fim)) {
+              g.periodos.push({ inicio: p.inicio, fim: p.fim });
+            }
           }
         }
       }
@@ -329,15 +365,18 @@ Deno.serve(async (req) => {
         );
       }
 
-      const toInsert: any[] = [];
-      const orderedGroups: Array<{ periodos: Array<{ inicio: string; fim: string }> }> = [];
-      for (const g of all) {
-        if (existSet.has(g.key)) { skipped++; continue; }
+      const pending = all.filter(g => {
+        if (existSet.has(g.key)) { skipped++; return false; }
+        return true;
+      });
+      // Hashes gerados em paralelo (bcrypt sequencial estourava o tempo limite)
+      const hashes = await Promise.all(pending.map(async (g) => {
         const plain = g.cpf || g.data.matricula || "123456";
-        const { data: hashData } = await supabase.rpc("hash_password", { plain_password: plain });
-        toInsert.push({ ...g.data, senha_hash: hashData, role: "professor" });
-        orderedGroups.push({ periodos: g.periodos });
-      }
+        const { data } = await supabase.rpc("hash_password", { plain_password: plain });
+        return data as string;
+      }));
+      const toInsert = pending.map((g, i) => ({ ...g.data, senha_hash: hashes[i], role: "professor" }));
+      const orderedGroups = pending.map(g => ({ periodos: g.periodos }));
       if (toInsert.length === 0) return jsonResponse({ success: true, count: 0, skipped });
       const { data: inserted, error } = await supabase.from("contratados").insert(toInsert).select("id");
       if (error) throw error;
@@ -354,6 +393,70 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: true, count: inserted?.length || 0, skipped });
 
     }
+
+    // POST atualizar contratados existentes via CSV (não sobrescreve com vazio/traços)
+    if (req.method === "POST" && action === "update_contratados_csv") {
+      const body = await req.json();
+      const rows = (Array.isArray(body.rows) ? body.rows : []) as Array<Record<string, string>>;
+      const isDash = (v: unknown) => /^[-–—]+$/.test(String(v ?? "").trim());
+      let updated = 0;
+      let notFound = 0;
+      for (const raw0 of rows) {
+        const r: Record<string, string> = {};
+        for (const [k, v] of Object.entries(raw0)) r[k] = isDash(v) ? "" : String(v ?? "");
+        const cpf = (r.cpf || "").replace(/\D/g, "");
+        const nome = String(r.nome || "").trim();
+        const mat = String(r.matricula || "").trim();
+
+        // localiza o registro: por CPF quando houver, senão por nome+matrícula
+        let query = supabase.from("contratados").select("id").limit(1);
+        if (cpf.length === 11) {
+          query = query.eq("cpf", cpf);
+        } else if (nome) {
+          query = query.eq("nome", nome);
+          query = mat ? query.eq("matricula", mat) : query.is("matricula", null);
+        } else { notFound++; continue; }
+        const { data: found, error: fe } = await query;
+        if (fe) throw fe;
+        const target = found?.[0];
+        if (!target) { notFound++; continue; }
+
+        const patch: Record<string, unknown> = {};
+        if (nome) patch.nome = nome;
+        if (mat) patch.matricula = mat;
+        const cargaVal = normCarga(r.carga_horaria);
+        if (cargaVal) patch.carga_horaria = cargaVal;
+        const cotas = String(r.total_cotas || "").replace(/\D/g, "");
+        if (cotas) patch.total_cotas = Math.min(parseInt(cotas), 2147483647);
+        const cargo = String(r.cargo || "").trim();
+        if (cargo) patch.cargo = cargo;
+        const vinculo = String(r.vinculo || "").trim();
+        if (vinculo) patch.vinculo = vinculo;
+        const status = String(r.status || "").trim();
+        if (status) patch.status = status.toUpperCase();
+
+        if (Object.keys(patch).length > 0) {
+          patch.updated_at = new Date().toISOString();
+          const { error: ue } = await supabase.from("contratados").update(patch).eq("id", target.id);
+          if (ue) throw ue;
+        }
+
+        // Períodos: quando o arquivo traz períodos, substitui a lista
+        const periodos = parsePeriodos(r.periodos ?? r.periodo_trabalhado ?? r.periodo);
+        if (periodos.length > 0) {
+          const { error: de } = await supabase.from("contratado_periodos").delete().eq("contratado_id", target.id);
+          if (de) throw de;
+          const { error: ie } = await supabase.from("contratado_periodos").insert(
+            periodos.map((p, i) => ({ contratado_id: target.id, inicio: p.inicio, fim: p.fim, ordem: i }))
+          );
+          if (ie) throw ie;
+        }
+        updated++;
+      }
+      return jsonResponse({ success: true, updated, not_found: notFound });
+    }
+
+
 
     // POST clear contratados (requires admin password)
     if ((req.method === "DELETE" || req.method === "POST") && action === "delete_all_contratados") {
