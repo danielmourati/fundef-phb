@@ -177,6 +177,7 @@ export type Database = {
           matricula: string | null
           nome: string
           role: string
+          senha_definida: boolean
           senha_hash: string | null
           status: string
           total_cotas: number | null
@@ -193,6 +194,7 @@ export type Database = {
           matricula?: string | null
           nome: string
           role?: string
+          senha_definida?: boolean
           senha_hash?: string | null
           status?: string
           total_cotas?: number | null
@@ -209,6 +211,7 @@ export type Database = {
           matricula?: string | null
           nome?: string
           role?: string
+          senha_definida?: boolean
           senha_hash?: string | null
           status?: string
           total_cotas?: number | null
@@ -349,6 +352,7 @@ export type Database = {
           matricula: string | null
           nome: string
           role: string
+          senha_definida: boolean
           senha_hash: string | null
           status: string
           total_cotas: number | null
@@ -367,6 +371,7 @@ export type Database = {
           matricula?: string | null
           nome: string
           role?: string
+          senha_definida?: boolean
           senha_hash?: string | null
           status?: string
           total_cotas?: number | null
@@ -385,6 +390,7 @@ export type Database = {
           matricula?: string | null
           nome?: string
           role?: string
+          senha_definida?: boolean
           senha_hash?: string | null
           status?: string
           total_cotas?: number | null
