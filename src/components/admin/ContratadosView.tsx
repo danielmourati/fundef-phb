@@ -12,6 +12,7 @@ import { Pagination, PaginationContent, PaginationItem, PaginationLink, Paginati
 import { Plus, Pencil, Trash2, Upload, Download, Trash, Loader2, Calendar, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { maskCPF, unmaskCPF, isValidCPF, maskDate, isValidDate, maskMonthYear, isValidMonthYear, STATUS_OPTIONS, statusBadgeClass, normalizeStatus } from '@/lib/masks';
+import { ImportReviewDialog, type ReviewItem, type ReviewDiff } from '@/components/ImportReviewDialog';
 
 interface Periodo { id?: string; inicio: string; fim: string; ordem?: number }
 interface Contratado {
