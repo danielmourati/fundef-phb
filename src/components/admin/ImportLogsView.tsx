@@ -128,12 +128,19 @@ const ImportLogsView = ({ token }: { token: string }) => {
   return (
     <Card>
       <CardContent className="p-4 sm:p-6 space-y-4">
-        <div>
-          <h3 className="font-semibold text-foreground">Relatórios de Importação</h3>
-          <p className="text-sm text-muted-foreground">
-            Histórico das importações realizadas, com as linhas atualizadas e as descartadas como duplicadas.
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div>
+            <h3 className="font-semibold text-foreground">Relatórios de Importação</h3>
+            <p className="text-sm text-muted-foreground">
+              Histórico das importações realizadas, com as linhas atualizadas e as descartadas como duplicadas.
+            </p>
+          </div>
+          <Button variant="outline" size="sm" disabled={backfilling} onClick={handleBackfill}>
+            {backfilling ? <Loader2 className="w-4 h-4 animate-spin" /> : <History className="w-4 h-4" />}
+            Recuperar importações de hoje
+          </Button>
         </div>
+
 
         <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
           <div className="relative flex-1">
