@@ -237,20 +237,43 @@ Deno.serve(async (req) => {
       const rows = all.data || [];
       matriculas = await Promise.all(rows.map(async (r) => ({
         ...r,
+        tipo: "efetivo",
         token: await signToken(r.id, r.role, r.matricula),
       })));
     }
 
-    // Para contratado: anexar os períodos trabalhados do contratado logado
-    let periodos: Array<{ inicio: string; fim: string; ordem: number }> = [];
-    if (sourceTipo === "contratado") {
+    const loadPeriodos = async (contratadoId: string) => {
       const { data: pers } = await supabase
         .from("contratado_periodos")
         .select("inicio, fim, ordem")
-        .eq("contratado_id", professor.id)
+        .eq("contratado_id", contratadoId)
         .order("ordem", { ascending: true });
-      periodos = pers || [];
+      return pers || [];
+    };
+
+    // Para contratado: anexar os períodos trabalhados + todas as matrículas do mesmo CPF
+    let periodos: Array<{ inicio: string; fim: string; ordem: number }> = [];
+    if (sourceTipo === "contratado") {
+      periodos = await loadPeriodos(professor.id);
+
+      if (professor.cpf) {
+        const all = await supabase
+          .from("contratados")
+          .select("id, nome, cpf, matricula, data_nascimento, carga_horaria, total_cotas, cargo, vinculo, role, status")
+          .eq("cpf", professor.cpf)
+          .order("matricula", { ascending: true });
+        const rows = all.data || [];
+        matriculas = await Promise.all(rows.map(async (r) => ({
+          ...r,
+          vinculo_inicio: null,
+          vinculo_fim: null,
+          tipo: "contratado",
+          periodos: await loadPeriodos(r.id),
+          token: await signToken(r.id, r.role, r.matricula),
+        })));
+      }
     }
+
 
     const token = await signToken(professor.id, professor.role, professor.matricula);
 
