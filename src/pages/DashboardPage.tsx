@@ -410,7 +410,7 @@ const DashboardPage = () => {
                       <>
                         <div className="border-t mx-5" />
                         <div className="px-5 py-4">
-                          <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-2">Períodos Trabalhados</p>
+                          <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-2">Período Trabalhado Contemplado</p>
                           {periodos && periodos.length > 0 ? (
                             <div className="flex flex-wrap gap-2">
                               {periodos.map((p, i) => (

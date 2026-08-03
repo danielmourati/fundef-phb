@@ -268,7 +268,7 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
                   <TableHead className="text-xs">Mat</TableHead>
                   <TableHead className="text-xs hidden md:table-cell">CPF</TableHead>
                   <TableHead className="text-xs hidden sm:table-cell">Vínculo</TableHead>
-                  <TableHead className="text-xs">Períodos Trabalhados</TableHead>
+                  <TableHead className="text-xs">Período Trabalhado Contemplado</TableHead>
                   <TableHead className="text-xs hidden sm:table-cell">CH</TableHead>
                   <TableHead className="text-xs hidden sm:table-cell">Cotas</TableHead>
                   <TableHead className="text-xs text-right">Ações</TableHead>
@@ -391,7 +391,7 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
             <div className="space-y-2 border rounded-lg p-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <Label>Períodos Trabalhados</Label>
+                  <Label>Período Trabalhado Contemplado</Label>
                   <p className="text-xs text-muted-foreground">Diferente do efetivo, o contratado pode ter múltiplos vínculos descontínuos.</p>
                 </div>
                 <Button type="button" size="sm" variant="outline" onClick={addPeriodo}>
