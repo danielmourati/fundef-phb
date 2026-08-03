@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { FileDown, Eye, Loader2, Search, ArrowRight, Trash2 } from 'lucide-react';
+import { FileDown, Eye, Loader2, Search, ArrowRight, Trash2, History } from 'lucide-react';
 import { toast } from 'sonner';
 import { downloadImportReportPdf, type ImportKind } from '@/lib/importReportPdf';
 import type { ReviewItem } from '@/components/ImportReviewDialog';
@@ -41,6 +41,7 @@ const ImportLogsView = ({ token }: { token: string }) => {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [loading, setLoading] = useState(true);
+  const [backfilling, setBackfilling] = useState(false);
   const [detail, setDetail] = useState<LogDetail | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -75,6 +76,26 @@ const ImportLogsView = ({ token }: { token: string }) => {
     setRows(data?.rows || []);
     setTotal(data?.total || 0);
   }, [call, page, pageSize, tipo, debounced, from, to]);
+
+  const handleBackfill = async () => {
+    setBackfilling(true);
+    const { data, error } = await supabase.functions.invoke('admin-api?action=backfill_import_logs', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: { date: new Date().toISOString().slice(0, 10) },
+    });
+    setBackfilling(false);
+    if (error || data?.error) { toast.error('Não foi possível recuperar as importações de hoje.'); return; }
+    const created = data?.created ?? 0;
+    toast.success(
+      created > 0
+        ? `${created} relatório(s) reconstruído(s) a partir dos dados de hoje.`
+        : 'Nenhuma importação nova encontrada para hoje.',
+    );
+    setPage(1);
+    load();
+  };
+
 
   useEffect(() => { load(); }, [load]);
 
@@ -128,12 +149,19 @@ const ImportLogsView = ({ token }: { token: string }) => {
   return (
     <Card>
       <CardContent className="p-4 sm:p-6 space-y-4">
-        <div>
-          <h3 className="font-semibold text-foreground">Relatórios de Importação</h3>
-          <p className="text-sm text-muted-foreground">
-            Histórico das importações realizadas, com as linhas atualizadas e as descartadas como duplicadas.
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div>
+            <h3 className="font-semibold text-foreground">Relatórios de Importação</h3>
+            <p className="text-sm text-muted-foreground">
+              Histórico das importações realizadas, com as linhas atualizadas e as descartadas como duplicadas.
+            </p>
+          </div>
+          <Button variant="outline" size="sm" disabled={backfilling} onClick={handleBackfill}>
+            {backfilling ? <Loader2 className="w-4 h-4 animate-spin" /> : <History className="w-4 h-4" />}
+            Recuperar importações de hoje
+          </Button>
         </div>
+
 
         <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
           <div className="relative flex-1">
@@ -195,7 +223,11 @@ const ImportLogsView = ({ token }: { token: string }) => {
                     <TableCell>
                       <Badge variant="outline">{TIPO_LABEL[r.tipo] || r.tipo}</Badge>
                     </TableCell>
-                    <TableCell className="max-w-[220px] truncate">{r.file_name || '—'}</TableCell>
+                    <TableCell className="max-w-[220px] truncate">
+                      {r.file_name || (
+                        <Badge variant="outline" className="bg-muted text-muted-foreground">Reconstruído</Badge>
+                      )}
+                    </TableCell>
                     <TableCell className="max-w-[160px] truncate">{r.executed_by_name || '—'}</TableCell>
                     <TableCell className="text-right font-semibold text-primary">{num(c.imported)}</TableCell>
                     <TableCell className="text-right font-semibold text-blue-700">{num(c.updated)}</TableCell>
