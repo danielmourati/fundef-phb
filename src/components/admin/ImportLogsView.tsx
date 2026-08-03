@@ -97,19 +97,75 @@ const ImportLogsView = ({ token }: { token: string }) => {
   };
 
 
-  const parseCsv = async (file: File): Promise<Record<string, string>[]> => {
-    const text = await file.text();
-    const lines = text.split('\n').filter((l) => l.trim());
-    if (lines.length < 2) return [];
-    const sep = lines[0].includes(';') ? ';' : ',';
-    const headers = lines[0].split(sep).map((h) => h.trim().toLowerCase().replace(/^\ufeff/, ''));
-    return lines.slice(1).map((line) => {
-      const values = line.split(sep).map((v) => v.trim());
-      const obj: Record<string, string> = {};
-      headers.forEach((h, i) => { obj[h] = values[i] || ''; });
-      return obj;
-    });
+  const HEADER_MAP: Record<string, string> = {
+    nome: 'nome',
+    mat: 'matricula',
+    matricula: 'matricula',
+    cpf: 'cpf',
+    admissao: 'vinculo_inicio',
+    vinculo_inicio: 'vinculo_inicio',
+    vinculo_fim: 'vinculo_fim',
+    'carga horaria': 'carga_horaria',
+    carga_horaria: 'carga_horaria',
+    cotas: 'total_cotas',
+    total_cotas: 'total_cotas',
+    cargo: 'cargo',
+    status: 'status',
+    vinculo: 'vinculo',
+    data_nascimento: 'data_nascimento',
   };
+
+  const splitCsv = (text: string, sep: string): string[][] => {
+    const out: string[][] = [];
+    let row: string[] = [];
+    let cur = '';
+    let quoted = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (quoted) {
+        if (ch === '"') {
+          if (text[i + 1] === '"') { cur += '"'; i++; } else quoted = false;
+        } else cur += ch;
+        continue;
+      }
+      if (ch === '"') { quoted = true; continue; }
+      if (ch === sep) { row.push(cur); cur = ''; continue; }
+      if (ch === '\n') { row.push(cur); out.push(row); row = []; cur = ''; continue; }
+      if (ch === '\r') continue;
+      cur += ch;
+    }
+    if (cur || row.length) { row.push(cur); out.push(row); }
+    return out;
+  };
+
+  const parseCsv = async (file: File): Promise<Record<string, string>[]> => {
+    const text = (await file.text()).replace(/^\ufeff/, '');
+    const sep = (text.split('\n')[0].match(/;/g)?.length || 0) >= (text.split('\n')[0].match(/,/g)?.length || 0) ? ';' : ',';
+    const grid = splitCsv(text, sep);
+    const norm = (s: string) => s.replace(/\s+/g, ' ').trim().toLowerCase();
+    const hi = grid.findIndex((r) => r.some((c) => norm(c) === 'nome') && r.some((c) => ['cpf', 'mat', 'matricula'].includes(norm(c))));
+    if (hi < 0) return [];
+    const header = grid[hi].map((c) => {
+      const key = norm(c);
+      if (HEADER_MAP[key]) return HEADER_MAP[key];
+      if (key.includes('aposentadoria') || key.includes('exonera')) return 'vinculo_fim';
+      if (key.includes('carga')) return 'carga_horaria';
+      return '';
+    });
+    const rows: Record<string, string>[] = [];
+    for (const r of grid.slice(hi + 1)) {
+      const obj: Record<string, string> = {};
+      header.forEach((f, i) => { if (f) obj[f] = (r[i] || '').trim(); });
+      if (!obj.nome) continue;
+      if (obj.carga_horaria !== undefined)
+        obj.carga_horaria = obj.carga_horaria.toUpperCase().replace(/O/g, '0').replace(/[^0-9/]/g, '');
+      if (obj.total_cotas !== undefined) obj.total_cotas = obj.total_cotas.replace(/\D/g, '');
+      if (obj.cpf !== undefined) obj.cpf = obj.cpf.replace(/\D/g, '');
+      rows.push(obj);
+    }
+    return rows;
+  };
+
 
   const handleBaselineFile = async (logId: string, file: File) => {
     setBusyId(logId);
