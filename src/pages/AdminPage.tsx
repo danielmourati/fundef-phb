@@ -2036,8 +2036,16 @@ const AdminPage = () => {
               <span className="text-muted-foreground">Já existentes na base</span>
               <span className="font-semibold text-orange-600">{summaryDialog.dupBaseRows}</span>
             </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Com dados a atualizar</span>
+              <span className="font-semibold text-blue-600">{summaryDialog.updateRows}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Sem alterações</span>
+              <span className="font-semibold">{summaryDialog.noChangeRows}</span>
+            </div>
             <div className="flex justify-between border-t pt-2 mt-2">
-              <span className="text-muted-foreground">Selecionadas para importar</span>
+              <span className="text-muted-foreground">Selecionadas para processar</span>
               <span className="font-semibold">{summaryDialog.selectedRows}</span>
             </div>
             <div className="flex justify-between">
@@ -2047,6 +2055,10 @@ const AdminPage = () => {
             <div className="flex justify-between border-t pt-2 mt-2">
               <span className="font-semibold text-primary">Registros importados</span>
               <span className="font-bold text-primary text-lg">{summaryDialog.imported}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="font-semibold text-blue-700">Registros atualizados</span>
+              <span className="font-bold text-blue-700 text-lg">{summaryDialog.updated}</span>
             </div>
           </div>
           <DialogFooter>
@@ -2059,17 +2071,24 @@ const AdminPage = () => {
         open={reviewState.open}
         items={reviewState.items}
         onCancel={() => { setReviewState({ open: false, items: [], validRows: [] }); toast.info('Importação cancelada.'); }}
-        onConfirm={async (rows) => {
+        onConfirm={async (rows, selectedItems) => {
+          const allItems = reviewState.items;
           setReviewState({ open: false, items: [], validRows: [] });
           const reviewCounts = {
-            total: reviewState.items.length,
-            valid: reviewState.items.filter(i => i.status === 'valid').length,
-            error: reviewState.items.filter(i => i.status === 'error').length,
-            dup_file: reviewState.items.filter(i => i.status === 'dup_file').length,
-            dup_base: reviewState.items.filter(i => i.status === 'dup_base').length,
+            total: allItems.length,
+            valid: allItems.filter(i => i.status === 'valid').length,
+            error: allItems.filter(i => i.status === 'error').length,
+            dup_file: allItems.filter(i => i.status === 'dup_file').length,
+            dup_base: allItems.filter(i => i.status === 'dup_base').length,
+            update: allItems.filter(i => i.status === 'update').length,
+            nochange: allItems.filter(i => i.status === 'nochange').length,
           };
-          await runImport(rows, reviewCounts);
+          const updateRows = selectedItems.filter(i => i.status === 'update').map(i => i.data);
+          const insertRows = selectedItems.filter(i => i.status !== 'update').map(i => i.data);
+          await runImport(insertRows, reviewCounts, updateRows);
         }}
+      />
+
       />
 
       <Dialog open={!!selectedReport} onOpenChange={(v) => { if (!v) setSelectedReport(null); }}>
