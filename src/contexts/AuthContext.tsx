@@ -109,18 +109,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       let tk: string = data.token;
       if (mats.length > 0) {
         const first = mats[0];
+        const { token: _tk, ...firstProf } = first;
         prof = normalizeProfessor({
-          id: first.id, nome: first.nome, cpf: first.cpf, matricula: first.matricula,
-          vinculo_inicio: first.vinculo_inicio,
-          vinculo_fim: first.vinculo_fim,
-          carga_horaria: first.carga_horaria ?? null,
-          total_cotas: first.total_cotas,
-          cargo: first.cargo ?? null,
-          role: first.role, status: (first as any).status ?? null,
-          vinculo_status: first.vinculo_status ?? null,
-        });
+          ...firstProf,
+          tipo: first.tipo ?? (data.professor?.tipo ?? null),
+          periodos: first.periodos ?? (first.id === data.professor?.id ? data.professor?.periodos : undefined),
+        } as Professor);
         tk = first.token;
       }
+
 
       setProfessor(prof);
       setToken(tk);
