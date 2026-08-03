@@ -264,17 +264,24 @@ Deno.serve(async (req) => {
     if (req.method === "POST" && action === "import_contratados") {
       const body = await req.json();
       const rows = Array.isArray(body.rows) ? body.rows : [];
-      // Agrupa por CPF: mesmo CPF gera 1 contratado com múltiplos períodos
-      const groups = new Map<string, { data: any; periodos: Array<{ inicio: string; fim: string }> }>();
+      // Agrupa por CPF (quando houver); linhas sem CPF (vazio ou "-") usam nome+matrícula como chave
+      const groups = new Map<string, { key: string; cpf: string; data: any; periodos: Array<{ inicio: string; fim: string }> }>();
       for (const r of rows) {
-        const cpf = String(r.cpf || "").replace(/\D/g, "");
-        if (!cpf || cpf.length !== 11) continue;
-        if (!groups.has(cpf)) {
-          groups.set(cpf, {
+        const rawCpf = String(r.cpf || "").trim();
+        const digits = rawCpf.replace(/\D/g, "");
+        const cpf = digits.length === 11 ? digits : "";
+        const nome = String(r.nome || "").trim();
+        const matricula = (r.matricula || "").toString().trim().replace(/^[-–—]+$/, "");
+        if (!cpf && !nome) continue;
+        const key = cpf ? `cpf:${cpf}` : `nm:${nome.toUpperCase()}|${matricula}`;
+        if (!groups.has(key)) {
+          groups.set(key, {
+            key,
+            cpf,
             data: {
-              nome: String(r.nome || "").trim(),
+              nome,
               cpf,
-              matricula: (r.matricula || "").toString().trim() || null,
+              matricula: matricula || null,
               data_nascimento: r.data_nascimento || null,
               carga_horaria: normCarga(r.carga_horaria) || "20",
               total_cotas: Math.min(parseInt(String(r.total_cotas || "").replace(/\D/g, "")) || 0, 10000),
@@ -285,7 +292,7 @@ Deno.serve(async (req) => {
             periodos: [],
           });
         }
-        const g = groups.get(cpf)!;
+        const g = groups.get(key)!;
         // Períodos vindos como "MM/AAAA a MM/AAAA; MM/AAAA a MM/AAAA" ou já parseados
         const periodosStr = String(r.periodos || r.periodo_trabalhado || r.periodo || "").trim();
         if (periodosStr) {
@@ -303,35 +310,49 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Filtra já existentes (por CPF)
-      const cpfs = [...groups.keys()];
       let skipped = 0;
-      if (cpfs.length === 0) return jsonResponse({ success: true, count: 0, skipped: 0 });
-      const { data: existing } = await supabase.from("contratados").select("cpf").in("cpf", cpfs);
-      const existSet = new Set((existing || []).map((r: any) => r.cpf));
+      const all = [...groups.values()];
+      if (all.length === 0) return jsonResponse({ success: true, count: 0, skipped: 0 });
+
+      // Filtra já existentes (por CPF quando houver; por nome+matrícula quando sem CPF)
+      const cpfs = all.map(g => g.cpf).filter(Boolean);
+      const existSet = new Set<string>();
+      if (cpfs.length > 0) {
+        const { data: existing } = await supabase.from("contratados").select("cpf").in("cpf", cpfs);
+        (existing || []).forEach((r: any) => existSet.add(`cpf:${r.cpf}`));
+      }
+      const noCpfNames = all.filter(g => !g.cpf).map(g => g.data.nome);
+      if (noCpfNames.length > 0) {
+        const { data: existingByName } = await supabase.from("contratados").select("nome, matricula").in("nome", noCpfNames);
+        (existingByName || []).forEach((r: any) =>
+          existSet.add(`nm:${String(r.nome || "").toUpperCase()}|${r.matricula || ""}`)
+        );
+      }
+
       const toInsert: any[] = [];
-      const orderedGroups: Array<{ cpf: string; periodos: Array<{ inicio: string; fim: string }> }> = [];
-      for (const [cpf, g] of groups) {
-        if (existSet.has(cpf)) { skipped++; continue; }
-        const { data: hashData } = await supabase.rpc("hash_password", { plain_password: cpf });
+      const orderedGroups: Array<{ periodos: Array<{ inicio: string; fim: string }> }> = [];
+      for (const g of all) {
+        if (existSet.has(g.key)) { skipped++; continue; }
+        const plain = g.cpf || g.data.matricula || "123456";
+        const { data: hashData } = await supabase.rpc("hash_password", { plain_password: plain });
         toInsert.push({ ...g.data, senha_hash: hashData, role: "professor" });
-        orderedGroups.push({ cpf, periodos: g.periodos });
+        orderedGroups.push({ periodos: g.periodos });
       }
       if (toInsert.length === 0) return jsonResponse({ success: true, count: 0, skipped });
-      const { data: inserted, error } = await supabase.from("contratados").insert(toInsert).select("id, cpf");
+      const { data: inserted, error } = await supabase.from("contratados").insert(toInsert).select("id");
       if (error) throw error;
-      const idByCpf = new Map((inserted || []).map((r: any) => [r.cpf, r.id]));
       const periodoRows: any[] = [];
-      for (const g of orderedGroups) {
-        const id = idByCpf.get(g.cpf);
-        if (!id) continue;
-        g.periodos.forEach((p, i) => periodoRows.push({ contratado_id: id, inicio: p.inicio, fim: p.fim, ordem: i }));
-      }
+      (inserted || []).forEach((row: any, idx: number) => {
+        const g = orderedGroups[idx];
+        if (!g) return;
+        g.periodos.forEach((p, i) => periodoRows.push({ contratado_id: row.id, inicio: p.inicio, fim: p.fim, ordem: i }));
+      });
       if (periodoRows.length > 0) {
         const { error: pe } = await supabase.from("contratado_periodos").insert(periodoRows);
         if (pe) throw pe;
       }
       return jsonResponse({ success: true, count: inserted?.length || 0, skipped });
+
     }
 
     // POST clear contratados (requires admin password)
