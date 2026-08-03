@@ -1266,6 +1266,8 @@ if (req.method === "POST" && action === "apply_baseline_diffs") {
     matched++;
     const diffs: { field: string; label: string; current: string | null; incoming: string }[] = [];
     for (const f of FIELDS) {
+      // só compara campos que existem na planilha anterior
+      if (!(f in base)) continue;
       const oldV = norm(base[f]);
       const newV = norm(cur[f]);
       if (isBlank(oldV) && isBlank(newV)) continue;
