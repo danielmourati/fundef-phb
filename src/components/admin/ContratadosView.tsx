@@ -146,6 +146,15 @@ const ContratadosView: React.FC<Props> = ({ token, search, onCountChange }) => {
   // ============== Import CSV ==============
   const fileRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
+  const [summary, setSummary] = useState({
+    open: false, total: 0, valid: 0, error: 0, dup_file: 0, dup_base: 0, update: 0, nochange: 0,
+    selected: 0, imported: 0, updated: 0, skipped: 0,
+  });
+
+
 
   const parseCSV = (text: string): Record<string, string>[] => {
     const lines = text.split('\n').map(l => l.replace(/\r$/, '')).filter(l => l.trim());
