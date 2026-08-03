@@ -807,12 +807,13 @@ const AdminPage = () => {
           nochange: items.filter(i => i.status === 'nochange').length,
         };
 
-        await runImport(rows, reviewCounts);
+        await runImport(rows, reviewCounts, [], { items, fileName: file.name, selectedLines: items.filter(i => i.status === 'valid').map(i => i.line) });
         return;
       }
 
       // Abre o modal mostrando todas as linhas (válidas pré-selecionadas + conflitos para revisão).
-      setReviewState({ open: true, items, validRows: [] });
+      setReviewState({ open: true, items, validRows: [], fileName: file.name });
+
     } catch (err: any) {
       toast.error(`Erro ao processar arquivo: ${err?.message || err}`);
     } finally {
