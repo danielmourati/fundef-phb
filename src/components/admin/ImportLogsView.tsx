@@ -77,6 +77,26 @@ const ImportLogsView = ({ token }: { token: string }) => {
     setTotal(data?.total || 0);
   }, [call, page, pageSize, tipo, debounced, from, to]);
 
+  const handleBackfill = async () => {
+    setBackfilling(true);
+    const { data, error } = await supabase.functions.invoke('admin-api?action=backfill_import_logs', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: { date: new Date().toISOString().slice(0, 10) },
+    });
+    setBackfilling(false);
+    if (error || data?.error) { toast.error('Não foi possível recuperar as importações de hoje.'); return; }
+    const created = data?.created ?? 0;
+    toast.success(
+      created > 0
+        ? `${created} relatório(s) reconstruído(s) a partir dos dados de hoje.`
+        : 'Nenhuma importação nova encontrada para hoje.',
+    );
+    setPage(1);
+    load();
+  };
+
+
   useEffect(() => { load(); }, [load]);
 
   const fetchDetail = async (id: string): Promise<LogDetail | null> => {
