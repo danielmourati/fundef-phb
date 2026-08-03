@@ -612,13 +612,18 @@ Deno.serve(async (req) => {
         if (digits.length === 8) return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
         return s;
       };
+      const isDash = (v: unknown) => /^[-–—]+$/.test(String(v ?? "").trim());
       let updated = 0;
       let notFound = 0;
-      for (const r of rows) {
+      for (const raw0 of rows) {
+        // campos preenchidos apenas com traços são tratados como vazios (não sobrescrevem)
+        const r: Record<string, string> = {};
+        for (const [k, v] of Object.entries(raw0)) r[k] = isDash(v) ? "" : (v as string);
         const cpf = (r.cpf || "").replace(/\D/g, "");
         if (cpf.length !== 11) { notFound++; continue; }
         const mat = (r.matricula || "").toString().trim();
         const patch: Record<string, unknown> = {};
+
         const nome = String(r.nome || "").trim();
         if (nome) patch.nome = nome;
         const vi = normalizeDateBR2(r.vinculo_inicio);
