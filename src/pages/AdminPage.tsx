@@ -460,7 +460,7 @@ const AdminPage = () => {
   const DIFF_FIELDS: { field: string; label: string; kind: 'text' | 'date' | 'number' }[] = [
     { field: 'nome', label: 'Nome', kind: 'text' },
     { field: 'vinculo_inicio', label: 'Admissão', kind: 'date' },
-    { field: 'vinculo_fim', label: 'Aposentadoria', kind: 'date' },
+    { field: 'vinculo_fim', label: 'Aposentadoria/Exoneração/Afastamento', kind: 'date' },
     { field: 'carga_horaria', label: 'Carga horária', kind: 'text' },
     { field: 'total_cotas', label: 'Total de cotas', kind: 'number' },
     { field: 'cargo', label: 'Cargo', kind: 'text' },
@@ -1263,7 +1263,7 @@ const AdminPage = () => {
                             <TableHead className="text-xs font-medium text-muted-foreground w-[80px] lg:w-[120px]">Mat</TableHead>
                             <TableHead className="text-xs font-medium text-muted-foreground hidden lg:table-cell">CPF</TableHead>
                             <TableHead className="text-xs font-medium text-muted-foreground hidden md:table-cell whitespace-nowrap">Data de Admissão</TableHead>
-                            <TableHead className="text-xs font-medium text-muted-foreground hidden md:table-cell whitespace-nowrap">Data da Aposentadoria</TableHead>
+                            <TableHead className="text-xs font-medium text-muted-foreground hidden md:table-cell whitespace-nowrap">Aposentadoria/Exoneração/Afastamento</TableHead>
                             <TableHead className="text-xs font-medium text-muted-foreground hidden sm:table-cell">Cotas</TableHead>
                             <TableHead className="text-xs font-medium text-muted-foreground text-right sticky right-0 bg-card/95 backdrop-blur-sm z-10 border-l border-border px-4 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]">Ações</TableHead>
                           </TableRow>
@@ -1783,7 +1783,7 @@ const AdminPage = () => {
                 <Input value={formData.vinculo_inicio} onChange={e => setFormData({ ...formData, vinculo_inicio: maskDate(e.target.value) })} placeholder="DD/MM/AAAA" />
               </div>
               <div className="space-y-2">
-                <Label>Data da Aposentadoria</Label>
+                <Label>Aposentadoria/Exoneração/Afastamento</Label>
                 <Input value={formData.vinculo_fim} onChange={e => setFormData({ ...formData, vinculo_fim: maskDate(e.target.value) })} placeholder="DD/MM/AAAA" />
               </div>
             </div>
@@ -1933,7 +1933,7 @@ const AdminPage = () => {
                       matricula: 'Mat',
                       cpf: 'CPF',
                       vinculo_inicio: 'Data de Admissão',
-                      vinculo_fim: 'Data da Aposentadoria',
+                      vinculo_fim: 'Aposentadoria/Exoneração/Afastamento',
                       carga_horaria: 'Carga Horária',
                       total_cotas: 'Cotas',
                       status: 'Status do Servidor',

@@ -395,7 +395,7 @@ const DashboardPage = () => {
                             <p className="font-medium text-sm">{formatDate(professor.vinculo_inicio)}</p>
                           </div>
                           <div>
-                            <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Data da Aposentadoria</p>
+                            <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Aposentadoria/Exoneração/Afastamento</p>
                             <p className="font-medium text-sm">{formatDate(professor.vinculo_fim)}</p>
                           </div>
                         </>
