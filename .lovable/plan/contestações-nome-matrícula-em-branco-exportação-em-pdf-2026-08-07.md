@@ -20,4 +20,6 @@ Observação: 5 dos contratados que contestaram realmente não têm matrícula c
 - `supabase/functions/admin-api/index.ts`, ação `GET contestacoes`: além do lookup em `professors`, fazer lookup em `contratados` pelos `contratado_id` e retornar `autor: { nome, matricula, vinculo }` mantendo `professors` por compatibilidade.
 - `src/pages/AdminPage.tsx`: atualizar a interface `Contestacao`, as células da tabela, `exportContestacoes` e adicionar `exportContestacoesPdf`.
 - PDF via `jspdf` (já usado no projeto), em novo arquivo `src/lib/contestacoesPdf.ts` seguindo o padrão de `src/lib/importReportPdf.ts`.
-- Nenhuma alteração de schema nem de dados é necessária.
+- Nenhuma alteração de schema nem de dados é necessária.  
+  
+certo, as contestações contém anexos, então cuidado com a forma que vai mostrar eles no csv e pdf. De resto, ok.
