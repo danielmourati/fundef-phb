@@ -536,21 +536,37 @@ Deno.serve(async (req) => {
     if (req.method === "GET" && action === "contestacoes") {
       const { data, error } = await supabase
         .from("contestacoes")
-        .select("id, motivo, descricao, whatsapp, status, created_at, professor_id, protocolo, resposta, documento_path, documento_nome")
+        .select("id, motivo, descricao, whatsapp, status, created_at, professor_id, contratado_id, protocolo, resposta, documento_path, documento_nome")
         .order("created_at", { ascending: false });
       if (error) throw error;
 
-      const profIds = [...new Set((data || []).map(c => c.professor_id))];
-      const { data: profs } = await supabase
-        .from("professors")
-        .select("id, nome, matricula")
-        .in("id", profIds);
+      const profIds = [...new Set((data || []).map(c => c.professor_id).filter(Boolean))];
+      const contrIds = [...new Set((data || []).map(c => c.contratado_id).filter(Boolean))];
+
+      const [{ data: profs }, { data: contrs }] = await Promise.all([
+        profIds.length
+          ? supabase.from("professors").select("id, nome, matricula").in("id", profIds)
+          : Promise.resolve({ data: [] as any[] }),
+        contrIds.length
+          ? supabase.from("contratados").select("id, nome, matricula").in("id", contrIds)
+          : Promise.resolve({ data: [] as any[] }),
+      ]);
 
       const profMap = new Map((profs || []).map(p => [p.id, p]));
-      const enrichedBase = (data || []).map(c => ({
-        ...c,
-        professors: profMap.get(c.professor_id) || null,
-      }));
+      const contrMap = new Map((contrs || []).map(p => [p.id, p]));
+      const enrichedBase = (data || []).map(c => {
+        const p = c.professor_id ? profMap.get(c.professor_id) : null;
+        const ct = c.contratado_id ? contrMap.get(c.contratado_id) : null;
+        const src = p || ct;
+        return {
+          ...c,
+          professors: p || null,
+          autor: src
+            ? { nome: src.nome || null, matricula: src.matricula || null, vinculo: p ? "Efetivo" : "Contratado" }
+            : null,
+        };
+      });
+
       // Attach signed URLs for documento_path
       const enriched = [];
       for (const c of enrichedBase) {

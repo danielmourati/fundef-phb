@@ -37,6 +37,8 @@ import { ImportReviewDialog, type ReviewItem } from '@/components/ImportReviewDi
 import ContratadosView from '@/components/admin/ContratadosView';
 import ImportLogsView from '@/components/admin/ImportLogsView';
 import { downloadImportReportPdf } from '@/lib/importReportPdf';
+import { downloadContestacoesPdf } from '@/lib/contestacoesPdf';
+
 import { logImport } from '@/lib/importLog';
 import { UserPlus, FileDown } from 'lucide-react';
 
@@ -58,15 +60,18 @@ interface Professor {
 
 interface Contestacao {
   id: string;
+  protocolo?: string | null;
   motivo: string;
   descricao: string;
   whatsapp: string | null;
   status: string;
   created_at: string;
   professors: { nome: string; matricula: string } | null;
+  autor?: { nome: string | null; matricula: string | null; vinculo: string } | null;
   documento_url?: string | null;
   documento_nome?: string | null;
 }
+
 
 interface Message {
   id: string;
@@ -823,17 +828,31 @@ const AdminPage = () => {
   };
 
 
+  const autorOf = (c: Contestacao) => ({
+    nome: c.autor?.nome || c.professors?.nome || '',
+    matricula: c.autor?.matricula || c.professors?.matricula || '',
+    vinculo: c.autor?.vinculo || (c.professors ? 'Efetivo' : ''),
+  });
+
+  const anexoOf = (c: Contestacao) =>
+    c.documento_nome ? `Sim - ${c.documento_nome}` : c.documento_url ? 'Sim' : 'Não';
+
   const exportContestacoes = () => {
     if (contestacoes.length === 0) { toast.error('Nenhuma contestação.'); return; }
+    const esc = (v: string) => `"${(v || '').replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
     const csvRows = [
-      ['Matrícula', 'Nome', 'Motivo', 'Descrição', 'WhatsApp', 'Status', 'Data'].join(','),
-      ...contestacoes.map(c => [
-        c.professors?.matricula || '', `"${c.professors?.nome || ''}"`,
-        `"${c.motivo}"`, `"${c.descricao}"`, c.whatsapp ? maskPhone(c.whatsapp) : '', c.status,
-        new Date(c.created_at).toLocaleDateString('pt-BR'),
-      ].join(',')),
+      ['Protocolo', 'Matrícula', 'Nome', 'Vínculo', 'Motivo', 'Descrição', 'WhatsApp', 'Anexo II', 'Status', 'Data'].join(','),
+      ...contestacoes.map(c => {
+        const a = autorOf(c);
+        return [
+          esc(c.protocolo || ''), esc(a.matricula), esc(a.nome), esc(a.vinculo),
+          esc(c.motivo), esc(c.descricao), esc(c.whatsapp ? maskPhone(c.whatsapp) : ''),
+          esc(anexoOf(c)), esc(c.status),
+          esc(new Date(c.created_at).toLocaleDateString('pt-BR')),
+        ].join(',');
+      }),
     ].join('\n');
-    const blob = new Blob([csvRows], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + csvRows], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -842,6 +861,27 @@ const AdminPage = () => {
     URL.revokeObjectURL(url);
     toast.success('Relatório exportado!');
   };
+
+  const exportContestacoesPdf = () => {
+    if (contestacoes.length === 0) { toast.error('Nenhuma contestação.'); return; }
+    downloadContestacoesPdf(contestacoes.map(c => {
+      const a = autorOf(c);
+      return {
+        protocolo: c.protocolo || '—',
+        matricula: a.matricula || '—',
+        nome: a.nome || '—',
+        vinculo: a.vinculo || '—',
+        motivo: c.motivo,
+        descricao: c.descricao,
+        whatsapp: c.whatsapp ? maskPhone(c.whatsapp) : '—',
+        anexo: anexoOf(c),
+        status: c.status,
+        data: new Date(c.created_at).toLocaleDateString('pt-BR'),
+      };
+    }));
+    toast.success('PDF gerado!');
+  };
+
 
   const handleSaveSettings = async () => {
     setSavingSettings(true);
@@ -1370,9 +1410,14 @@ const AdminPage = () => {
               <CardContent className="p-0">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-border">
                   <h3 className="font-semibold text-foreground">Contestações ({contestacoes.length})</h3>
-                  <Button size="sm" variant="outline" onClick={exportContestacoes}>
-                    <Download className="w-4 h-4 mr-1.5" /> Exportar CSV
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" variant="outline" onClick={exportContestacoes}>
+                      <Download className="w-4 h-4 mr-1.5" /> Exportar CSV
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={exportContestacoesPdf}>
+                      <FileDown className="w-4 h-4 mr-1.5" /> Exportar PDF
+                    </Button>
+                  </div>
                 </div>
                 {loading ? (
                   <div className="p-6 text-muted-foreground text-sm">Carregando...</div>
@@ -1385,6 +1430,7 @@ const AdminPage = () => {
                         <TableRow className="hover:bg-transparent">
                           <TableHead className="text-xs font-medium text-muted-foreground">Matrícula</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground">Nome</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">Vínculo</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground">Motivo</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground">Descrição</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground">WhatsApp</TableHead>
@@ -1396,8 +1442,12 @@ const AdminPage = () => {
                       <TableBody>
                         {contestacoes.map(c => (
                           <TableRow key={c.id}>
-                            <TableCell className="font-mono text-sm">{c.professors?.matricula}</TableCell>
-                            <TableCell className="text-sm">{c.professors?.nome}</TableCell>
+                            <TableCell className="font-mono text-sm">{autorOf(c).matricula || '—'}</TableCell>
+                            <TableCell className="text-sm">{autorOf(c).nome || '—'}</TableCell>
+                            <TableCell className="text-sm">
+                              <Badge variant="secondary" className="text-xs">{autorOf(c).vinculo || '—'}</Badge>
+                            </TableCell>
+
                             <TableCell className="text-sm">{c.motivo}</TableCell>
                             <TableCell className="max-w-[200px] truncate text-sm">{c.descricao}</TableCell>
                             <TableCell className="text-sm">{c.whatsapp ? maskPhone(c.whatsapp) : '—'}</TableCell>
