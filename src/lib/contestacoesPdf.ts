@@ -15,17 +15,17 @@ export interface ContestacaoRow {
 
 const FOOTER = 'Desenvolvido pelo Núcleo de Tecnologia e Dados - SEDUC Parnaíba';
 
-const COLS: { key: keyof ContestacaoRow; label: string; w: number }[] = [
-  { key: 'protocolo', label: 'Protocolo', w: 78 },
-  { key: 'matricula', label: 'Matrícula', w: 50 },
-  { key: 'nome', label: 'Nome', w: 140 },
-  { key: 'vinculo', label: 'Vínculo', w: 55 },
-  { key: 'motivo', label: 'Motivo', w: 95 },
-  { key: 'descricao', label: 'Descrição', w: 175 },
-  { key: 'whatsapp', label: 'WhatsApp', w: 78 },
-  { key: 'anexo', label: 'Anexo II', w: 90 },
-  { key: 'status', label: 'Status', w: 50 },
-  { key: 'data', label: 'Data', w: 55 },
+const COLS: { key: keyof ContestacaoRow; label: string; weight: number; min: number }[] = [
+  { key: 'protocolo', label: 'Protocolo', weight: 74, min: 66 },
+  { key: 'matricula', label: 'Matrícula', weight: 46, min: 42 },
+  { key: 'nome', label: 'Nome', weight: 132, min: 100 },
+  { key: 'vinculo', label: 'Vínculo', weight: 50, min: 44 },
+  { key: 'motivo', label: 'Motivo', weight: 88, min: 70 },
+  { key: 'descricao', label: 'Descrição', weight: 165, min: 120 },
+  { key: 'whatsapp', label: 'WhatsApp', weight: 72, min: 64 },
+  { key: 'anexo', label: 'Anexo II', weight: 82, min: 60 },
+  { key: 'status', label: 'Status', weight: 46, min: 40 },
+  { key: 'data', label: 'Data', weight: 62, min: 58 },
 ];
 
 export function generateContestacoesPdf(rows: ContestacaoRow[]): jsPDF {
@@ -44,9 +44,23 @@ export function generateContestacoesPdf(rows: ContestacaoRow[]): jsPDF {
     doc.setTextColor(0);
   };
 
+  // Larguras responsivas: escala proporcional para caber exatamente na área útil
+  const usable = pageW - M * 2;
+  const totalWeight = COLS.reduce((s, c) => s + c.weight, 0);
+  const scale = usable / totalWeight;
+  const widths = COLS.map((c) => Math.max(c.min, c.weight * scale));
+  const sumWidths = widths.reduce((s, w) => s + w, 0);
+  if (sumWidths > usable) {
+    // reduz proporcionalmente o excedente respeitando o mínimo global
+    const factor = usable / sumWidths;
+    for (let i = 0; i < widths.length; i++) widths[i] *= factor;
+  }
+
   const xs: number[] = [];
   let acc = M;
-  for (const c of COLS) { xs.push(acc); acc += c.w; }
+  widths.forEach((w) => { xs.push(acc); acc += w; });
+  const tableRight = acc;
+
 
   const header = () => {
     doc.setFillColor(29, 78, 216);
@@ -73,9 +87,17 @@ export function generateContestacoesPdf(rows: ContestacaoRow[]): jsPDF {
 
   header();
 
+  const fmt = (key: keyof ContestacaoRow, v: unknown) => {
+    const s = v == null || v === '' ? '—' : String(v);
+    if (key !== 'data' || s === '—') return s;
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return s;
+    return `${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+  };
+
   let zebra = false;
   for (const r of rows) {
-    const cells = COLS.map((c) => doc.splitTextToSize(String(r[c.key] ?? '—' ) || '—', c.w - 6));
+    const cells = COLS.map((c, i) => doc.splitTextToSize(fmt(c.key, r[c.key]), widths[i] - 6));
     const rowH = Math.max(...cells.map((c) => c.length)) * 8 + 6;
     if (y + rowH > pageH - 26) {
       footer();
@@ -85,7 +107,7 @@ export function generateContestacoesPdf(rows: ContestacaoRow[]): jsPDF {
     }
     if (zebra) {
       doc.setFillColor(246, 248, 252);
-      doc.rect(M, y, acc - M, rowH, 'F');
+      doc.rect(M, y, tableRight - M, rowH, 'F');
     }
     zebra = !zebra;
     doc.setFont('helvetica', 'normal');
@@ -94,9 +116,12 @@ export function generateContestacoesPdf(rows: ContestacaoRow[]): jsPDF {
       cell.forEach((part: string, j: number) => doc.text(part, xs[i] + 3, y + 9 + j * 8));
     });
     doc.setDrawColor(224);
-    doc.line(M, y + rowH, acc, y + rowH);
+    doc.line(M, y + rowH, tableRight, y + rowH);
+    // bordas verticais
+    [...xs, tableRight].forEach((x) => doc.line(x, y, x, y + rowH));
     y += rowH;
   }
+
 
   footer();
   return doc;
