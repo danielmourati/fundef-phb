@@ -58,15 +58,18 @@ interface Professor {
 
 interface Contestacao {
   id: string;
+  protocolo?: string | null;
   motivo: string;
   descricao: string;
   whatsapp: string | null;
   status: string;
   created_at: string;
   professors: { nome: string; matricula: string } | null;
+  autor?: { nome: string | null; matricula: string | null; vinculo: string } | null;
   documento_url?: string | null;
   documento_nome?: string | null;
 }
+
 
 interface Message {
   id: string;
