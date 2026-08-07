@@ -1410,9 +1410,14 @@ const AdminPage = () => {
               <CardContent className="p-0">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-border">
                   <h3 className="font-semibold text-foreground">Contestações ({contestacoes.length})</h3>
-                  <Button size="sm" variant="outline" onClick={exportContestacoes}>
-                    <Download className="w-4 h-4 mr-1.5" /> Exportar CSV
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" variant="outline" onClick={exportContestacoes}>
+                      <Download className="w-4 h-4 mr-1.5" /> Exportar CSV
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={exportContestacoesPdf}>
+                      <FileDown className="w-4 h-4 mr-1.5" /> Exportar PDF
+                    </Button>
+                  </div>
                 </div>
                 {loading ? (
                   <div className="p-6 text-muted-foreground text-sm">Carregando...</div>
@@ -1425,6 +1430,7 @@ const AdminPage = () => {
                         <TableRow className="hover:bg-transparent">
                           <TableHead className="text-xs font-medium text-muted-foreground">Matrícula</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground">Nome</TableHead>
+                          <TableHead className="text-xs font-medium text-muted-foreground">Vínculo</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground">Motivo</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground">Descrição</TableHead>
                           <TableHead className="text-xs font-medium text-muted-foreground">WhatsApp</TableHead>
@@ -1436,8 +1442,12 @@ const AdminPage = () => {
                       <TableBody>
                         {contestacoes.map(c => (
                           <TableRow key={c.id}>
-                            <TableCell className="font-mono text-sm">{c.professors?.matricula}</TableCell>
-                            <TableCell className="text-sm">{c.professors?.nome}</TableCell>
+                            <TableCell className="font-mono text-sm">{autorOf(c).matricula || '—'}</TableCell>
+                            <TableCell className="text-sm">{autorOf(c).nome || '—'}</TableCell>
+                            <TableCell className="text-sm">
+                              <Badge variant="secondary" className="text-xs">{autorOf(c).vinculo || '—'}</Badge>
+                            </TableCell>
+
                             <TableCell className="text-sm">{c.motivo}</TableCell>
                             <TableCell className="max-w-[200px] truncate text-sm">{c.descricao}</TableCell>
                             <TableCell className="text-sm">{c.whatsapp ? maskPhone(c.whatsapp) : '—'}</TableCell>
