@@ -37,6 +37,8 @@ import { ImportReviewDialog, type ReviewItem } from '@/components/ImportReviewDi
 import ContratadosView from '@/components/admin/ContratadosView';
 import ImportLogsView from '@/components/admin/ImportLogsView';
 import { downloadImportReportPdf } from '@/lib/importReportPdf';
+import { downloadContestacoesPdf } from '@/lib/contestacoesPdf';
+
 import { logImport } from '@/lib/importLog';
 import { UserPlus, FileDown } from 'lucide-react';
 
