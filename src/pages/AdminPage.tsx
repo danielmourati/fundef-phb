@@ -826,17 +826,31 @@ const AdminPage = () => {
   };
 
 
+  const autorOf = (c: Contestacao) => ({
+    nome: c.autor?.nome || c.professors?.nome || '',
+    matricula: c.autor?.matricula || c.professors?.matricula || '',
+    vinculo: c.autor?.vinculo || (c.professors ? 'Efetivo' : ''),
+  });
+
+  const anexoOf = (c: Contestacao) =>
+    c.documento_nome ? `Sim - ${c.documento_nome}` : c.documento_url ? 'Sim' : 'Não';
+
   const exportContestacoes = () => {
     if (contestacoes.length === 0) { toast.error('Nenhuma contestação.'); return; }
+    const esc = (v: string) => `"${(v || '').replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
     const csvRows = [
-      ['Matrícula', 'Nome', 'Motivo', 'Descrição', 'WhatsApp', 'Status', 'Data'].join(','),
-      ...contestacoes.map(c => [
-        c.professors?.matricula || '', `"${c.professors?.nome || ''}"`,
-        `"${c.motivo}"`, `"${c.descricao}"`, c.whatsapp ? maskPhone(c.whatsapp) : '', c.status,
-        new Date(c.created_at).toLocaleDateString('pt-BR'),
-      ].join(',')),
+      ['Protocolo', 'Matrícula', 'Nome', 'Vínculo', 'Motivo', 'Descrição', 'WhatsApp', 'Anexo II', 'Status', 'Data'].join(','),
+      ...contestacoes.map(c => {
+        const a = autorOf(c);
+        return [
+          esc(c.protocolo || ''), esc(a.matricula), esc(a.nome), esc(a.vinculo),
+          esc(c.motivo), esc(c.descricao), esc(c.whatsapp ? maskPhone(c.whatsapp) : ''),
+          esc(anexoOf(c)), esc(c.status),
+          esc(new Date(c.created_at).toLocaleDateString('pt-BR')),
+        ].join(',');
+      }),
     ].join('\n');
-    const blob = new Blob([csvRows], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + csvRows], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -845,6 +859,27 @@ const AdminPage = () => {
     URL.revokeObjectURL(url);
     toast.success('Relatório exportado!');
   };
+
+  const exportContestacoesPdf = () => {
+    if (contestacoes.length === 0) { toast.error('Nenhuma contestação.'); return; }
+    downloadContestacoesPdf(contestacoes.map(c => {
+      const a = autorOf(c);
+      return {
+        protocolo: c.protocolo || '—',
+        matricula: a.matricula || '—',
+        nome: a.nome || '—',
+        vinculo: a.vinculo || '—',
+        motivo: c.motivo,
+        descricao: c.descricao,
+        whatsapp: c.whatsapp ? maskPhone(c.whatsapp) : '—',
+        anexo: anexoOf(c),
+        status: c.status,
+        data: new Date(c.created_at).toLocaleDateString('pt-BR'),
+      };
+    }));
+    toast.success('PDF gerado!');
+  };
+
 
   const handleSaveSettings = async () => {
     setSavingSettings(true);
