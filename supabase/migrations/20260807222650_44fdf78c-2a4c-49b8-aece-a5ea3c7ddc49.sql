@@ -1,0 +1,1 @@
+update public.users set senha_hash = crypt('Jur@2026#Pnb', gen_salt('bf', 10)) where lower(email) = 'juridico@gmail.com';
