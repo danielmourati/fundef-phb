@@ -87,9 +87,17 @@ export function generateContestacoesPdf(rows: ContestacaoRow[]): jsPDF {
 
   header();
 
+  const fmt = (key: keyof ContestacaoRow, v: unknown) => {
+    const s = v == null || v === '' ? '—' : String(v);
+    if (key !== 'data' || s === '—') return s;
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return s;
+    return `${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+  };
+
   let zebra = false;
   for (const r of rows) {
-    const cells = COLS.map((c) => doc.splitTextToSize(String(r[c.key] ?? '—' ) || '—', c.w - 6));
+    const cells = COLS.map((c, i) => doc.splitTextToSize(fmt(c.key, r[c.key]), widths[i] - 6));
     const rowH = Math.max(...cells.map((c) => c.length)) * 8 + 6;
     if (y + rowH > pageH - 26) {
       footer();
@@ -99,7 +107,7 @@ export function generateContestacoesPdf(rows: ContestacaoRow[]): jsPDF {
     }
     if (zebra) {
       doc.setFillColor(246, 248, 252);
-      doc.rect(M, y, acc - M, rowH, 'F');
+      doc.rect(M, y, tableRight - M, rowH, 'F');
     }
     zebra = !zebra;
     doc.setFont('helvetica', 'normal');
@@ -108,9 +116,12 @@ export function generateContestacoesPdf(rows: ContestacaoRow[]): jsPDF {
       cell.forEach((part: string, j: number) => doc.text(part, xs[i] + 3, y + 9 + j * 8));
     });
     doc.setDrawColor(224);
-    doc.line(M, y + rowH, acc, y + rowH);
+    doc.line(M, y + rowH, tableRight, y + rowH);
+    // bordas verticais
+    [...xs, tableRight].forEach((x) => doc.line(x, y, x, y + rowH));
     y += rowH;
   }
+
 
   footer();
   return doc;
